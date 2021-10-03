@@ -1,0 +1,87 @@
+use clap::{App, AppSettings, Arg, crate_version};
+
+pub fn build(argv0: &str) -> App<'static, 'static> {
+    App::new(argv0)
+        .setting(AppSettings::DeriveDisplayOrder)
+        .setting(AppSettings::DisableHelpSubcommand)
+        .setting(AppSettings::DisableVersion)
+        .version(crate_version!())
+
+        .arg(Arg::with_name("cpus")
+            .short("c")
+            .long("cpus")
+            .takes_value(true)
+            .value_name("INDICES")
+            .help("Target cpu ids, default all, ex. 0,1,3-5"))
+
+        .arg(Arg::with_name("cpu-on")
+            .short("o")
+            .long("cpu-on")
+            .takes_value(true)
+            .value_name("0|1")
+            .help("Set cpu online status per --cpus"))
+
+        .arg(Arg::with_name("cpu-on-each")
+            .short("O")
+            .long("cpu-on-each")
+            .takes_value(true)
+            .value_name("[0|1|-]+")
+            .help("Set cpu online status, ex. 10-1 → 0=ON 1=OFF 2=SKIP 3=ON"))
+
+        .arg(Arg::with_name("cpufreq-gov")
+            .short("g")
+            .long("cpufreq-gov")
+            .takes_value(true)
+            .value_name("NAME")
+            .help("Set cpufreq governor per --cpus"))
+
+        .arg(Arg::with_name("cpufreq-min")
+            .short("n")
+            .long("cpufreq-min")
+            .takes_value(true)
+            .value_name("HZ")
+            .help("Set cpufreq min freq per --cpus, ex. 1200mhz, 1.2ghz"))
+
+        .arg(Arg::with_name("cpufreq-max")
+            .short("x")
+            .long("cpufreq-max")
+            .takes_value(true)
+            .value_name("HZ")
+            .help("Set cpufreq max freq per --cpus, ex. 1200mhz, 1.2ghz"))
+
+        .arg(Arg::with_name("pstate-epb")
+            .long("pstate-epb")
+            .takes_value(true)
+            .value_name("0-15")
+            .help("Set intel_pstate energy/performance bias per --cpus"))
+
+        .arg(Arg::with_name("pstate-epp")
+            .long("pstate-epp")
+            .takes_value(true)
+            .value_name("NAME")
+            .help("Set intel_pstate energy/performance pref per --cpus"))
+
+        .arg(Arg::with_name("drm-i915")
+            .long("drm-i915")
+            .takes_value(true)
+            .value_name("INDICES")
+            .help("Target i915 card ids, default all, ex. 0,1,3-5"))
+
+        .arg(Arg::with_name("drm-i915-min")
+            .long("drm-i915-min")
+            .takes_value(true)
+            .value_name("HZ")
+            .help("Set i915 min frequency per --drm-i915, ex. 1200mhz, 1.2ghz"))
+
+        .arg(Arg::with_name("drm-i915-max")
+            .long("drm-i915-max")
+            .takes_value(true)
+            .value_name("HZ")
+            .help("Set i915 max frequency per --drm-i915, ex. 1200mhz, 1.2ghz"))
+
+        .arg(Arg::with_name("drm-i915-boost")
+            .long("drm-i915-boost")
+            .takes_value(true)
+            .value_name("HZ")
+            .help("Set i915 boost frequency per --drm-i915, ex. 1200mhz, 1.2ghz"))
+}
