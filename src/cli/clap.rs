@@ -1,7 +1,20 @@
 use clap::{App, AppSettings, Arg, crate_version};
+use crate::Result;
+use super::{Cli, logging, parse};
 
-pub fn build(argv0: &str) -> App<'static, 'static> {
-    App::new(argv0)
+fn argv0(argv: &[String]) -> &str {
+    let default = "knobs";
+    argv
+        .first()
+        .map(|s| s.as_str())
+        .unwrap_or(default)
+        .split('/')
+        .last()
+        .unwrap_or(default)
+}
+
+pub fn parse(argv: &[String]) -> Result<Cli> {
+    let m = App::new(argv0(argv))
         .setting(AppSettings::DeriveDisplayOrder)
         .setting(AppSettings::DisableHelpSubcommand)
         .setting(AppSettings::DisableVersion)
@@ -90,4 +103,22 @@ pub fn build(argv0: &str) -> App<'static, 'static> {
             .takes_value(true)
             .value_name("HZ")
             .help("Set i915 boost frequency per --drm-i915, ex. 1200mhz, 1.2ghz"))
+
+        .get_matches_from(argv);
+
+    if m.is_present("verbose") { logging::enable()?; }
+    Ok(Cli {
+        cpus: parse::cpus(m.value_of("cpus"))?,
+        cpu_on: parse::cpu_on(m.value_of("cpu-on"))?,
+        cpu_on_each: parse::cpu_on_each(m.value_of("cpu-on-each"))?,
+        cpufreq_gov: parse::cpufreq_gov(m.value_of("cpufreq-gov")),
+        cpufreq_min: parse::cpufreq_min(m.value_of("cpufreq-min"))?,
+        cpufreq_max: parse::cpufreq_max(m.value_of("cpufreq-max"))?,
+        pstate_epb: parse::pstate_epb(m.value_of("pstate-epb"))?,
+        pstate_epp: parse::pstate_epp(m.value_of("pstate-epp")),
+        drm_i915: parse::drm_i915(m.value_of("drm-i915"))?,
+        drm_i915_min: parse::drm_i915_min(m.value_of("drm-i915-min"))?,
+        drm_i915_max: parse::drm_i915_max(m.value_of("drm-i915-max"))?,
+        drm_i915_boost: parse::drm_i915_boost(m.value_of("drm-i915-boost"))?,
+    })
 }

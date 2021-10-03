@@ -3,7 +3,7 @@ use zysfs::io::devices::system::cpu::blocking::cpus;
 use zysfs::io::class::drm::blocking::{cards as drm_cards, driver as drm_driver};
 use crate::Result;
 
-mod app;
+mod clap;
 mod logging;
 mod parse;
 
@@ -25,29 +25,7 @@ pub struct Cli {
 
 impl Cli {
     pub fn from_args(argv: &[String]) -> Result<Self> {
-        let argv0 = argv
-            .first()
-            .map(|s| s.as_str())
-            .unwrap_or("knobs")
-            .split('/')
-            .last()
-            .unwrap_or("knobs");
-        let m = app::build(argv0).get_matches_from(argv);
-        if m.is_present("verbose") { logging::enable()?; }
-        Ok(Self {
-            cpus: parse::cpus(m.value_of("cpus"))?,
-            cpu_on: parse::cpu_on(m.value_of("cpu-on"))?,
-            cpu_on_each: parse::cpu_on_each(m.value_of("cpu-on-each"))?,
-            cpufreq_gov: parse::cpufreq_gov(m.value_of("cpufreq-gov")),
-            cpufreq_min: parse::cpufreq_min(m.value_of("cpufreq-min"))?,
-            cpufreq_max: parse::cpufreq_max(m.value_of("cpufreq-max"))?,
-            pstate_epb: parse::pstate_epb(m.value_of("pstate-epb"))?,
-            pstate_epp: parse::pstate_epp(m.value_of("pstate-epp")),
-            drm_i915: parse::drm_i915(m.value_of("drm-i915"))?,
-            drm_i915_min: parse::drm_i915_min(m.value_of("drm-i915-min"))?,
-            drm_i915_max: parse::drm_i915_max(m.value_of("drm-i915-max"))?,
-            drm_i915_boost: parse::drm_i915_boost(m.value_of("drm-i915-boost"))?,
-        })
+        clap::parse(argv)
     }
 
     pub fn has_cpu_args(&self) -> bool {
