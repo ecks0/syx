@@ -30,7 +30,7 @@ fn format_available_epps(policies: &[Policy]) -> Option<String> {
         .iter()
         .filter_map(|p| p.energy_performance_available_preferences.clone().map(|p| p.join(" ")))
         .collect();
-    prefs.sort();
+    prefs.sort_unstable();
     prefs.dedup();
     if prefs.is_empty() { return None; }
     let mut tab = Table::new("{:<} {:<}");
@@ -50,7 +50,7 @@ fn format_available_epps(policies: &[Policy]) -> Option<String> {
     Some(tab.to_string())
 }
 
-fn format() -> Option<String> {
+pub fn format() -> Option<String> {
     let status = status().ok()?;
     let mut s = vec![];
     if let Some(ss) = format_status(&status) { s.push(ss); }
@@ -61,10 +61,4 @@ fn format() -> Option<String> {
         }
     }
     if s.is_empty() { None } else { Some(s.join("\n")) }
-}
-
-pub fn print() {
-    if let Some(s) = format() {
-        println!("{}", s);
-    }
 }

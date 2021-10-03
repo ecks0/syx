@@ -46,7 +46,7 @@ fn format_governors(policies: &[CpufreqPolicy]) -> Option<String> {
         .iter()
         .filter_map(|p| p.scaling_available_governors.clone().map(|g| g.join(" ")))
         .collect();
-    governors.sort();
+    governors.sort_unstable();
     governors.dedup();
     if governors.is_empty() { return None; }
     let mut tab = Table::new("{:<} {:<}");
@@ -66,17 +66,11 @@ fn format_governors(policies: &[CpufreqPolicy]) -> Option<String> {
     Some(tab.to_string())
 }
 
-fn format() -> Option<String> {
+pub fn format() -> Option<String> {
     let cpu_pols = CpuPolicy::all()?;
     let cpufreq_pols = CpufreqPolicy::all().unwrap_or_else(Vec::new);
     let mut s = vec![];
     if let Some(ss) = format_cpu_cpufreq(&cpu_pols, &cpufreq_pols) { s.push(ss); }
     if let Some(ss) = format_governors(&cpufreq_pols) { s.push(ss); }
     if s.is_empty() { None } else { Some(s.join("\n")) }
-}
-
-pub fn print() {
-    if let Some(s) = format() {
-        println!("{}", s);
-    }
 }

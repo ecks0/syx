@@ -4,6 +4,7 @@ use zysfs::io::class::drm::blocking::{cards as drm_cards, driver as drm_driver};
 use crate::Result;
 
 mod app;
+mod logging;
 mod parse;
 
 #[derive(Debug)]
@@ -32,6 +33,7 @@ impl Cli {
             .last()
             .unwrap_or("knobs");
         let m = app::build(argv0).get_matches_from(argv);
+        if m.is_present("verbose") { logging::enable()?; }
         Ok(Self {
             cpus: parse::cpus(m.value_of("cpus"))?,
             cpu_on: parse::cpu_on(m.value_of("cpu-on"))?,

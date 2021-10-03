@@ -14,5 +14,5 @@ pub fn policy(cli: &Cli, cpu_ids: &[u64]) -> Option<Cpufreq> {
         };
         policies.push(policy);
     }
-    Some(Cpufreq { policies: Some(policies) })
+    Some(Cpufreq { policies: Some(policies), ..Default::default() })
 }

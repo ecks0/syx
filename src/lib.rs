@@ -7,6 +7,9 @@ pub enum Error {
     #[error(transparent)]
     Clap(#[from] clap::Error),
 
+    #[error(transparent)]
+    LogSetLogger(#[from] log::SetLoggerError),
+
     #[error("Parse error: {flag}: {msg}")]
     Parse {
         flag: &'static str,

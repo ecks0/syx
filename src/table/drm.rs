@@ -42,7 +42,7 @@ fn format_i915(id_driver: &[(u64, String)]) -> Option<String> {
     Some(tab.to_string())
 }
 
-fn format() -> Option<String> { 
+pub fn format() -> Option<String> { 
     let card_ids = Card::ids()?;
     let id_driver: Vec<(u64, String)> = card_ids
         .into_iter()
@@ -53,10 +53,4 @@ fn format() -> Option<String> {
         s.push(ss);
     }
     if s.is_empty() { None } else { Some(s.join("\n")) }
-}
-
-pub fn print() {
-    if let Some(s) = format() {
-        println!("{}", s);
-    }
 }

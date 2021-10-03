@@ -7,6 +7,12 @@ pub fn build(argv0: &str) -> App<'static, 'static> {
         .setting(AppSettings::DisableVersion)
         .version(crate_version!())
 
+        .arg(Arg::with_name("verbose")
+            .short("v")
+            .long("verbose")
+            .takes_value(false)
+            .help("Enables verbose output"))
+
         .arg(Arg::with_name("cpus")
             .short("c")
             .long("cpus")

@@ -5,7 +5,10 @@ edition = "2018"
 
 [dependencies]
 clap = "2.33"
+fern = "0.6"
+log = "0.4"
 measurements = "0.10"
 tabular = "0.1"
 thiserror = "1"
 zysfs = { git = "https://github.com/ecks0/zysfs-rs", features = ["blocking", "types"] }
+#zysfs = { path = "/home/user/src/zysfs-rs", features = ["blocking", "types"] }
