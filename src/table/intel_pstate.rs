@@ -13,7 +13,7 @@ fn format_epb_epp(policies: &[Policy]) -> Option<String> {
     let mut tab = Table::new("{:<} {:<} {:<}");
     let mut row = |a: &str, b: &str, c: &str| { tab.add_row(Row::new().with_cell(a).with_cell(b).with_cell(c)); };
     row("CPU", "EP bias", "EP preference");
-    row("----", "--------", "--------------");
+    row("----", "--------", "--------------------");
     for policy in policies {
         row(
             &policy.id.map(|v| v.to_string()).unwrap_or_else(dot),

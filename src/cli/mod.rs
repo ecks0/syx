@@ -71,6 +71,7 @@ impl Cli {
         self.has_cpufreq_args() ||
         self.has_intel_pstate_args()
     }
+
     pub fn has_drm_i915_args(&self) -> bool {
         self.drm_i915_min.is_some() ||
         self.drm_i915_max.is_some() ||
@@ -94,7 +95,7 @@ impl Cli {
         if cpus.is_empty() { None } else { Some(cpus) }
     }
 
-    fn drm_cards_for_driver(&self, arg_value: &Option<Vec<u64>>, driver: &str) -> Option<Vec<u64>> {
+    fn drm_cards(&self, arg_value: &Option<Vec<u64>>, driver: &str) -> Option<Vec<u64>> {
         let card_ids =
             if let Some(card_ids) = arg_value {
                 let mut card_ids = card_ids.clone();
@@ -119,6 +120,6 @@ impl Cli {
     }
 
     pub fn drm_i915(&self) -> Option<Vec<u64>> {
-        self.drm_cards_for_driver(&self.drm_i915, "i915")
+        self.drm_cards(&self.drm_i915, "i915")
     }
 }
