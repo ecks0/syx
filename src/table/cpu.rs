@@ -42,7 +42,6 @@ fn format_cpu_cpufreq(cpu_pols: &[CpuPolicy], cpufreq_pols: &[CpufreqPolicy]) ->
 }
 
 fn format_governors(policies: &[CpufreqPolicy]) -> Option<String> {
-    if policies.is_empty() { return None; }
     let mut governors: Vec<String> = policies
         .iter()
         .filter_map(|p| p.scaling_available_governors.clone().map(|g| g.join(" ")))

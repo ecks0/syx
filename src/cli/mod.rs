@@ -31,7 +31,7 @@ impl Cli {
             .split('/')
             .last()
             .unwrap_or("knobs");
-        let m = app::build(argv0).get_matches_from_safe(argv)?;
+        let m = app::build(argv0).get_matches_from(argv);
         Ok(Self {
             cpus: parse::cpus(m.value_of("cpus"))?,
             cpu_on: parse::cpu_on(m.value_of("cpu-on"))?,

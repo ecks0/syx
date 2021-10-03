@@ -48,7 +48,6 @@ fn format() -> Option<String> {
         .into_iter()
         .filter_map(|id| driver(id).ok().map(|d| (id, d)))
         .collect();
-    if id_driver.is_empty() { return None; }
     let mut s = vec![];
     if let Some(ss) = format_i915(&id_driver) {
         s.push(ss);
