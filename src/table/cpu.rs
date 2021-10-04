@@ -2,7 +2,6 @@ use measurements::Frequency;
 use zysfs::types::blocking::Read as _;
 use zysfs::types::devices::system::cpu::Policy as CpuPolicy;
 use zysfs::types::devices::system::cpu::cpufreq::Policy as CpufreqPolicy;
-use crate::timer::Timer;
 use super::{dot, Table};
 
 fn khz(khz: u64) -> String {
@@ -57,26 +56,10 @@ fn format_governors(policies: &[CpufreqPolicy]) -> Option<String> {
 }
 
 pub fn format() -> Option<String> {
-    let mut t = Timer::start();
-
     let cpu_pols = CpuPolicy::all()?;
-    t.end(".. Load cpu policies");
-
     let cpufreq_pols = CpufreqPolicy::all().unwrap_or_else(Vec::new);
-    t.end(".. Load cpufreq policies");
-
     let mut s = vec![];
-    t.reset();
-
-    if let Some(ss) = format_cpu_cpufreq(&cpu_pols, &cpufreq_pols) {
-        s.push(ss);
-        t.end(".. Format cpu table");
-    }
-
-    if let Some(ss) = format_governors(&cpufreq_pols) {
-        s.push(ss);
-        t.end(".. Format cpufreq governors table");
-    }
-
+    if let Some(ss) = format_cpu_cpufreq(&cpu_pols, &cpufreq_pols) { s.push(ss); }
+    if let Some(ss) = format_governors(&cpufreq_pols) { s.push(ss); }
     if s.is_empty() { None } else { Some(s.join("\n")) }
 }

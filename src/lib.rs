@@ -1,13 +1,9 @@
 mod cli;
 mod policy;
 mod table;
-mod timer;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error(transparent)]
-    Clap(#[from] clap::Error),
-
     #[error(transparent)]
     LogSetLogger(#[from] log::SetLoggerError),
 
@@ -16,9 +12,6 @@ pub enum Error {
         flag: &'static str,
         msg: &'static str,
     },
-
-    #[error(transparent)]
-    Zysfs(#[from] zysfs::io::blocking::Error),
 }
 
 impl Error {
@@ -28,34 +21,25 @@ impl Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub fn run() -> Result<()> {
-    let mut t = timer::Timer::start();
+    use std::env::args;
+    use crate::{cli::Cli, policy::Policy};
 
-    let args: Vec<String> = std::env::args().collect();
-    t.end("Collect args");
-
-    let cli = match cli::Cli::from_args(&args) {
+    let args: Vec<String> = args().collect();
+    let cli = match Cli::from_args(&args) {
         Ok(cli) => cli,
         Err(err) =>
             match err {
                 Error::Parse { flag, msg } => {
-                    println!("Error: {} {}", flag, msg);
+                    eprintln!("Error: {} {}", flag, msg);
                     std::process::exit(1);
                 },
                 _ => return Err(err),
             },
     };
-    t.end("Build cli");
-
-    let policy = policy::Policy::from_cli(&cli);
-    t.end("Build policy");
-
+    let policy = Policy::from_cli(&cli);
     policy.apply();
-    t.end("Apply policy");
-
-    let s = table::format();
-    t.end("Format table");
-
-    if let Some(s) = s { println!("\n{}", s); }
-
+    if let Some(s) = table::format() {
+        println!("\n{}", s);
+    }
     Ok(())
 }

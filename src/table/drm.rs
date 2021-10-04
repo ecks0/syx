@@ -2,7 +2,6 @@ use measurements::Frequency;
 use zysfs::io::class::drm::blocking::driver;
 use zysfs::types::blocking::Read as _;
 use zysfs::types::class::drm::{Card, DriverPolicy};
-use crate::timer::Timer;
 use super::{dot, Table};
 
 fn mhz(mhz: u64) -> String {
@@ -36,23 +35,12 @@ fn format_i915(id_driver: &[(u64, String)]) -> Option<String> {
 }
 
 pub fn format() -> Option<String> {
-    let mut t = Timer::start();
-
     let card_ids = Card::ids()?;
-    t.end(".. Load drm card ids");
-
     let id_driver: Vec<(u64, String)> = card_ids
         .into_iter()
         .filter_map(|id| driver(id).ok().map(|d| (id, d)))
         .collect();
-    t.end(".. Load drm card drivers");
-
     let mut s = vec![];
-
-    if let Some(ss) = format_i915(&id_driver) {
-        s.push(ss);
-        t.end(".. Format drm i915 table");
-    }
-
+    if let Some(ss) = format_i915(&id_driver) { s.push(ss); }
     if s.is_empty() { None } else { Some(s.join("\n")) }
 }
