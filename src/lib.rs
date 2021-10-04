@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod policy;
 pub mod table;
+mod timer;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {

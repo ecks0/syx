@@ -1,6 +1,10 @@
 use zysfs::types::{
     blocking::Write as _,
-    devices::system::cpu::{Cpu, cpufreq::Cpufreq, intel_pstate::IntelPstate},
+    devices::system::cpu::{
+        Cpu,
+        cpufreq::Cpufreq,
+        intel_pstate::IntelPstate,
+    },
     class::drm::Drm,
 };
 use crate::cli::Cli;
@@ -9,7 +13,6 @@ mod cpu;
 mod cpufreq;
 mod drm;
 mod intel_pstate;
-
 
 #[derive(Debug, Default)]
 pub struct Policy {

@@ -1,9 +1,9 @@
 use measurements::Frequency;
-use tabular::{Row, Table};
 use zysfs::types::blocking::Read as _;
 use zysfs::types::devices::system::cpu::Policy as CpuPolicy;
 use zysfs::types::devices::system::cpu::cpufreq::Policy as CpufreqPolicy;
-use super::dot;
+use crate::timer::Timer;
+use super::{dot, Table};
 
 fn khz(khz: u64) -> String {
     let f = Frequency::from_kilohertz(khz as f64);
@@ -13,21 +13,14 @@ fn khz(khz: u64) -> String {
 fn format_cpu_cpufreq(cpu_pols: &[CpuPolicy], cpufreq_pols: &[CpufreqPolicy]) -> Option<String> {
     if cpu_pols.is_empty() { return None; }
     let cpufreq_pol_default = CpufreqPolicy::default();
-    let cpufreq_policy = |id: u64| -> &CpufreqPolicy { 
+    let cpufreq_policy = |id: u64| -> &CpufreqPolicy {
         cpufreq_pols.iter().find(|p| Some(id) == p.id).unwrap_or(&cpufreq_pol_default)
     };
-    let mut tab = Table::new("{:<} {:<} {:<} {:<} {:<} {:<} {:<} {:<}");
-    let mut row = |a: &str, b: &str, c: &str, d: &str, e: &str, f: &str, g: &str, h: &str| {
-        tab.add_row(Row::new()
-            .with_cell(a).with_cell(b).with_cell(c).with_cell(d)
-            .with_cell(e).with_cell(f).with_cell(g).with_cell(h));
-    };
-    row("CPU", "Online", "Governor", "Cur", "Min", "Max", "Min limit", "Max limit");
-    row("----", "-------", "------------", "----------", "----------", "----------", "----------", "----------");
+    let mut tab = Table::new(&["CPU", "Online", "Governor", "Cur", "Min", "Max", "CPU min", "CPU max"]);
     for cpu_pol in cpu_pols {
         let id = if let Some(id) = cpu_pol.id { id } else { continue; };
         let cpufreq_pol = cpufreq_policy(id);
-        row(
+        tab.row(&[
             &id.to_string(),
             &cpu_pol.cpu_online.map(|v| v.to_string()).unwrap_or_else(dot),
             &cpufreq_pol.scaling_governor.clone().unwrap_or_else(dot),
@@ -36,41 +29,54 @@ fn format_cpu_cpufreq(cpu_pols: &[CpuPolicy], cpufreq_pols: &[CpufreqPolicy]) ->
             &cpufreq_pol.scaling_max_freq.map(khz).unwrap_or_else(dot),
             &cpufreq_pol.cpuinfo_min_freq.map(khz).unwrap_or_else(dot),
             &cpufreq_pol.cpuinfo_max_freq.map(khz).unwrap_or_else(dot),
-        );
+        ]);
     }
     Some(tab.to_string())
 }
 
 fn format_governors(policies: &[CpufreqPolicy]) -> Option<String> {
-    let mut governors: Vec<String> = policies
+    let mut govs: Vec<String> = policies
         .iter()
         .filter_map(|p| p.scaling_available_governors.clone().map(|g| g.join(" ")))
         .collect();
-    governors.sort_unstable();
-    governors.dedup();
-    if governors.is_empty() { return None; }
-    let mut tab = Table::new("{:<} {:<}");
-    let mut row = |a: &str, b: &str| { tab.add_row(Row::new().with_cell(a).with_cell(b)); };
-    row("CPU", "Available governors");
-    row("----", "--------------------");
-    if governors.len() == 1 {
-        row("all", &governors[0]);
+    govs.sort_unstable();
+    govs.dedup();
+    if govs.is_empty() { return None; }
+    let mut tab = Table::new(&["CPU", "Available governors"]);
+    if govs.len() == 1 {
+        tab.row(&["all", &govs[0]]);
     } else {
         for p in policies {
-            row(
+            tab.row(&[
                 &p.id.map(|v| v.to_string()).unwrap_or_else(dot),
                 &p.scaling_available_governors.clone().map(|v| v.join(" ")).unwrap_or_else(dot),
-            );
+            ]);
         }
     }
     Some(tab.to_string())
 }
 
 pub fn format() -> Option<String> {
+    let mut t = Timer::start();
+
     let cpu_pols = CpuPolicy::all()?;
+    t.end(".. Load cpu policies");
+
     let cpufreq_pols = CpufreqPolicy::all().unwrap_or_else(Vec::new);
+    t.end(".. Load cpufreq policies");
+
     let mut s = vec![];
-    if let Some(ss) = format_cpu_cpufreq(&cpu_pols, &cpufreq_pols) { s.push(ss); }
-    if let Some(ss) = format_governors(&cpufreq_pols) { s.push(ss); }
+    t.reset();
+
+    if let Some(ss) = format_cpu_cpufreq(&cpu_pols, &cpufreq_pols) {
+        s.push(ss);
+        t.end(".. Format cpu table");
+    }
+
+    if let Some(ss) = format_governors(&cpufreq_pols) {
+        s.push(ss);
+        t.end(".. Format cpufreq governors table");
+    }
+
     if s.is_empty() { None } else { Some(s.join("\n")) }
 }

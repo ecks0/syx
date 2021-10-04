@@ -1,9 +1,9 @@
 use measurements::Frequency;
-use tabular::{Table, Row};
 use zysfs::io::class::drm::blocking::driver;
 use zysfs::types::blocking::Read as _;
 use zysfs::types::class::drm::{Card, DriverPolicy};
-use super::dot;
+use crate::timer::Timer;
+use super::{dot, Table};
 
 fn mhz(mhz: u64) -> String {
     let f = Frequency::from_megahertz(mhz as f64);
@@ -16,17 +16,10 @@ fn format_i915(id_driver: &[(u64, String)]) -> Option<String> {
         .filter_map(|(id, driver)| if "i915" == driver { Card::read(*id) } else { None })
         .collect();
     if cards.is_empty() { return None; }
-    let mut tab = Table::new("{:<} {:<} {:<} {:<} {:<} {:<} {:<} {:<} {:<}");
-    let mut row = |a: &str, b: &str, c: &str, d: &str, e: &str, f: &str, g: &str, h: &str, i: &str| {
-        tab.add_row(Row::new()
-            .with_cell(a).with_cell(b).with_cell(c).with_cell(d).with_cell(e)
-            .with_cell(f).with_cell(g).with_cell(h).with_cell(i));
-    };
-    row("Card", "Driver", "Actual", "Req'd", "Min", "Max", "Boost", "Min limit", "Max limit");
-    row("-----", "-------", "----------", "----------", "----------", "----------", "----------", "----------", "----------");
+    let mut tab = Table::new(&["Card", "Driver", "Actual", "Req'd", "Min", "Max", "Boost", "GPU min", "GPU max"]);
     for card in cards {
         if let Some(DriverPolicy::I915(policy)) = card.driver_policy {
-            row(
+            tab.row(&[
                 &card.id.map(|v| v.to_string()).unwrap_or_else(dot),
                 &card.driver.clone().unwrap_or_else(dot),
                 &policy.act_freq_mhz.map(mhz).unwrap_or_else(dot),
@@ -36,21 +29,30 @@ fn format_i915(id_driver: &[(u64, String)]) -> Option<String> {
                 &policy.boost_freq_mhz.map(mhz).unwrap_or_else(dot),
                 &policy.rpn_freq_mhz.map(mhz).unwrap_or_else(dot),
                 &policy.rp0_freq_mhz.map(mhz).unwrap_or_else(dot),
-            );
+            ]);
         }
     }
     Some(tab.to_string())
 }
 
-pub fn format() -> Option<String> { 
+pub fn format() -> Option<String> {
+    let mut t = Timer::start();
+
     let card_ids = Card::ids()?;
+    t.end(".. Load drm card ids");
+
     let id_driver: Vec<(u64, String)> = card_ids
         .into_iter()
         .filter_map(|id| driver(id).ok().map(|d| (id, d)))
         .collect();
+    t.end(".. Load drm card drivers");
+
     let mut s = vec![];
+
     if let Some(ss) = format_i915(&id_driver) {
         s.push(ss);
+        t.end(".. Format drm i915 table");
     }
+
     if s.is_empty() { None } else { Some(s.join("\n")) }
 }

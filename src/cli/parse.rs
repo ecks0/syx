@@ -21,13 +21,13 @@ fn parse_frequency(flag: &'static str, s: &str) -> Result<Frequency> {
         }
     }
     if let Some(i) = pos {
-        match s[..i].parse::<u64>() {
+        match s[..i].parse::<f64>() {
             Ok(v) => match &s[i..] {
-                "hz" => Ok(Frequency::from_hertz(v as f64)),
-                "khz" => Ok(Frequency::from_kilohertz(v as f64)),
-                "mhz" => Ok(Frequency::from_megahertz(v as f64)),
-                "ghz" => Ok(Frequency::from_gigahertz(v as f64)),
-                "thz" => Ok(Frequency::from_terahertz(v as f64)),
+                "hz" => Ok(Frequency::from_hertz(v)),
+                "khz" => Ok(Frequency::from_kilohertz(v)),
+                "mhz" => Ok(Frequency::from_megahertz(v)),
+                "ghz" => Ok(Frequency::from_gigahertz(v)),
+                "thz" => Ok(Frequency::from_terahertz(v)),
                 _ => Err(Error::parse(flag, "unrecognized hertz magnitude")),
             },
             Err(_) => Err(Error::parse(flag, "expected hertz value, ex. 1200mhz, 1.2ghz")),
@@ -35,7 +35,7 @@ fn parse_frequency(flag: &'static str, s: &str) -> Result<Frequency> {
     } else {
         match s.parse::<u64>() {
             Ok(v) => Ok(Frequency::from_hertz(v as f64)),
-            Err(_) => Err(Error::parse(flag, "expected hertz value, ex. 1200mhz, 1.2ghz")),
+            Err(_) => Err(Error::parse(flag, "expected hertz value, ex. 1300mhz, 1.3ghz")),
         }
     }
 }

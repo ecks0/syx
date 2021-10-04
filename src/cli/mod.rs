@@ -1,7 +1,14 @@
 use measurements::frequency::Frequency;
 use zysfs::io::devices::system::cpu::blocking::cpus;
 use zysfs::io::class::drm::blocking::{cards as drm_cards, driver as drm_driver};
-use crate::Result;
+use std::env::args;
+use crate::{
+    Error,
+    Result,
+    policy::Policy,
+    table,
+    timer::Timer,
+};
 
 mod clap;
 mod logging;
@@ -24,6 +31,39 @@ pub struct Cli {
 }
 
 impl Cli {
+    pub fn run() -> Result<()> {
+        let mut t = Timer::start();
+
+        let args: Vec<String> = args().collect();
+        t.end("Collect args");
+
+        let cli = match Cli::from_args(&args) {
+            Ok(cli) => cli,
+            Err(err) =>
+                match err {
+                    Error::Parse { flag, msg } => {
+                        println!("Error: {} {}", flag, msg);
+                        std::process::exit(1);
+                    },
+                    _ => return Err(err),
+                },
+        };
+        t.end("Build cli");
+
+        let policy = Policy::from_cli(&cli);
+        t.end("Build policy");
+
+        policy.apply();
+        t.end("Apply policy");
+
+        let s = table::format();
+        t.end("Format table");
+
+        if let Some(s) = s { println!("\n{}", s); }
+
+        Ok(())
+    }
+
     pub fn from_args(argv: &[String]) -> Result<Self> {
         clap::parse(argv)
     }
