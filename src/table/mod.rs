@@ -1,5 +1,4 @@
 use comfy_table as ct;
-use std::fmt::Display;
 
 mod cpu;
 mod drm;
@@ -11,16 +10,12 @@ fn dot() -> String { "•".to_string() }
 struct Table(ct::Table);
 
 impl Table {
-    pub fn new<S: Display>(header: &[S]) -> Self {
-        let headers: Vec<String> = header
-            .iter()
-            .map(|d| d.to_string())
-            .collect();
+    pub fn new(header: &[&str]) -> Self {
         let mut tab = ct::Table::new();
         tab.load_preset(ct::presets::NOTHING);
-        tab.set_header(&headers);
+        tab.set_header(header);
         tab.add_row(
-            headers
+            header
                 .iter()
                 .map(|h| "-".repeat(h.len().max(4)))
                 .collect::<Vec<String>>()
@@ -28,7 +23,7 @@ impl Table {
         Self(tab)
     }
 
-    pub fn row<S: Display>(&mut self, row: &[S]) {
+    pub fn row(&mut self, row: &[&str]) {
         self.0.add_row(row);
     }
 }

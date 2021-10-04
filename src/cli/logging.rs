@@ -6,7 +6,7 @@ static DEBUG_VAR: &str = "KNOBS_DEBUG";
 
 fn debug() -> bool {
     if let Ok(v) = std::env::var(DEBUG_VAR) {
-        !v.is_empty() && v != "0" && v != "false"
+        !v.is_empty() && v != "0" && v.to_lowercase() != "false"
     } else {
         false
     }

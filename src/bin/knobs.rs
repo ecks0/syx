@@ -1,1 +1,1 @@
-fn main() -> knobs::Result<()> { knobs::cli::Cli::run() }
+fn main() -> knobs::Result<()> { knobs::run() }
