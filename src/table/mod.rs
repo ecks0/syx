@@ -1,8 +1,10 @@
 use comfy_table as ct;
+use std::fmt::Display;
 
 mod cpu;
 mod drm;
 mod intel_pstate;
+mod nvml;
 
 fn dot() -> String { "•".to_string() }
 
@@ -23,7 +25,7 @@ impl Table {
         Self(tab)
     }
 
-    pub fn row(&mut self, row: &[&str]) {
+    pub fn row<S: Display>(&mut self, row: &[S]) {
         self.0.add_row(row);
     }
 }
@@ -39,5 +41,6 @@ pub fn format() -> Option<String> {
     if let Some(ss) = cpu::format() { s.push(ss); }
     if let Some(ss) = intel_pstate::format() { s.push(ss); }
     if let Some(ss) = drm::format() { s.push(ss); }
+    if let Some(ss) = nvml::format() { s.push(ss); }
     if s.is_empty() { None } else { Some(s.join("\n")) }
 }

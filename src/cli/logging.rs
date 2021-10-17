@@ -1,8 +1,7 @@
 use fern::Dispatch;
 use log::LevelFilter;
-use crate::Result;
 
-static DEBUG_VAR: &str = "KNOBS_DEBUG";
+const DEBUG_VAR: &str = "KNOBS_DEBUG";
 
 fn debug() -> bool {
     if let Ok(v) = std::env::var(DEBUG_VAR) {
@@ -12,21 +11,23 @@ fn debug() -> bool {
     }
 }
 
-pub fn configure(verbose: bool) -> Result<()> {
+pub fn configure(verbose: bool) {
     let level =
         if debug() {
             LevelFilter::Debug
         } else if verbose {
             LevelFilter::Warn
         } else {
-            return Ok(());
+            LevelFilter::Error
         };
-    Dispatch::new()
-        .format(|out, message, _record| {
-            out.finish(format_args!("{}", message))
+    if let Err(err) = Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!("{:>5} {}", record.level(), message))
         })
         .level(level)
         .chain(std::io::stderr())
-        .apply()?;
-    Ok(())
+        .apply()
+    {
+        eprintln!("Log configuration error: {}", err);
+    }
 }

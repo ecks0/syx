@@ -4,12 +4,14 @@ version = "0.2.0"
 edition = "2018"
 
 [dependencies]
-chrono = "0.4.19"
 clap = "2.33"
 comfy-table = "4.1"
 fern = "0.6"
 log = "0.4"
 measurements = "0.10"
+#nvml-facade = { git = "https://github.com/ecks0/nvml-facade" }
+nvml-facade = { path = "/home/user/src/nvml-facade" }
+regex = "1.5.4"
 thiserror = "1"
-zysfs = { git = "https://github.com/ecks0/zysfs-rs", features = ["blocking", "types"] }
-#zysfs = { path = "/home/user/src/zysfs-rs", features = ["blocking", "types"] }
+#zysfs = { git = "https://github.com/ecks0/zysfs", features = ["blocking", "types"] }
+zysfs = { path = "/home/user/src/zysfs", features = ["blocking", "types"] }

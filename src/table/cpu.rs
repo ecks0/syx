@@ -2,7 +2,7 @@ use measurements::Frequency;
 use zysfs::types::blocking::Read as _;
 use zysfs::types::devices::system::cpu::Policy as CpuPolicy;
 use zysfs::types::devices::system::cpu::cpufreq::Policy as CpufreqPolicy;
-use super::{dot, Table};
+use crate::table::{dot, Table};
 
 fn khz(khz: u64) -> String {
     let f = Frequency::from_kilohertz(khz as f64);
@@ -20,14 +20,14 @@ fn format_cpu_cpufreq(cpu_pols: &[CpuPolicy], cpufreq_pols: &[CpufreqPolicy]) ->
         let id = if let Some(id) = cpu_pol.id { id } else { continue; };
         let cpufreq_pol = cpufreq_policy(id);
         tab.row(&[
-            &id.to_string(),
-            &cpu_pol.cpu_online.map(|v| v.to_string()).unwrap_or_else(dot),
-            &cpufreq_pol.scaling_governor.clone().unwrap_or_else(dot),
-            &cpufreq_pol.scaling_cur_freq.map(khz).unwrap_or_else(dot),
-            &cpufreq_pol.scaling_min_freq.map(khz).unwrap_or_else(dot),
-            &cpufreq_pol.scaling_max_freq.map(khz).unwrap_or_else(dot),
-            &cpufreq_pol.cpuinfo_min_freq.map(khz).unwrap_or_else(dot),
-            &cpufreq_pol.cpuinfo_max_freq.map(khz).unwrap_or_else(dot),
+            id.to_string(),
+            cpu_pol.cpu_online.map(|v| v.to_string()).unwrap_or_else(dot),
+            cpufreq_pol.scaling_governor.clone().unwrap_or_else(dot),
+            cpufreq_pol.scaling_cur_freq.map(khz).unwrap_or_else(dot),
+            cpufreq_pol.scaling_min_freq.map(khz).unwrap_or_else(dot),
+            cpufreq_pol.scaling_max_freq.map(khz).unwrap_or_else(dot),
+            cpufreq_pol.cpuinfo_min_freq.map(khz).unwrap_or_else(dot),
+            cpufreq_pol.cpuinfo_max_freq.map(khz).unwrap_or_else(dot),
         ]);
     }
     Some(tab.to_string())

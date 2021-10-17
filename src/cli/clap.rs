@@ -106,7 +106,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
 
         .get_matches_from(argv);
 
-    logging::configure(m.is_present("verbose"))?;
+    logging::configure(m.is_present("verbose"));
 
     Ok(Cli {
         cpus: parse::cpus(m.value_of("cpus"))?,

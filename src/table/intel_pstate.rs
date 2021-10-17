@@ -1,7 +1,7 @@
 use zysfs::io::devices::system::cpu::intel_pstate::blocking::status;
 use zysfs::types::blocking::Read as _;
 use zysfs::types::devices::system::cpu::intel_pstate::Policy;
-use super::{dot, Table};
+use crate::table::{Table, dot};
 
 fn format_status(status: &str) -> Option<String> {
     Some(format!(" intel_pstate: {}\n", status))
@@ -12,9 +12,9 @@ fn format_epb_epp(policies: &[Policy]) -> Option<String> {
     let mut tab = Table::new(&["CPU", "EP bias", "EP preference"]);
     for policy in policies {
         tab.row(&[
-            &policy.id.map(|v| v.to_string()).unwrap_or_else(dot),
-            &policy.energy_perf_bias.map(|v| v.to_string()).unwrap_or_else(dot),
-            &policy.energy_performance_preference.clone().unwrap_or_else(dot),
+            policy.id.map(|v| v.to_string()).unwrap_or_else(dot),
+            policy.energy_perf_bias.map(|v| v.to_string()).unwrap_or_else(dot),
+            policy.energy_performance_preference.clone().unwrap_or_else(dot),
         ]);
     }
     Some(tab.to_string())
@@ -35,8 +35,8 @@ fn format_available_epps(policies: &[Policy]) -> Option<String> {
     } else {
         for policy in policies {
             tab.row(&[
-                &policy.id.map(|v| v.to_string()).unwrap_or_else(dot),
-                &policy.energy_performance_available_preferences.clone().map(|v| v.join(" ")).unwrap_or_else(dot),
+                policy.id.map(|v| v.to_string()).unwrap_or_else(dot),
+                policy.energy_performance_available_preferences.clone().map(|v| v.join(" ")).unwrap_or_else(dot),
             ]);
         }
     }

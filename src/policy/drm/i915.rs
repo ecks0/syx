@@ -1,7 +1,7 @@
-use zysfs::types::class::drm::{Drm, Card, DriverPolicy, I915};
+use zysfs::types::class::drm::{Card, DriverPolicy, I915};
 use crate::cli::Cli;
 
-fn policy_i915(cli: &Cli) -> Option<Vec<Card>> {
+pub fn policy(cli: &Cli) -> Option<Vec<Card>> {
     if !cli.has_drm_i915_args() { return None; }
     let card_ids = cli.drm_i915()?;
     let driver_policy = DriverPolicy::I915(
@@ -22,13 +22,4 @@ fn policy_i915(cli: &Cli) -> Option<Vec<Card>> {
         cards.push(card);
     }
     Some(cards)
-}
-
-pub fn policy(cli: &Cli) -> Option<Drm> {
-    if !cli.has_drm_args() { return None; }
-    let mut cards = vec![];
-    if let Some(cards_i915) = policy_i915(cli) {
-        cards.extend(cards_i915);
-    }
-    if cards.is_empty() { None } else { Some(Drm { cards: Some(cards) }) }
 }

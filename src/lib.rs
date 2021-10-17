@@ -4,10 +4,7 @@ mod table;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error(transparent)]
-    LogSetLogger(#[from] log::SetLoggerError),
-
-    #[error("Parse error: {flag}: {msg}")]
+    #[error("Error: {flag} {msg}")]
     Parse {
         flag: &'static str,
         msg: &'static str,
@@ -20,20 +17,19 @@ impl Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub fn run() -> Result<()> {
-    use std::env::args;
-    use crate::{cli::Cli, policy::Policy};
+use std::env::args;
+use crate::{cli::Cli, policy::Policy};
 
+pub fn run() -> Result<()> {
     let args: Vec<String> = args().collect();
     let cli = match Cli::from_args(&args) {
         Ok(cli) => cli,
         Err(err) =>
             match err {
-                Error::Parse { flag, msg } => {
-                    eprintln!("Error: {} {}", flag, msg);
+                Error::Parse { .. } => {
+                    eprintln!("{}", err);
                     std::process::exit(1);
                 },
-                _ => return Err(err),
             },
     };
     let policy = Policy::from_cli(&cli);
