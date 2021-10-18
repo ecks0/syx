@@ -137,13 +137,13 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .takes_value(true)
             .value_name("HZ|HZ,HZ")
             .conflicts_with("nvml-gpu-clock-reset")
-            .help("Set nvidia gpu clock min,max frequency per --nvml, ex. 1200mhz, 900mhz,1.4ghz"))
+            .help("Set nvidia gpu min,max frequency per --nvml, ex. 1200mhz or 900mhz,1.4ghz"))
 
         .arg(Arg::with_name("nvml-gpu-clock-reset")
             .long("nvml-gpu-clock-reset")
             .takes_value(false)
             .conflicts_with("nvml-gpu-clock")
-            .help("Reset nvidia gpu clock min,max frequency per --nvml"))
+            .help("Reset nvidia gpu min,max frequency per --nvml"))
 
         .arg(Arg::with_name("nvml-power-limit")
             .long("nvml-power-limit")
