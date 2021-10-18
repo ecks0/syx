@@ -23,7 +23,16 @@ pub struct Policy {
 }
 
 impl Policy {
-    pub fn from_cli(cli: &Cli) -> Self {
+    pub fn apply(&self) {
+        if let Some(cpu) = &self.cpu { cpu.write(); }
+        if let Some(cpufreq) = &self.cpufreq { cpufreq.write(); }
+        if let Some(intel_pstate) = &self.intel_pstate { intel_pstate.write(); }
+        if let Some(drm) = &self.drm { drm.write(); }
+    }
+}
+
+impl From<&Cli> for Policy {
+    fn from(cli: &Cli) -> Self {
         let mut s = Self::default();
         if cli.has_cpu_or_related_args() {
             if let Some(cpu_ids) = cli.cpus() {
@@ -34,12 +43,5 @@ impl Policy {
         }
         s.drm = drm::policy(cli);
         s
-    }
-
-    pub fn apply(&self) {
-        if let Some(cpu) = &self.cpu { cpu.write(); }
-        if let Some(cpufreq) = &self.cpufreq { cpufreq.write(); }
-        if let Some(intel_pstate) = &self.intel_pstate { intel_pstate.write(); }
-        if let Some(drm) = &self.drm { drm.write(); }
     }
 }

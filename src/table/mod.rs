@@ -6,7 +6,12 @@ mod drm;
 mod intel_pstate;
 mod nvml;
 
-fn dot() -> String { "•".to_string() }
+pub use cpu::format as format_cpu;
+pub use intel_pstate::format as format_intel_pstate;
+pub use drm::format as format_drm;
+pub use nvml::format as format_nvml;
+
+fn dot() -> String { "\u{2022}".to_string() }
 
 #[derive(Debug)]
 struct Table(ct::Table);
@@ -19,7 +24,7 @@ impl Table {
         tab.add_row(
             header
                 .iter()
-                .map(|h| "-".repeat(h.len().max(4)))
+                .map(|h| "-".repeat(h.len()))
                 .collect::<Vec<String>>()
         );
         Self(tab)
@@ -34,13 +39,4 @@ impl std::fmt::Display for Table {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}", self.0)
     }
-}
-
-pub fn format() -> Option<String> {
-    let mut s = vec![];
-    if let Some(ss) = cpu::format() { s.push(ss); }
-    if let Some(ss) = intel_pstate::format() { s.push(ss); }
-    if let Some(ss) = drm::format() { s.push(ss); }
-    if let Some(ss) = nvml::format() { s.push(ss); }
-    if s.is_empty() { None } else { Some(s.join("\n")) }
 }

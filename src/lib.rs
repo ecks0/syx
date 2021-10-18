@@ -17,25 +17,22 @@ impl Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-use std::env::args;
-use crate::{cli::Cli, policy::Policy};
+use crate::cli::Cli;
 
 pub fn run() -> Result<()> {
-    let args: Vec<String> = args().collect();
-    let cli = match Cli::from_args(&args) {
+    let args: Vec<String> = std::env::args().collect();
+    run_with_args(&args)
+}
+
+pub fn run_with_args(args: &[String]) -> Result<()> {
+    let cli = match Cli::from_args(args) {
         Ok(cli) => cli,
-        Err(err) =>
-            match err {
-                Error::Parse { .. } => {
-                    eprintln!("{}", err);
-                    std::process::exit(1);
-                },
-            },
+        Err(err) => {
+            eprintln!("{}", err);
+            std::process::exit(1);
+        },
     };
-    let policy = Policy::from_cli(&cli);
-    policy.apply();
-    if let Some(s) = table::format() {
-        println!("\n{}", s);
-    }
+    cli.apply();
+    cli.show();
     Ok(())
 }

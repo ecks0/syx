@@ -1,7 +1,7 @@
 use measurements::frequency::Frequency;
 use zysfs::io::devices::system::cpu::blocking::cpus;
 use zysfs::io::class::drm::blocking::{cards as drm_cards, driver as drm_driver};
-use crate::Result;
+use crate::{Result, policy::Policy, table};
 
 mod clap;
 mod logging;
@@ -9,6 +9,10 @@ mod parse;
 
 #[derive(Debug)]
 pub struct Cli {
+    pub show_cpu: Option<()>,
+    pub show_intel_pstate: Option<()>,
+    pub show_drm: Option<()>,
+    pub show_nvml: Option<()>,
     pub cpus: Option<Vec<u64>>,
     pub cpu_on: Option<bool>,
     pub cpu_on_each: Option<Vec<(u64, bool)>>,
@@ -26,6 +30,13 @@ pub struct Cli {
 impl Cli {
     pub fn from_args(argv: &[String]) -> Result<Self> {
         clap::parse(argv)
+    }
+
+    pub fn has_show_args(&self) -> bool {
+        self.show_cpu.is_some() ||
+        self.show_intel_pstate.is_some() ||
+        self.show_drm.is_some() ||
+        self.show_nvml.is_some()
     }
 
     pub fn has_cpu_args(&self) -> bool {
@@ -99,5 +110,28 @@ impl Cli {
 
     pub fn drm_i915(&self) -> Option<Vec<u64>> {
         self.drm_cards(&self.drm_i915, "i915")
+    }
+
+    pub fn apply(&self) {
+        let policy: Policy = self.into();
+        policy.apply();
+    }
+
+    pub fn show(&self) {
+        let mut s = vec![String::with_capacity(0)];
+        let show_all = !self.has_show_args();
+        if show_all || self.show_cpu.is_some() {
+            if let Some(ss) = table::format_cpu() { s.push(ss); }
+        }
+        if show_all || self.show_intel_pstate.is_some() {
+            if let Some(ss) = table::format_intel_pstate() { s.push(ss); }
+        }
+        if show_all || self.show_drm.is_some() {
+            if let Some(ss) = table::format_drm() { s.push(ss); }
+        }
+        if show_all || self.show_nvml.is_some() {
+            if let Some(ss) = table::format_nvml() { s.push(ss); }
+        }
+        if !s.is_empty() { println!("{}", s.join("\n")); }
     }
 }

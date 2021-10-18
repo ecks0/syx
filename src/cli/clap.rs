@@ -20,6 +20,26 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
         .setting(AppSettings::DisableVersion)
         .version(crate_version!())
 
+        .arg(Arg::with_name("show-cpu")
+            .long("show-cpu")
+            .takes_value(false)
+            .help("Print cpu and cpufreq values"))
+
+        .arg(Arg::with_name("show-pstate")
+            .long("show-pstate")
+            .takes_value(false)
+            .help("Print intel_pstate values"))
+
+        .arg(Arg::with_name("show-drm")
+            .long("show-drm")
+            .takes_value(false)
+            .help("Print drm values"))
+
+        .arg(Arg::with_name("show-nvml")
+            .long("show-nvml")
+            .takes_value(false)
+            .help("Print nvidia management library values"))
+
         .arg(Arg::with_name("verbose")
             .short("v")
             .long("verbose")
@@ -109,6 +129,10 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
     logging::configure(m.is_present("verbose"));
 
     Ok(Cli {
+        show_cpu: if m.is_present("show-cpu") { Some(()) } else { None },
+        show_intel_pstate: if m.is_present("show-pstate") { Some(()) } else { None },
+        show_drm: if m.is_present("show-drm") { Some(()) } else { None },
+        show_nvml: if m.is_present("show-nvml") { Some(()) } else { None },
         cpus: parse::cpus(m.value_of("cpus"))?,
         cpu_on: parse::cpu_on(m.value_of("cpu-on"))?,
         cpu_on_each: parse::cpu_on_each(m.value_of("cpu-on-each"))?,

@@ -9,6 +9,28 @@ fn khz(khz: u64) -> String {
     if khz >= 1000u64.pow(2) { format!("{:.1}", f) } else { format!("{:.0}", f) }
 }
 
+fn format_governors(policies: &[CpufreqPolicy]) -> Option<String> {
+    let mut govs: Vec<String> = policies
+        .iter()
+        .filter_map(|p| p.scaling_available_governors.clone().map(|g| g.join(" ")))
+        .collect();
+    govs.sort_unstable();
+    govs.dedup();
+    if govs.is_empty() { return None; }
+    let mut tab = Table::new(&["CPU", "Available governors"]);
+    if govs.len() == 1 {
+        tab.row(&["all", &govs[0]]);
+    } else {
+        for p in policies {
+            tab.row(&[
+                &p.id.map(|v| v.to_string()).unwrap_or_else(dot),
+                &p.scaling_available_governors.clone().map(|v| v.join(" ")).unwrap_or_else(dot),
+            ]);
+        }
+    }
+    Some(tab.to_string())
+}
+
 fn format_cpu_cpufreq(cpu_pols: &[CpuPolicy], cpufreq_pols: &[CpufreqPolicy]) -> Option<String> {
     if cpu_pols.is_empty() { return None; }
     let cpufreq_pol_default = CpufreqPolicy::default();
@@ -33,33 +55,11 @@ fn format_cpu_cpufreq(cpu_pols: &[CpuPolicy], cpufreq_pols: &[CpufreqPolicy]) ->
     Some(tab.to_string())
 }
 
-fn format_governors(policies: &[CpufreqPolicy]) -> Option<String> {
-    let mut govs: Vec<String> = policies
-        .iter()
-        .filter_map(|p| p.scaling_available_governors.clone().map(|g| g.join(" ")))
-        .collect();
-    govs.sort_unstable();
-    govs.dedup();
-    if govs.is_empty() { return None; }
-    let mut tab = Table::new(&["CPU", "Available governors"]);
-    if govs.len() == 1 {
-        tab.row(&["all", &govs[0]]);
-    } else {
-        for p in policies {
-            tab.row(&[
-                &p.id.map(|v| v.to_string()).unwrap_or_else(dot),
-                &p.scaling_available_governors.clone().map(|v| v.join(" ")).unwrap_or_else(dot),
-            ]);
-        }
-    }
-    Some(tab.to_string())
-}
-
 pub fn format() -> Option<String> {
     let cpu_pols = CpuPolicy::all()?;
     let cpufreq_pols = CpufreqPolicy::all().unwrap_or_else(Vec::new);
     let mut s = vec![];
-    if let Some(ss) = format_cpu_cpufreq(&cpu_pols, &cpufreq_pols) { s.push(ss); }
     if let Some(ss) = format_governors(&cpufreq_pols) { s.push(ss); }
+    if let Some(ss) = format_cpu_cpufreq(&cpu_pols, &cpufreq_pols) { s.push(ss); }
     if s.is_empty() { None } else { Some(s.join("\n")) }
 }
