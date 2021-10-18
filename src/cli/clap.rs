@@ -14,7 +14,7 @@ fn argv0(argv: &[String]) -> &str {
 }
 
 const HELP_ENV: &str = r#"ENVS:
-        KNOBS_LOG    error|warn|info|debug|trace - default error
+        KNOBS_LOG=<error|warn|info|debug|trace>    Log level, default error
 "#;
 
 pub fn parse(argv: &[String]) -> Result<Cli> {
