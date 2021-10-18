@@ -38,7 +38,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
         .arg(Arg::with_name("show-nvml")
             .long("show-nvml")
             .takes_value(false)
-            .help("Print nvidia management library values"))
+            .help("Print nvidia management values"))
 
         .arg(Arg::with_name("verbose")
             .short("v")
@@ -46,9 +46,9 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .takes_value(false)
             .help("Enables verbose output"))
 
-        .arg(Arg::with_name("cpus")
+        .arg(Arg::with_name("cpu")
             .short("c")
-            .long("cpus")
+            .long("cpu")
             .takes_value(true)
             .value_name("INDICES")
             .help("Target cpu ids, default all, ex. 0,1,3-5"))
@@ -58,7 +58,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .long("cpu-on")
             .takes_value(true)
             .value_name("0|1")
-            .help("Set cpu online status per --cpus"))
+            .help("Set cpu online status per --cpu"))
 
         .arg(Arg::with_name("cpu-on-each")
             .short("O")
@@ -72,33 +72,33 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .long("cpufreq-gov")
             .takes_value(true)
             .value_name("NAME")
-            .help("Set cpufreq governor per --cpus"))
+            .help("Set cpufreq governor per --cpu"))
 
         .arg(Arg::with_name("cpufreq-min")
             .short("n")
             .long("cpufreq-min")
             .takes_value(true)
             .value_name("HZ")
-            .help("Set cpufreq min freq per --cpus, ex. 1200mhz, 1.2ghz"))
+            .help("Set cpufreq min freq per --cpu, ex. 1200mhz, 1.2ghz"))
 
         .arg(Arg::with_name("cpufreq-max")
             .short("x")
             .long("cpufreq-max")
             .takes_value(true)
             .value_name("HZ")
-            .help("Set cpufreq max freq per --cpus, ex. 1200mhz, 1.2ghz"))
+            .help("Set cpufreq max freq per --cpu, ex. 1200mhz, 1.2ghz"))
 
         .arg(Arg::with_name("pstate-epb")
             .long("pstate-epb")
             .takes_value(true)
             .value_name("0-15")
-            .help("Set intel_pstate energy/performance bias per --cpus"))
+            .help("Set intel_pstate energy/performance bias per --cpu"))
 
         .arg(Arg::with_name("pstate-epp")
             .long("pstate-epp")
             .takes_value(true)
             .value_name("NAME")
-            .help("Set intel_pstate energy/performance pref per --cpus"))
+            .help("Set intel_pstate energy/performance pref per --cpu"))
 
         .arg(Arg::with_name("drm-i915")
             .long("drm-i915")
@@ -124,6 +124,29 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .value_name("HZ")
             .help("Set i915 boost frequency per --drm-i915, ex. 1200mhz, 1.2ghz"))
 
+        .arg(Arg::with_name("nvml")
+            .long("nvml")
+            .takes_value(true)
+            .value_name("INDICES")
+            .help("Target nvidia gpus, default all, index or pci id, 0,1,3-5"))
+
+        .arg(Arg::with_name("nvml-gpu-clock")
+            .long("nvml-gpu-clock")
+            .takes_value(true)
+            .value_name("HZ|HZ,HZ")
+            .help("Set nvidia gpu clock min,max frequency per --nvml, ex. 1.2ghz,1.4ghz"))
+
+        .arg(Arg::with_name("nvml-gpu-clock-reset")
+            .long("nvml-gpu-clock-reset")
+            .takes_value(false)
+            .help("Reset nvidia gpu clock min,max frequency per --nvml"))
+
+        .arg(Arg::with_name("nvml-power-limit")
+            .long("nvml-power-limit")
+            .takes_value(true)
+            .value_name("WATTS")
+            .help("Set nvidia gpu power limit per --nvml, ex. 260w, 260000mw"))
+
         .get_matches_from(argv);
 
     logging::configure(m.is_present("verbose"));
@@ -133,7 +156,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
         show_intel_pstate: if m.is_present("show-pstate") { Some(()) } else { None },
         show_drm: if m.is_present("show-drm") { Some(()) } else { None },
         show_nvml: if m.is_present("show-nvml") { Some(()) } else { None },
-        cpus: parse::cpus(m.value_of("cpus"))?,
+        cpu: parse::cpu(m.value_of("cpu"))?,
         cpu_on: parse::cpu_on(m.value_of("cpu-on"))?,
         cpu_on_each: parse::cpu_on_each(m.value_of("cpu-on-each"))?,
         cpufreq_gov: parse::cpufreq_gov(m.value_of("cpufreq-gov")),
@@ -145,5 +168,9 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
         drm_i915_min: parse::drm_i915_min(m.value_of("drm-i915-min"))?,
         drm_i915_max: parse::drm_i915_max(m.value_of("drm-i915-max"))?,
         drm_i915_boost: parse::drm_i915_boost(m.value_of("drm-i915-boost"))?,
+        nvml: parse::nvml(m.value_of("nvml"))?,
+        nvml_gpu_clock: parse::nvml_gpu_clock(m.value_of("nvml-gpu-clock"))?,
+        nvml_gpu_clock_reset: if m.is_present("nvml-gpu-clock-reset") { Some(()) } else { None },
+        nvml_power_limit: parse::nvml_power_limit(m.value_of("nvml-power-limit"))?,
     })
 }

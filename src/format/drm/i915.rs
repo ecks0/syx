@@ -1,7 +1,7 @@
 use measurements::Frequency;
 use zysfs::types::blocking::Read as _;
 use zysfs::types::class::drm::{Card, DriverPolicy};
-use crate::table::{Table, dot};
+use crate::format::{Table, dot};
 
 pub(crate) fn mhz(mhz: u64) -> String {
     let f = Frequency::from_megahertz(mhz as f64);

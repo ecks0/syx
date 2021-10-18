@@ -1,6 +1,6 @@
 mod cli;
 mod policy;
-mod table;
+mod format;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {

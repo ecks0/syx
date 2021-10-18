@@ -2,7 +2,7 @@ use measurements::Frequency;
 use zysfs::types::blocking::Read as _;
 use zysfs::types::devices::system::cpu::Policy as CpuPolicy;
 use zysfs::types::devices::system::cpu::cpufreq::Policy as CpufreqPolicy;
-use crate::table::{dot, Table};
+use crate::format::{dot, Table};
 
 fn khz(khz: u64) -> String {
     let f = Frequency::from_kilohertz(khz as f64);

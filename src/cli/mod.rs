@@ -1,7 +1,8 @@
-use measurements::frequency::Frequency;
+use measurements::{Frequency, Power};
+use nvml_facade::Nvml;
 use zysfs::io::devices::system::cpu::blocking::cpus;
 use zysfs::io::class::drm::blocking::{cards as drm_cards, driver as drm_driver};
-use crate::{Result, policy::Policy, table};
+use crate::{Result, policy::Policy, format};
 
 mod clap;
 mod logging;
@@ -13,7 +14,7 @@ pub struct Cli {
     pub show_intel_pstate: Option<()>,
     pub show_drm: Option<()>,
     pub show_nvml: Option<()>,
-    pub cpus: Option<Vec<u64>>,
+    pub cpu: Option<Vec<u64>>,
     pub cpu_on: Option<bool>,
     pub cpu_on_each: Option<Vec<(u64, bool)>>,
     pub cpufreq_gov: Option<String>,
@@ -25,6 +26,10 @@ pub struct Cli {
     pub drm_i915_min: Option<Frequency>,
     pub drm_i915_max: Option<Frequency>,
     pub drm_i915_boost: Option<Frequency>,
+    pub nvml: Option<Vec<u32>>,
+    pub nvml_gpu_clock: Option<(Frequency, Frequency)>,
+    pub nvml_gpu_clock_reset: Option<()>,
+    pub nvml_power_limit: Option<Power>,
 }
 
 impl Cli {
@@ -71,20 +76,26 @@ impl Cli {
         self.has_drm_i915_args()
     }
 
-    pub fn cpus(&self) -> Option<Vec<u64>> {
-        let cpus =
-            if let Some(cpus) = &self.cpus {
-                let mut cpus = cpus.clone();
-                cpus.sort_unstable();
-                cpus.dedup();
-                cpus
+    pub fn has_nvml_args(&self) -> bool {
+        self.nvml_gpu_clock.is_some() ||
+        self.nvml_gpu_clock_reset.is_some() ||
+        self.nvml_power_limit.is_some()
+    }
+
+    pub fn cpu(&self) -> Option<Vec<u64>> {
+        let cpu =
+            if let Some(cpu) = &self.cpu {
+                let mut cpu = cpu.clone();
+                cpu.sort_unstable();
+                cpu.dedup();
+                cpu
             } else {
                 cpus().ok()?
             };
-        if cpus.is_empty() { None } else { Some(cpus) }
+        if cpu.is_empty() { None } else { Some(cpu) }
     }
 
-    fn drm_cards(&self, arg_value: &Option<Vec<u64>>, driver: &str) -> Option<Vec<u64>> {
+    fn drm(&self, arg_value: &Option<Vec<u64>>, driver: &str) -> Option<Vec<u64>> {
         let card_ids =
             if let Some(card_ids) = arg_value {
                 let mut card_ids = card_ids.clone();
@@ -109,7 +120,18 @@ impl Cli {
     }
 
     pub fn drm_i915(&self) -> Option<Vec<u64>> {
-        self.drm_cards(&self.drm_i915, "i915")
+        self.drm(&self.drm_i915, "i915")
+    }
+
+    pub fn nvml(&self) -> Option<Vec<u32>> {
+        if let Some(card_ids) = self.nvml.clone() {
+            let mut card_ids = card_ids;
+            card_ids.sort_unstable();
+            card_ids.dedup();
+            Some(card_ids)
+        } else {
+            Nvml::ids()
+        }
     }
 
     pub fn apply(&self) {
@@ -121,16 +143,16 @@ impl Cli {
         let mut s = vec![String::with_capacity(0)];
         let show_all = !self.has_show_args();
         if show_all || self.show_cpu.is_some() {
-            if let Some(ss) = table::format_cpu() { s.push(ss); }
+            if let Some(ss) = format::format_cpu() { s.push(ss); }
         }
         if show_all || self.show_intel_pstate.is_some() {
-            if let Some(ss) = table::format_intel_pstate() { s.push(ss); }
+            if let Some(ss) = format::format_intel_pstate() { s.push(ss); }
         }
         if show_all || self.show_drm.is_some() {
-            if let Some(ss) = table::format_drm() { s.push(ss); }
+            if let Some(ss) = format::format_drm() { s.push(ss); }
         }
         if show_all || self.show_nvml.is_some() {
-            if let Some(ss) = table::format_nvml() { s.push(ss); }
+            if let Some(ss) = format::format_nvml() { s.push(ss); }
         }
         if !s.is_empty() { println!("{}", s.join("\n")); }
     }

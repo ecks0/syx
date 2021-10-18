@@ -1,7 +1,7 @@
 use zysfs::io::devices::system::cpu::intel_pstate::blocking::status;
 use zysfs::types::blocking::Read as _;
 use zysfs::types::devices::system::cpu::intel_pstate::Policy;
-use crate::table::{Table, dot};
+use crate::format::{Table, dot};
 
 fn format_status(status: &str) -> Option<String> {
     Some(format!(" intel_pstate: {}\n", status))
