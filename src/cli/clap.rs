@@ -18,6 +18,7 @@ const HELP_ENV: &str = r#"ENVS:
 "#;
 
 pub fn parse(argv: &[String]) -> Result<Cli> {
+    logging::configure();
     let m = App::new(argv0(argv))
         .setting(AppSettings::DeriveDisplayOrder)
         .setting(AppSettings::DisableHelpSubcommand)
@@ -129,7 +130,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .long("nvml")
             .takes_value(true)
             .value_name("INDICES")
-            .help("Target nvidia gpus, default all, index or pci id, 0,1,3-5"))
+            .help("Target nvidia gpu ids, default all, ex. 0,1,3-5"))
 
         .arg(Arg::with_name("nvml-gpu-clock")
             .long("nvml-gpu-clock")
@@ -151,8 +152,6 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .help("Set nvidia gpu power limit per --nvml, ex. 260, 260w, 0.26kw"))
 
         .get_matches_from(argv);
-
-    logging::configure();
 
     Ok(Cli {
         show_cpu: if m.is_present("show-cpu") { Some(()) } else { None },

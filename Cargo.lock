@@ -317,6 +317,7 @@ dependencies = [
 [[package]]
 name = "nvml-facade"
 version = "0.1.0"
+source = "git+https://github.com/ecks0/nvml-facade#b274a42575634c8f65617bd176fca89a21000e7d"
 dependencies = [
  "log",
  "nvml-wrapper",
@@ -618,6 +619,7 @@ dependencies = [
 [[package]]
 name = "zysfs"
 version = "0.1.0"
+source = "git+https://github.com/ecks0/zysfs#070211bb9a459b85622783d33ff86f1b3985cb07"
 dependencies = [
  "log",
  "nix",
