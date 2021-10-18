@@ -69,7 +69,7 @@ fn parse_power(flag: &'static str, s: &str) -> Result<Power> {
     }
 }
 
-fn parse_indices(flag: &'static str, s: &str) -> Result<Option<Vec<u64>>> {
+fn parse_indices(flag: &'static str, s: &str) -> Result<Vec<u64>> {
     let mut ids = vec![];
     for item in s.split(',') {
         let s: Vec<&str> = item.split('-').collect();
@@ -83,10 +83,10 @@ fn parse_indices(flag: &'static str, s: &str) -> Result<Option<Vec<u64>>> {
             _ => return Err(Error::parse(flag, "expected sequence of indices, ex. 0,1,3-5,10")),
         }
     }
-    Ok(if ids.is_empty() { None } else { Some(ids) })
+    Ok(ids)
 }
 
-fn parse_toggles(flag: &'static str, s: &str) -> Result<Option<Vec<(u64, bool)>>> {
+fn parse_toggles(flag: &'static str, s: &str) -> Result<Vec<(u64, bool)>> {
     let mut toggles = vec![];
     for (i, c) in s.chars().enumerate() {
         toggles.push(
@@ -101,130 +101,78 @@ fn parse_toggles(flag: &'static str, s: &str) -> Result<Option<Vec<(u64, bool)>>
             )
         );
     }
-    Ok(if toggles.is_empty() { None } else { Some(toggles) })
+    Ok(toggles)
 }
 
 fn parse_u64(flag: &'static str, s: &str) -> Result<u64> {
-    match s.parse::<u64>() {
-        Ok(v) => Ok(v),
-        Err(_) => Err(Error::parse(flag, "expected integer value")),
+    s.parse::<u64>()
+        .map_err(|_| Error::parse(flag, "expected 64-bit integer value"))
+}
+
+pub fn cpu(s: &str) -> Result<Vec<u64>> {
+    parse_indices("-c/--cpu", s)
+}
+
+pub fn cpu_on(s: &str) -> Result<bool> {
+    parse_bool("-o/--cpu-on", s)
+}
+
+pub fn cpu_on_each(s: &str) -> Result<Vec<(u64, bool)>> {
+    parse_toggles("-O/--cpu-on-each", s)
+}
+
+pub fn cpufreq_min(s: &str) -> Result<Frequency> {
+    parse_frequency("-n/--cpufreq-min", s)
+}
+
+pub fn cpufreq_max(s: &str) -> Result<Frequency> {
+    parse_frequency("-x/--cpufreq-max", s)
+}
+
+pub fn pstate_epb(s: &str) -> Result<u64> {
+    let epb = parse_u64("--pstate-epb", s)?;
+    if epb > 15 {
+        Err(Error::parse("--pstate-epb", "expected integer between 0 and 15, inclusive"))
+    } else {
+        Ok(epb)
     }
 }
 
-pub fn cpu(s: Option<&str>) -> Result<Option<Vec<u64>>> {
-    Ok(match s {
-        Some(s) => parse_indices("-c/--cpu", s)?,
-        None => None,
-    })
+pub fn drm_i915(s: &str) -> Result<Vec<u64>> {
+    parse_indices("--drm-i915", s)
 }
 
-pub fn cpu_on(s: Option<&str>) -> Result<Option<bool>> {
-    Ok(match s {
-        Some(s) => Some(parse_bool("-o/--cpu-on", s)?),
-        None => None,
-    })
+pub fn drm_i915_min(s: &str) -> Result<Frequency> {
+    parse_frequency("--i915-freq-min", s)
 }
 
-pub fn cpu_on_each(s: Option<&str>) -> Result<Option<Vec<(u64, bool)>>> {
-    Ok(match s {
-        Some(s) => parse_toggles("-O/--cpu-on-each", s)?,
-        None => None,
-    })
+pub fn drm_i915_max(s: &str) -> Result<Frequency> {
+    parse_frequency("--i915-freq-max", s)
 }
 
-pub fn cpufreq_gov(s: Option<&str>) -> Option<String> {
-    s.map(|s| s.to_string())
+pub fn drm_i915_boost(s: &str) -> Result<Frequency> {
+    parse_frequency("--i915-freq-boost", s)
 }
 
-pub fn cpufreq_min(s: Option<&str>) -> Result<Option<Frequency>> {
-    Ok(match s {
-        Some(s) => Some(parse_frequency("-n/--cpufreq-min", s)?),
-        None => None,
-    })
+pub fn nvml(s: &str) -> Result<Vec<u32>> {
+    Ok(parse_indices("--nvml", s)?.into_iter().map(|i| i as u32).collect())
 }
 
-pub fn cpufreq_max(s: Option<&str>) -> Result<Option<Frequency>> {
-    Ok(match s {
-        Some(s) => Some(parse_frequency("-x/--cpufreq-max", s)?),
-        None => None,
-    })
+pub fn nvml_gpu_clock(s: &str) -> Result<(Frequency, Frequency)> {
+    let s: Vec<&str> = s.split(',').collect();
+    match &s[..] {
+        [freq] => {
+            let freq = parse_frequency("--nvml-gpu-clock", freq)?;
+            Ok((freq, freq))
+        }
+        [min, max] => Ok((
+            parse_frequency("--nvml-gpu-clock", min)?,
+            parse_frequency("--nvml-gpu-clock", max)?,
+        )),
+        _ => Err(Error::parse("--nvml-gpu-clock", "Example: 1.4ghz (constant) or 1.2ghz,1.6ghz (min,max)")),
+    }
 }
 
-pub fn pstate_epb(s: Option<&str>) -> Result<Option<u64>> {
-    Ok(match s {
-        None => None,
-        Some(s) => {
-            let epb = parse_u64("--pstate-epb", s)?;
-            if epb > 15 {
-                return Err(Error::parse("--pstate-epb", "expected integer between 0 and 15, inclusive"));
-            } else {
-                Some(epb)
-            }
-        },
-    })
-}
-
-pub fn pstate_epp(s: Option<&str>) -> Option<String> {
-    s.map(|s| s.to_string())
-}
-
-pub fn drm_i915(s: Option<&str>) -> Result<Option<Vec<u64>>> {
-    Ok(match s {
-        Some(s) => parse_indices("--drm-i915", s)?,
-        None => None,
-    })
-}
-
-pub fn drm_i915_min(s: Option<&str>) -> Result<Option<Frequency>> {
-    Ok(match s {
-        Some(s) => Some(parse_frequency("--i915-freq-min", s)?),
-        None => None,
-    })
-}
-
-pub fn drm_i915_max(s: Option<&str>) -> Result<Option<Frequency>> {
-    Ok(match s {
-        Some(s) => Some(parse_frequency("--i915-freq-max", s)?),
-        None => None,
-    })
-}
-
-pub fn drm_i915_boost(s: Option<&str>) -> Result<Option<Frequency>> {
-    Ok(match s {
-        Some(s) => Some(parse_frequency("--i915-freq-boost", s)?),
-        None => None,
-    })
-}
-
-pub fn nvml(s: Option<&str>) -> Result<Option<Vec<u32>>> {
-    Ok(match s {
-        Some(s) => parse_indices("--nvml", s)?.map(|i| i.into_iter().map(|i| i as u32).collect()),
-        None => None,
-    })
-}
-
-pub fn nvml_gpu_clock(s: Option<&str>) -> Result<Option<(Frequency, Frequency)>> {
-    Ok(match s {
-        Some(s) => {
-            let s: Vec<&str> = s.split(',').collect();
-            match &s[..] {
-                [freq] => {
-                    let freq = parse_frequency("--nvml-gpu-clock", freq)?;
-                    Some((freq, freq))
-                }
-                [min, max] => Some((
-                    parse_frequency("--nvml-gpu-clock", min)?,
-                    parse_frequency("--nvml-gpu-clock", max)?,
-                )),
-                _ => return Err(Error::parse("--nvml-gpu-clock", "Example: 1.4ghz (constant) or 1.2ghz,1.6ghz (min,max)")),
-            }
-        },
-        None => None,
-    })
-}
-pub fn nvml_power_limit(s: Option<&str>) -> Result<Option<Power>> {
-    Ok(match s {
-        Some(s) => Some(parse_power("--nvml-power-limit", s)?),
-        None => None,
-    })
+pub fn nvml_power_limit(s: &str) -> Result<Power> {
+    parse_power("--nvml-power-limit", s)
 }
