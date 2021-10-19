@@ -9,7 +9,7 @@ const AFTER_HELP: &str = r#"    All flags may be expressed as environment variab
         --cpufreq-gov schedutil        => KNOBS_CPUFREQ_GOV=schedutil
         --nvml-gpu-clock 800mhz,1.2ghz => KNOBS_NVML_GPU_CLOCK=800mhz,1.2ghz
 
-    The log level may be set via KNOBS_LOG. The default log level is error. For example:
+    The log level (default error) may be set via KNOBS_LOG. For example:
 
         KNOBS_LOG=warn
         KNOBS_LOG=debug
@@ -200,7 +200,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .long("nvml-gpu-clock-reset")
             .takes_value(false)
             .conflicts_with("nvml-gpu-clock")
-            .help("Reset nvidia gpu min,max frequency per --nvml"))
+            .help("Reset nvidia gpu frequency to default per --nvml"))
 
         .arg(Arg::with_name("nvml-power-limit")
             .long("nvml-power-limit")

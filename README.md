@@ -2,24 +2,14 @@
 
 ## About
 
-Display and set system tunables.
+Display and set system tunables:
 
-## Supported tunables
-
-- cpu
-  - online status
-- cpufreq
-  - governor
-  - min/max frequencies
-- intel_pstate
-  - epb
-  - epp
+- cpu: online/offline
+- cpufreq: governor, min and max frequencies
+- intel_pstate: epb, epp
 - drm
-  - i915
-    - min/max/boost frequencies
-- nvml (nvidia management library)
-  - graphics clock min/max frequency
-  - power limit
+  - i915: min/max/boost frequencies
+- nvidia: GPU clock min/max frequency, power limit
 
 ## Example usage
 
@@ -161,7 +151,7 @@ OPTIONS:
         --drm-i915-boost <HZ>          Set i915 boost frequency per --drm-i915, ex. 1200, 1200mhz, 1.2ghz
         --nvml <INDICES>               Target nvidia gpu ids, default all, ex. 0,1,3-5
         --nvml-gpu-clock <HZ|HZ,HZ>    Set nvidia gpu min,max frequency per --nvml, ex. 1200mhz or 900mhz,1.4ghz
-        --nvml-gpu-clock-reset         Reset nvidia gpu min,max frequency per --nvml
+        --nvml-gpu-clock-reset         Reset nvidia gpu frequency to default per --nvml
         --nvml-power-limit <WATTS>     Set nvidia gpu power limit per --nvml, ex. 260, 260w, 0.26kw
     -h, --help                         Prints help information
 
@@ -172,7 +162,7 @@ OPTIONS:
         --cpufreq-gov schedutil        => KNOBS_CPUFREQ_GOV=schedutil
         --nvml-gpu-clock 800mhz,1.2ghz => KNOBS_NVML_GPU_CLOCK=800mhz,1.2ghz
 
-    The log level may be set via KNOBS_LOG. The default log level is error. For example:
+    The log level (default error) may be set via KNOBS_LOG. For example:
 
         KNOBS_LOG=warn
         KNOBS_LOG=debug
