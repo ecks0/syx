@@ -1,24 +1,79 @@
-use clap::{App, AppSettings, Arg, crate_version};
-use crate::cli::Result;
-use super::{Cli, logging, parse};
+use clap::{App, AppSettings, Arg, ArgMatches, crate_version};
+use log::debug;
+use crate::cli::{Cli, Result};
 
+const AFTER_HELP: &str = r#"    All flags may be expressed as environment variables. For example:
+
+        --show-cpu                     => KNOBS_SHOW_CPU=1
+        --cpu 1,3-5                    => KNOBS_CPU=1,3-5
+        --cpufreq-gov schedutil        => KNOBS_CPUFREQ_GOV=schedutil
+        --nvml-gpu-clock 800mhz,1.2ghz => KNOBS_NVML_GPU_CLOCK=800mhz,1.2ghz
+
+    The log level may be set via KNOBS_LOG. The default log level is error. For example:
+
+        KNOBS_LOG=warn
+        KNOBS_LOG=debug
+"#;
+
+// Determine the binary name from argv[0].
 fn argv0(argv: &[String]) -> &str {
-    let default = "knobs";
+    const DEFAULT: &str = "knobs";
     argv
         .first()
         .map(|s| s.as_str())
-        .unwrap_or(default)
+        .unwrap_or(DEFAULT)
         .split('/')
         .last()
-        .unwrap_or(default)
+        .unwrap_or(DEFAULT)
 }
 
-const HELP_ENV: &str = r#"ENVS:
-        KNOBS_LOG=<error|warn|info|debug|trace>    Log level, default error
-"#;
+// Convert a cli flag name to an environment variable name.
+fn env_name(cli_name: &str) -> String {
+    format!("KNOBS_{}", cli_name.to_uppercase().replace("-", "_"))
+}
 
+// Return a flag value, preferring the command line, falling back to environment variables.
+fn flag(name: &str, m: &ArgMatches) -> Option<()> {
+    match m.is_present(name) {
+        true => Some(()),
+        false =>
+            if std::env::var(&env_name(name))
+                .ok()
+                .map(|v| !v.is_empty() && v != "0" && v.to_lowercase() != "false")
+                .unwrap_or(false)
+            {
+                debug!("--{}: using value from environment", name);
+                Some(())
+            } else {
+                None
+            },
+    }
+}
+
+// Parse and return an argument value, preferring the command line, falling back to environment variables.
+fn arg<P, T>(name: &str, m: &ArgMatches, parse: P) -> Result<Option<T>>
+where
+    P: FnOnce(&str) -> Result<T>
+{
+    let val = match m.value_of(name) {
+        Some(v) => v.to_string(),
+        None =>
+            match std::env::var(&env_name(name)) {
+                Ok(v) => {
+                    debug!("--{}: using value from environment", name);
+                    v
+                },
+                _ => return Ok(None),
+            },
+    };
+    Ok(Some(parse(&val)?))
+}
+
+// Build and parse the clap cli specification, returning a `Cli` instance.
 pub fn parse(argv: &[String]) -> Result<Cli> {
-    logging::configure();
+
+    crate::cli::logging::configure();
+
     let m = App::new(argv0(argv))
 
         .setting(AppSettings::DeriveDisplayOrder)
@@ -28,7 +83,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
 
         .version(crate_version!())
 
-        .after_help(HELP_ENV)
+        .after_help(AFTER_HELP)
 
         .arg(Arg::with_name("show-cpu")
             .long("show-cpu")
@@ -155,26 +210,28 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
 
         .get_matches_from(argv);
 
+    use crate::cli::parse;
+
     Ok(Cli {
-        show_cpu: if m.is_present("show-cpu") { Some(()) } else { None },
-        show_intel_pstate: if m.is_present("show-pstate") { Some(()) } else { None },
-        show_drm: if m.is_present("show-drm") { Some(()) } else { None },
-        show_nvml: if m.is_present("show-nvml") { Some(()) } else { None },
-        cpu: if let Some(v) = m.value_of("cpu") { Some(parse::cpu(v)?) } else { None },
-        cpu_on: if let Some(v) = m.value_of("cpu-on") { Some(parse::cpu_on(v)?) } else { None },
-        cpu_on_each: if let Some(v) = m.value_of("cpu-on-each") { Some(parse::cpu_on_each(v)?) } else { None },
-        cpufreq_gov: m.value_of("cpufreq-gov").map(String::from),
-        cpufreq_min: if let Some(v) = m.value_of("cpufreq-min") { Some(parse::cpufreq_min(v)?) } else { None },
-        cpufreq_max: if let Some(v) = m.value_of("cpufreq-max") { Some(parse::cpufreq_max(v)?) } else { None },
-        pstate_epb: if let Some(v) = m.value_of("pstate-epb") { Some(parse::pstate_epb(v)?) } else { None },
-        pstate_epp: m.value_of("pstate-epp").map(String::from),
-        drm_i915: if let Some(v) = m.value_of("drm-i915") { Some(parse::drm_i915(v)?) } else { None },
-        drm_i915_min: if let Some(v) = m.value_of("drm-i915-min") { Some(parse::drm_i915_min(v)?) } else { None },
-        drm_i915_max: if let Some(v) = m.value_of("drm-i915-max") { Some(parse::drm_i915_max(v)?) } else { None },
-        drm_i915_boost: if let Some(v) = m.value_of("drm-i915-boost") { Some(parse::drm_i915_boost(v)?) } else { None },
-        nvml: if let Some(v) = m.value_of("nvml") { Some(parse::nvml(v)?) } else { None },
-        nvml_gpu_clock: if let Some(v) = m.value_of("nvml-gpu-clock") { Some(parse::nvml_gpu_clock(v)?) } else { None },
-        nvml_gpu_clock_reset: if m.is_present("nvml-gpu-clock-reset") { Some(()) } else { None },
-        nvml_power_limit: if let Some(v) = m.value_of("nvml-power-limit") { Some(parse::nvml_power_limit(v)?) } else { None },
+        show_cpu: flag("show-cpu", &m),
+        show_intel_pstate: flag("show-pstate", &m),
+        show_drm: flag("show-drm", &m),
+        show_nvml: flag("show-nvml", &m),
+        cpu: arg("cpu", &m, parse::cpu)?,
+        cpu_on: arg("cpu-on", &m, parse::cpu_on)?,
+        cpu_on_each: arg("cpu-on-each", &m, parse::cpu_on_each)?,
+        cpufreq_gov: arg("cpufreq-gov", &m, parse::cpufreq_gov)?,
+        cpufreq_min: arg("cpufreq-min", &m, parse::cpufreq_min)?,
+        cpufreq_max: arg("cpufreq-max", &m, parse::cpufreq_max)?,
+        pstate_epb: arg("pstate-epb", &m, parse::pstate_epb)?,
+        pstate_epp: arg("pstate-epp", &m, parse::pstate_epp)?,
+        drm_i915: arg("drm-i915", &m, parse::drm_i915)?,
+        drm_i915_min: arg("drm-i915-min", &m, parse::drm_i915_min)?,
+        drm_i915_max: arg("drm-i915-max", &m, parse::drm_i915_max)?,
+        drm_i915_boost: arg("drm-i915-boost", &m, parse::drm_i915_boost)?,
+        nvml: arg("nvml", &m, parse::nvml)?,
+        nvml_gpu_clock: arg("nvml-gpu-clock", &m, parse::nvml_gpu_clock)?,
+        nvml_gpu_clock_reset: flag("nvml-gpu-clock-reset", &m),
+        nvml_power_limit: arg("nvml-power-limit", &m, parse::nvml_power_limit)?,
     })
 }

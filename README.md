@@ -165,6 +165,15 @@ OPTIONS:
         --nvml-power-limit <WATTS>     Set nvidia gpu power limit per --nvml, ex. 260, 260w, 0.26kw
     -h, --help                         Prints help information
 
-ENVS:
-        KNOBS_LOG=<error|warn|info|debug|trace>    Log level, default error
+    All flags may be expressed as environment variables. For example:
+
+        --show-cpu                     => KNOBS_SHOW_CPU=1
+        --cpu 1,3-5                    => KNOBS_CPU=1,3-5
+        --cpufreq-gov schedutil        => KNOBS_CPUFREQ_GOV=schedutil
+        --nvml-gpu-clock 800mhz,1.2ghz => KNOBS_NVML_GPU_CLOCK=800mhz,1.2ghz
+
+    The log level may be set via KNOBS_LOG. The default log level is error. For example:
+
+        KNOBS_LOG=warn
+        KNOBS_LOG=debug
 ```

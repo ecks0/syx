@@ -123,6 +123,10 @@ pub fn cpu_on_each(s: &str) -> Result<Vec<(u64, bool)>> {
     parse_toggles("-O/--cpu-on-each", s)
 }
 
+pub fn cpufreq_gov(s: &str) -> Result<String> {
+    Ok(s.to_string())
+}
+
 pub fn cpufreq_min(s: &str) -> Result<Frequency> {
     parse_frequency("-n/--cpufreq-min", s)
 }
@@ -138,6 +142,10 @@ pub fn pstate_epb(s: &str) -> Result<u64> {
     } else {
         Ok(epb)
     }
+}
+
+pub fn pstate_epp(s: &str) -> Result<String> {
+    Ok(s.to_string())
 }
 
 pub fn drm_i915(s: &str) -> Result<Vec<u64>> {
