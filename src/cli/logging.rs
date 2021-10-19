@@ -8,7 +8,7 @@ pub fn configure() {
 
     Builder::from_env(env)
         .format(|buf, record| {
-            writeln!(buf, "{}",record.args())
+            writeln!(buf, "{}", record.args())
         })
         .init();
 }
