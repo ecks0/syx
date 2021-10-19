@@ -111,18 +111,7 @@ _(Assembled using output from several systems in order to show all available tab
 
  CPU  EP bias  EP preference
  ---  -------  -------------
- 0    6        balance_performance
- 1    6        balance_performance
- 2    6        balance_performance
- 3    6        balance_performance
- 4    6        balance_performance
- 5    6        balance_performance
- 6    6        balance_performance
- 7    6        balance_performance
- 8    6        balance_performance
- 9    6        balance_performance
- 10   6        balance_performance
- 11   6        balance_performance
+ all  6        balance_performance
 
  CPU  Available EP preferences
  ---  ------------------------
