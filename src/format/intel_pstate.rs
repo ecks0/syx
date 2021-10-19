@@ -9,13 +9,29 @@ fn format_status(status: &str) -> Option<String> {
 
 fn format_epb_epp(policies: &[Policy]) -> Option<String> {
     if policies.is_empty() { return None; }
+    let mut values: Vec<(Option<u64>, Option<String>)> = policies
+        .iter()
+        .map(|p| (p.energy_perf_bias, p.energy_performance_preference.clone()))
+        .collect();
+    values.sort_unstable();
+    values.dedup();
     let mut tab = Table::new(&["CPU", "EP bias", "EP preference"]);
-    for policy in policies {
+    if values.len() == 1 {
+        let values = values.pop().unwrap();
         tab.row(&[
-            policy.id.map(|v| v.to_string()).unwrap_or_else(dot),
-            policy.energy_perf_bias.map(|v| v.to_string()).unwrap_or_else(dot),
-            policy.energy_performance_preference.clone().unwrap_or_else(dot),
+            "all".to_string(),
+            values.0.map(|v| v.to_string()).unwrap_or_else(dot),
+            values.1.unwrap_or_else(dot),
         ]);
+    } else {
+        drop(values);
+        for policy in policies {
+            tab.row(&[
+                policy.id.map(|v| v.to_string()).unwrap_or_else(dot),
+                policy.energy_perf_bias.map(|v| v.to_string()).unwrap_or_else(dot),
+                policy.energy_performance_preference.clone().unwrap_or_else(dot),
+            ]);
+        }
     }
     Some(tab.to_string())
 }
