@@ -1,5 +1,5 @@
 use clap::{App, AppSettings, Arg, crate_version};
-use crate::Result;
+use crate::cli::Result;
 use super::{Cli, logging, parse};
 
 fn argv0(argv: &[String]) -> &str {
@@ -20,10 +20,12 @@ const HELP_ENV: &str = r#"ENVS:
 pub fn parse(argv: &[String]) -> Result<Cli> {
     logging::configure();
     let m = App::new(argv0(argv))
+
         .setting(AppSettings::DeriveDisplayOrder)
         .setting(AppSettings::DisableHelpSubcommand)
         .setting(AppSettings::DisableVersion)
         .setting(AppSettings::UnifiedHelpMessage)
+
         .version(crate_version!())
 
         .after_help(HELP_ENV)

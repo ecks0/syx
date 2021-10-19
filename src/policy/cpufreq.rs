@@ -1,18 +1,28 @@
 use crate::cli::Cli;
 use zysfs::types::devices::system::cpu::cpufreq::{Cpufreq, Policy};
+use zysfs::types::blocking::Read as _;
 
-pub fn policy(cli: &Cli, cpu_ids: &[u64]) -> Option<Cpufreq> {
-    if !cli.has_cpufreq_args() || cpu_ids.is_empty() { return None; }
-    let mut policies = vec![];
-    for cpu_id in cpu_ids {
-        let policy = Policy {
-            id: Some(*cpu_id),
-            scaling_governor: cli.cpufreq_gov.clone(),
-            scaling_min_freq: cli.cpufreq_min.map(|f| f.as_kilohertz() as u64),
-            scaling_max_freq: cli.cpufreq_max.map(|f| f.as_kilohertz() as u64),
+impl From<&Cli> for Option<Cpufreq> {
+    fn from(cli: &Cli) -> Self {
+        if !cli.has_cpufreq_args() { return None; }
+        let policy_ids = if let Some(ids) = cli.cpu.clone() { ids } else { Policy::ids()? };
+        let scaling_min_freq = cli.cpufreq_min.map(|f| f.as_kilohertz() as u64);
+        let scaling_max_freq = cli.cpufreq_max.map(|f| f.as_kilohertz() as u64);
+        let mut policies = vec![];
+        for policy_id in policy_ids {
+            let policy = Policy {
+                id: Some(policy_id),
+                scaling_governor: cli.cpufreq_gov.clone(),
+                scaling_min_freq,
+                scaling_max_freq,
+                ..Default::default()
+            };
+            policies.push(policy);
+        }
+        let s = Cpufreq {
+            policies: Some(policies),
             ..Default::default()
         };
-        policies.push(policy);
+        Some(s)
     }
-    Some(Cpufreq { policies: Some(policies), ..Default::default() })
 }

@@ -6,10 +6,10 @@ mod drm;
 mod intel_pstate;
 mod nvml;
 
-pub use cpu::format as format_cpu;
-pub use intel_pstate::format as format_intel_pstate;
-pub use drm::format as format_drm;
-pub use nvml::format as format_nvml;
+pub use cpu::format as cpu;
+pub use intel_pstate::format as intel_pstate;
+pub use drm::format as drm;
+pub use nvml::format as nvml;
 
 fn dot() -> String { "\u{2022}".to_string() }
 

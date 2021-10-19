@@ -38,16 +38,12 @@ impl Policy {
 
 impl From<&Cli> for Policy {
     fn from(cli: &Cli) -> Self {
-        let mut s = Self::default();
-        if cli.has_cpu_or_related_args() {
-            if let Some(cpu_ids) = cli.cpu() {
-                s.cpu = cpu::policy(cli, &cpu_ids);
-                s.cpufreq = cpufreq::policy(cli, &cpu_ids);
-                s.intel_pstate = intel_pstate::policy(cli, &cpu_ids);
-            }
+        Self {
+            cpu: cli.into(),
+            cpufreq: cli.into(),
+            drm: cli.into(),
+            intel_pstate: cli.into(),
+            nvml: cli.into(),
         }
-        s.drm = drm::policy(cli);
-        s.nvml = nvml::policy(cli);
-        s
     }
 }

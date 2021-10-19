@@ -1,1 +1,1 @@
-fn main() -> knobs::Result<()> { knobs::run() }
+fn main() { knobs::run() }

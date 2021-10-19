@@ -59,7 +59,7 @@ pub fn format() -> Option<String> {
     let cpu_pols = CpuPolicy::all()?;
     let cpufreq_pols = CpufreqPolicy::all().unwrap_or_else(Vec::new);
     let mut s = vec![];
-    if let Some(ss) = format_governors(&cpufreq_pols) { s.push(ss); }
     if let Some(ss) = format_cpu_cpufreq(&cpu_pols, &cpufreq_pols) { s.push(ss); }
+    if let Some(ss) = format_governors(&cpufreq_pols) { s.push(ss); }
     if s.is_empty() { None } else { Some(s.join("\n")) }
 }

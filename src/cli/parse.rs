@@ -1,5 +1,5 @@
 use measurements::{Frequency, Power};
-use crate::{Error, Result};
+use crate::cli::{Error, Result};
 
 fn parse_bool(flag: &'static str, s: &str) -> Result<bool> {
     match s {
@@ -83,6 +83,8 @@ fn parse_indices(flag: &'static str, s: &str) -> Result<Vec<u64>> {
             _ => return Err(Error::parse(flag, "expected sequence of indices, ex. 0,1,3-5,10")),
         }
     }
+    ids.sort_unstable();
+    ids.dedup();
     Ok(ids)
 }
 
