@@ -83,29 +83,54 @@ knobs --nvml-gpu-clock 600mhz,2.2ghz
 knobs --nvml 0,1 --nvml-gpu-clock 600mhz,2.2ghz
 ```
 
-## Example Output
+## Output values
+
+_(Assembled using output from several systems in order to show all available tables.)_
 
 ```
  CPU  Online  Governor   Cur      Min      Max      CPU min  CPU max
  ---  ------  --------   ---      ---      ---      -------  -------
- 0    •       schedutil  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 1    true    schedutil  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 2    true    schedutil  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 3    true    schedutil  4.3 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 4    true    schedutil  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 5    true    schedutil  4.3 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 6    true    schedutil  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 7    true    schedutil  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 8    true    schedutil  4.1 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 9    true    schedutil  4.1 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 10   true    schedutil  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 11   true    schedutil  4.2 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
+ 0    •       powersave  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
+ 1    true    powersave  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
+ 2    true    powersave  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
+ 3    true    powersave  4.3 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
+ 4    true    powersave  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
+ 5    true    powersave  4.3 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
+ 6    true    powersave  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
+ 7    true    powersave  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
+ 8    true    powersave  4.1 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
+ 9    true    powersave  4.1 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
+ 10   true    powersave  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
+ 11   true    powersave  4.2 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
 
  CPU  Available governors
  ---  -------------------
- all  conservative ondemand userspace powersave performance schedutil
+ all  performance powersave
 
- intel_pstate: passive
+ intel_pstate: active
+
+ CPU  EP bias  EP preference
+ ---  -------  -------------
+ 0    6        balance_performance
+ 1    6        balance_performance
+ 2    6        balance_performance
+ 3    6        balance_performance
+ 4    6        balance_performance
+ 5    6        balance_performance
+ 6    6        balance_performance
+ 7    6        balance_performance
+ 8    6        balance_performance
+ 9    6        balance_performance
+ 10   6        balance_performance
+ 11   6        balance_performance
+
+ CPU  Available EP preferences
+ ---  ------------------------
+ all  default performance balance_performance balance_power power
+
+ Card  Driver  Actual   Req'd    Min      Max      Boost    GPU min  GPU max
+ ----  ------  ------   -----    ---      ---      -----    -------  -------
+ 0     i915    100 MHz  300 MHz  100 MHz  1.4 GHz  1.4 GHz  100 MHz  1.4 GHz
 
           Nvidia GPU  0
  -------------------  -------------------
