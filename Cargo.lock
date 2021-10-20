@@ -317,7 +317,7 @@ dependencies = [
 [[package]]
 name = "nvml-facade"
 version = "0.1.0"
-source = "git+https://github.com/ecks0/nvml-facade#ba477f1dfe1608fb4b8ccf3c94b8e0e871c2f221"
+source = "git+https://github.com/ecks0/nvml-facade#a534fea81f31228d049393727e1d8018ff407730"
 dependencies = [
  "log",
  "nvml-wrapper",

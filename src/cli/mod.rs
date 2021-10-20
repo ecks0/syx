@@ -121,7 +121,6 @@ impl Cli {
         }
         #[cfg(feature = "nvml")]
         if show_all || self.show_nvml.is_some() {
-            println!("FOO");
             if let Some(ss) = format::nvml() { s.push(ss); }
         }
         if !s.is_empty() { println!("{}", s.join("\n")); }
