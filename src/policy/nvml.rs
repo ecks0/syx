@@ -1,4 +1,4 @@
-use crate::cli::Cli;
+use crate::cli::{CardId, Cli};
 
 #[derive(Clone, Debug, Default)]
 pub struct Policy {
@@ -39,12 +39,33 @@ impl Nvml {
     }
 }
 
+fn card_ids(ids: Vec<CardId>) -> Option<Vec<u32>> {
+    fn card_id(id: CardId) -> Option<u32> {
+        match id {
+            CardId::Index(id) => Some(id as u32),
+            CardId::PciId(id) => Some(nvml_facade::Nvml::device_for_pci_id(&id)?.card().id()?),
+        }
+    }
+    let mut indices = vec![];
+    for id in ids {
+        match card_id(id) {
+            Some(id) => indices.push(id),
+            _ => continue,
+        }
+    }
+    if indices.is_empty() { None } else {
+        indices.sort_unstable();
+        indices.dedup();
+        Some(indices)
+    }
+}
+
 impl From<&Cli> for Option<Nvml> {
     fn from(cli: &Cli) -> Self {
         if !cli.has_nvml_args() { return None; }
-        let ids = if let Some(ids) = cli.nvml.clone() { ids } else { nvml_facade::Nvml::ids()? };
+        let ids = if let Some(ids) = cli.nvml.clone() { card_ids(ids)? } else { nvml_facade::Nvml::ids()? };
         let gpu_clock = cli
-            .nvml_gpu_clock
+            .nvml_gpu_freq
             .map(|(min, max)| (
                 min.as_megahertz() as u32,
                 max.as_megahertz() as u32,
@@ -57,7 +78,7 @@ impl From<&Cli> for Option<Nvml> {
             let pol = Policy {
                 id: Some(id),
                 gpu_clock,
-                gpu_clock_reset: cli.nvml_gpu_clock_reset,
+                gpu_clock_reset: cli.nvml_gpu_freq_reset,
                 power_limit,
             };
             policies.push(pol);

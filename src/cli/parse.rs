@@ -1,5 +1,5 @@
 use measurements::{Frequency, Power};
-use crate::cli::{Error, Result};
+use crate::cli::{Error, CardId, Result};
 
 fn parse_bool(flag: &'static str, s: &str) -> Result<bool> {
     match s {
@@ -37,6 +37,21 @@ fn parse_frequency(flag: &'static str, s: &str) -> Result<Frequency> {
             Ok(v) => Ok(Frequency::from_megahertz(v as f64)),
             Err(_) => Err(Error::parse(flag, "expected hertz value, ex. 1300mhz, 1.3ghz")),
         }
+    }
+}
+
+fn parse_frequency_min_max(flag: &'static str, s: &str) -> Result<(Frequency, Frequency)> {
+    let s: Vec<&str> = s.split(',').collect();
+    match &s[..] {
+        [freq] => {
+            let freq = parse_frequency(flag, freq)?;
+            Ok((freq, freq))
+        }
+        [min, max] => Ok((
+            parse_frequency(flag, min)?,
+            parse_frequency(flag, max)?,
+        )),
+        _ => Err(Error::parse(flag, "Expected frequency min/max, ex. 800mhz,1.2ghz)")),
     }
 }
 
@@ -85,6 +100,26 @@ fn parse_indices(flag: &'static str, s: &str) -> Result<Vec<u64>> {
     }
     ids.sort_unstable();
     ids.dedup();
+    Ok(ids)
+}
+
+fn parse_card_ids(flag: &'static str, s: &str) -> Result<Vec<CardId>> {
+    let mut indices = vec![];
+    let mut pci_ids = vec![];
+    for ss in s.split(',') {
+        if ss.contains(':') {
+            pci_ids.push(ss.to_string());
+        } else {
+            indices.push(ss.to_string());
+        }
+    }
+    let mut ids = vec![];
+    for id in parse_indices(flag, &indices.join(","))? {
+        ids.push(CardId::Index(id));
+    }
+    for id in pci_ids {
+        ids.push(CardId::PciId(id));
+    }
     Ok(ids)
 }
 
@@ -148,8 +183,8 @@ pub fn pstate_epp(s: &str) -> Result<String> {
     Ok(s.to_string())
 }
 
-pub fn drm_i915(s: &str) -> Result<Vec<u64>> {
-    parse_indices("--drm-i915", s)
+pub fn drm_i915(s: &str) -> Result<Vec<CardId>> {
+    parse_card_ids("--drm-i915", s)
 }
 
 pub fn drm_i915_min(s: &str) -> Result<Frequency> {
@@ -164,23 +199,12 @@ pub fn drm_i915_boost(s: &str) -> Result<Frequency> {
     parse_frequency("--i915-freq-boost", s)
 }
 
-pub fn nvml(s: &str) -> Result<Vec<u32>> {
-    Ok(parse_indices("--nvml", s)?.into_iter().map(|i| i as u32).collect())
+pub fn nvml(s: &str) -> Result<Vec<CardId>> {
+    parse_card_ids("--nvml", s)
 }
 
 pub fn nvml_gpu_clock(s: &str) -> Result<(Frequency, Frequency)> {
-    let s: Vec<&str> = s.split(',').collect();
-    match &s[..] {
-        [freq] => {
-            let freq = parse_frequency("--nvml-gpu-clock", freq)?;
-            Ok((freq, freq))
-        }
-        [min, max] => Ok((
-            parse_frequency("--nvml-gpu-clock", min)?,
-            parse_frequency("--nvml-gpu-clock", max)?,
-        )),
-        _ => Err(Error::parse("--nvml-gpu-clock", "Example: 1.4ghz (constant) or 1.2ghz,1.6ghz (min,max)")),
-    }
+    parse_frequency_min_max("--nvml-gpu-clock", s)
 }
 
 pub fn nvml_power_limit(s: &str) -> Result<Power> {

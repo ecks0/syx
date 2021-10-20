@@ -2,17 +2,28 @@ use clap::{App, AppSettings, Arg, ArgMatches, crate_version};
 use log::debug;
 use crate::cli::{Cli, Result};
 
-const AFTER_HELP: &str = r#"    All flags may be expressed as environment variables. For example:
+const AFTER_HELP: &str = r#"    Units and special values are handled uniformly for all arguments.
 
-        --show-cpu                     => KNOBS_SHOW_CPU=1
-        --cpu 1,3-5                    => KNOBS_CPU=1,3-5
-        --cpufreq-gov schedutil        => KNOBS_CPUFREQ_GOV=schedutil
-        --nvml-gpu-clock 800mhz,1.2ghz => KNOBS_NVML_GPU_CLOCK=800mhz,1.2ghz
+        INDICES   A comma-delimited sequence of integers and/or integer ranges.
 
-    The log level (default error) may be set via KNOBS_LOG. For example:
+        TOGGLES   An enumeration of 0 (deactivate), 1 (activate) or - (skip) characters, where the
+                  character is an action, and the character's position is an ID on which to act.
 
-        KNOBS_LOG=warn
-        KNOBS_LOG=debug
+    Floating point values may be given for the following units.
+
+           FREQ     Default: megahertz when unspecified
+                  Supported: hz/h - khz/k - mhz/m - ghz/g - thz/t
+
+          POWER     Default: watts when unspecified
+                  Supported: mw/m - w - kw/k
+
+    All flags may be expressed as env vars. For example:
+
+        --show-cpu                 → KNOBS_SHOW_CPU=1
+        --cpu 1,3-5                → KNOBS_CPU=1,3-5
+        --nvml-gpu-freq 800,1.2ghz → KNOBS_NVML_GPU_FREQ=800,1.2ghz
+
+    The KNOBS_LOG env var may be set to trace, debug, info, warn, or error (default).
 "#;
 
 // Determine the binary name from argv[0].
@@ -123,7 +134,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .short("O")
             .long("cpu-on-each")
             .takes_value(true)
-            .value_name("[0|1|-]+")
+            .value_name("TOGGLES")
             .help("Set cpu online status, ex. 10-1 → 0=ON 1=OFF 2=SKIP 3=ON"))
 
         .arg(Arg::with_name("cpufreq-gov")
@@ -137,15 +148,15 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .short("n")
             .long("cpufreq-min")
             .takes_value(true)
-            .value_name("HZ")
-            .help("Set cpufreq min freq per --cpu, ex. 1200, 1200mhz, 1.2ghz"))
+            .value_name("FREQ")
+            .help("Set cpufreq min freq per --cpu, ex. 1200 or 1.2ghz"))
 
         .arg(Arg::with_name("cpufreq-max")
             .short("x")
             .long("cpufreq-max")
             .takes_value(true)
-            .value_name("HZ")
-            .help("Set cpufreq max freq per --cpu, ex. 1200, 1200mhz, 1.2ghz"))
+            .value_name("FREQ")
+            .help("Set cpufreq max freq per --cpu, ex. 1200 or 1.2ghz"))
 
         .arg(Arg::with_name("pstate-epb")
             .long("pstate-epb")
@@ -163,50 +174,53 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .long("drm-i915")
             .takes_value(true)
             .value_name("INDICES")
-            .help("Target i915 card ids, default all, ex. 0,1,3-5"))
+            .help("Target i915 card ids or pci ids, default all, ex. 0,1,3-5"))
 
         .arg(Arg::with_name("drm-i915-min")
             .long("drm-i915-min")
             .takes_value(true)
-            .value_name("HZ")
-            .help("Set i915 min frequency per --drm-i915, ex. 1200, 1200mhz, 1.2ghz"))
+            .value_name("FREQ")
+            .help("Set i915 min frequency per --drm-i915, ex. 1200 or 1.2ghz"))
 
         .arg(Arg::with_name("drm-i915-max")
             .long("drm-i915-max")
             .takes_value(true)
-            .value_name("HZ")
-            .help("Set i915 max frequency per --drm-i915, ex. 1200, 1200mhz, 1.2ghz"))
+            .value_name("FREQ")
+            .help("Set i915 max frequency per --drm-i915, ex. 1200 or 1.2ghz"))
 
         .arg(Arg::with_name("drm-i915-boost")
             .long("drm-i915-boost")
             .takes_value(true)
-            .value_name("HZ")
-            .help("Set i915 boost frequency per --drm-i915, ex. 1200, 1200mhz, 1.2ghz"))
+            .value_name("FREQ")
+            .help("Set i915 boost frequency per --drm-i915, ex. 1200 or 1.2ghz"))
 
         .arg(Arg::with_name("nvml")
             .long("nvml")
             .takes_value(true)
             .value_name("INDICES")
-            .help("Target nvidia gpu ids, default all, ex. 0,1,3-5"))
+            .help("Target nvidia card ids or pci ids, default all, ex. 0,1,3-5"))
 
-        .arg(Arg::with_name("nvml-gpu-clock")
-            .long("nvml-gpu-clock")
+        // It is preferred to have separate min and max arguments, however this is not straightforwardly
+        // possible with nvml. `nvml-wrapper` exposes methods to set both the min/max gpu clock at once,
+        // but does not seem to provide a way to get the current min/max gpu clock constraints.
+        .arg(Arg::with_name("nvml-gpu-freq")
+            .long("nvml-gpu-freq")
             .takes_value(true)
-            .value_name("HZ|HZ,HZ")
-            .conflicts_with("nvml-gpu-clock-reset")
-            .help("Set nvidia gpu min,max frequency per --nvml, ex. 1200mhz or 900mhz,1.4ghz"))
+            .value_name("FREQ,FREQ|FREQ")
+            .conflicts_with("nvml-gpu-freq-reset")
+            .help("Set nvidia gpu min,max frequency per --nvml, ex. 800,1.2ghz"))
 
-        .arg(Arg::with_name("nvml-gpu-clock-reset")
-            .long("nvml-gpu-clock-reset")
+        .arg(Arg::with_name("nvml-gpu-freq-reset")
+            .long("nvml-gpu-freq-reset")
             .takes_value(false)
-            .conflicts_with("nvml-gpu-clock")
+            .conflicts_with("nvml-gpu-freq")
             .help("Reset nvidia gpu frequency to default per --nvml"))
 
         .arg(Arg::with_name("nvml-power-limit")
             .long("nvml-power-limit")
             .takes_value(true)
-            .value_name("WATTS")
-            .help("Set nvidia gpu power limit per --nvml, ex. 260, 260w, 0.26kw"))
+            .value_name("POWER")
+            .help("Set nvidia card power limit per --nvml, ex. 260 or 0.26kw"))
 
         .get_matches_from(argv);
 
@@ -230,8 +244,8 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
         drm_i915_max: arg("drm-i915-max", &m, parse::drm_i915_max)?,
         drm_i915_boost: arg("drm-i915-boost", &m, parse::drm_i915_boost)?,
         nvml: arg("nvml", &m, parse::nvml)?,
-        nvml_gpu_clock: arg("nvml-gpu-clock", &m, parse::nvml_gpu_clock)?,
-        nvml_gpu_clock_reset: flag("nvml-gpu-clock-reset", &m),
+        nvml_gpu_freq: arg("nvml-gpu-freq", &m, parse::nvml_gpu_clock)?,
+        nvml_gpu_freq_reset: flag("nvml-gpu-freq-reset", &m),
         nvml_power_limit: arg("nvml-power-limit", &m, parse::nvml_power_limit)?,
     })
 }

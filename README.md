@@ -2,10 +2,10 @@
 
 ## About
 
-Display and set system tunables:
+Display and set Linux system tunables:
 
 - cpu: online/offline
-- cpufreq: governor, min and max frequencies
+- cpufreq: governor, min/max frequencies
 - intel_pstate: epb, epp
 - drm
   - i915: min/max/boost frequencies
@@ -20,21 +20,21 @@ Display and set system tunables:
 **For all CPUs**
 
 ```
-knobs -n 800mhz -x 4.4ghz
+knobs -n 800 -x 4.4ghz
 ```
 ...or with long args...
 ```
-knobs --cpufreq-min 800mhz --cpufreq-max 4.4ghz
+knobs --cpufreq-min 800 --cpufreq-max 4.4ghz
 ```
 
 **For the first 4 CPUs only**
 
 ```
-knobs -c 0-3 -n 800mz -x 4.4ghz
+knobs -c 0-3 -n 800 -x 4.4ghz
 ```
 ...or with long args...
 ```
-knobs --cpu 0-3 --cpufreq-min 800mhz --cpufreq-max 4.4ghz
+knobs --cpu 0-3 --cpufreq-min 800 --cpufreq-max 4.4ghz
 ```
 
 ---
@@ -64,13 +64,13 @@ knobs --cpu 0-3 --pstate-epb 6
 **For all GPUs**
 
 ```
-knobs --nvml-gpu-clock 600mhz,2.2ghz
+knobs --nvml-gpu-clock 600,2.2ghz
 ```
 
 **For the first 2 GPUs only**
 
 ```
-knobs --nvml 0,1 --nvml-gpu-clock 600mhz,2.2ghz
+knobs --nvml 0,1 --nvml-gpu-clock 600,2.2ghz
 ```
 
 ## Output values
@@ -133,37 +133,48 @@ USAGE:
     knobs [OPTIONS]
 
 OPTIONS:
-        --show-cpu                     Print cpu and cpufreq values
-        --show-pstate                  Print intel_pstate values
-        --show-drm                     Print drm values
-        --show-nvml                    Print nvidia management values
-    -c, --cpu <INDICES>                Target cpu ids, default all, ex. 0,1,3-5
-    -o, --cpu-on <0|1>                 Set cpu online status per --cpu
-    -O, --cpu-on-each <[0|1|-]+>       Set cpu online status, ex. 10-1 → 0=ON 1=OFF 2=SKIP 3=ON
-    -g, --cpufreq-gov <NAME>           Set cpufreq governor per --cpu
-    -n, --cpufreq-min <HZ>             Set cpufreq min freq per --cpu, ex. 1200, 1200mhz, 1.2ghz
-    -x, --cpufreq-max <HZ>             Set cpufreq max freq per --cpu, ex. 1200, 1200mhz, 1.2ghz
-        --pstate-epb <0-15>            Set intel_pstate energy/performance bias per --cpu
-        --pstate-epp <NAME>            Set intel_pstate energy/performance pref per --cpu
-        --drm-i915 <INDICES>           Target i915 card ids, default all, ex. 0,1,3-5
-        --drm-i915-min <HZ>            Set i915 min frequency per --drm-i915, ex. 1200, 1200mhz, 1.2ghz
-        --drm-i915-max <HZ>            Set i915 max frequency per --drm-i915, ex. 1200, 1200mhz, 1.2ghz
-        --drm-i915-boost <HZ>          Set i915 boost frequency per --drm-i915, ex. 1200, 1200mhz, 1.2ghz
-        --nvml <INDICES>               Target nvidia gpu ids, default all, ex. 0,1,3-5
-        --nvml-gpu-clock <HZ|HZ,HZ>    Set nvidia gpu min,max frequency per --nvml, ex. 1200mhz or 900mhz,1.4ghz
-        --nvml-gpu-clock-reset         Reset nvidia gpu frequency to default per --nvml
-        --nvml-power-limit <WATTS>     Set nvidia gpu power limit per --nvml, ex. 260, 260w, 0.26kw
-    -h, --help                         Prints help information
+        --show-cpu                          Print cpu and cpufreq values
+        --show-pstate                       Print intel_pstate values
+        --show-drm                          Print drm values
+        --show-nvml                         Print nvidia management values
+    -c, --cpu <INDICES>                     Target cpu ids, default all, ex. 0,1,3-5
+    -o, --cpu-on <0|1>                      Set cpu online status per --cpu
+    -O, --cpu-on-each <TOGGLES>             Set cpu online status, ex. 10-1 → 0=ON 1=OFF 2=SKIP 3=ON
+    -g, --cpufreq-gov <NAME>                Set cpufreq governor per --cpu
+    -n, --cpufreq-min <FREQ>                Set cpufreq min freq per --cpu, ex. 1200 or 1.2ghz
+    -x, --cpufreq-max <FREQ>                Set cpufreq max freq per --cpu, ex. 1200 or 1.2ghz
+        --pstate-epb <0-15>                 Set intel_pstate energy/performance bias per --cpu
+        --pstate-epp <NAME>                 Set intel_pstate energy/performance pref per --cpu
+        --drm-i915 <INDICES>                Target i915 card ids or pci ids, default all, ex. 0,1,3-5
+        --drm-i915-min <FREQ>               Set i915 min frequency per --drm-i915, ex. 1200 or 1.2ghz
+        --drm-i915-max <FREQ>               Set i915 max frequency per --drm-i915, ex. 1200 or 1.2ghz
+        --drm-i915-boost <FREQ>             Set i915 boost frequency per --drm-i915, ex. 1200 or 1.2ghz
+        --nvml <INDICES>                    Target nvidia card ids or pci ids, default all, ex. 0,1,3-5
+        --nvml-gpu-freq <FREQ,FREQ|FREQ>    Set nvidia gpu min,max frequency per --nvml, ex. 800,1.2ghz
+        --nvml-gpu-freq-reset               Reset nvidia gpu frequency to default per --nvml
+        --nvml-power-limit <POWER>          Set nvidia card power limit per --nvml, ex. 260 or 0.26kw
+    -h, --help                              Prints help information
 
-    All flags may be expressed as environment variables. For example:
+    Units and special values are handled uniformly for all arguments.
 
-        --show-cpu                     => KNOBS_SHOW_CPU=1
-        --cpu 1,3-5                    => KNOBS_CPU=1,3-5
-        --cpufreq-gov schedutil        => KNOBS_CPUFREQ_GOV=schedutil
-        --nvml-gpu-clock 800mhz,1.2ghz => KNOBS_NVML_GPU_CLOCK=800mhz,1.2ghz
+        INDICES   A comma-delimited sequence of integers and/or integer ranges.
 
-    The log level (default error) may be set via KNOBS_LOG. For example:
+        TOGGLES   An enumeration of 0 (deactivate), 1 (activate) or - (skip) characters, where the
+                  character is an action, and the character's position is an ID on which to act.
 
-        KNOBS_LOG=warn
-        KNOBS_LOG=debug
+    Floating point values may be given for the following units.
+
+           FREQ     Default: megahertz when unspecified
+                  Supported: hz/h - khz/k - mhz/m - ghz/g - thz/t
+
+          POWER     Default: watts when unspecified
+                  Supported: mw/m - w - kw/k
+
+    All flags may be expressed as env vars. For example:
+
+        --show-cpu                 → KNOBS_SHOW_CPU=1
+        --cpu 1,3-5                → KNOBS_CPU=1,3-5
+        --nvml-gpu-freq 800,1.2ghz → KNOBS_NVML_GPU_FREQ=800,1.2ghz
+
+    The KNOBS_LOG env var may be set to trace, debug, info, warn, or error (default).
 ```

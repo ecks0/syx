@@ -20,6 +20,12 @@ impl Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+#[derive(Clone, Debug)]
+pub enum CardId {
+    Index(u64),
+    PciId(String),
+}
+
 #[derive(Debug)]
 pub struct Cli {
     pub show_cpu: Option<()>,
@@ -34,13 +40,13 @@ pub struct Cli {
     pub cpufreq_max: Option<Frequency>,
     pub pstate_epb: Option<u64>,
     pub pstate_epp: Option<String>,
-    pub drm_i915: Option<Vec<u64>>,
+    pub drm_i915: Option<Vec<CardId>>,
     pub drm_i915_min: Option<Frequency>,
     pub drm_i915_max: Option<Frequency>,
     pub drm_i915_boost: Option<Frequency>,
-    pub nvml: Option<Vec<u32>>,
-    pub nvml_gpu_clock: Option<(Frequency, Frequency)>,
-    pub nvml_gpu_clock_reset: Option<()>,
+    pub nvml: Option<Vec<CardId>>,
+    pub nvml_gpu_freq: Option<(Frequency, Frequency)>,
+    pub nvml_gpu_freq_reset: Option<()>,
     pub nvml_power_limit: Option<Power>,
 }
 
@@ -83,8 +89,8 @@ impl Cli {
     }
 
     pub fn has_nvml_args(&self) -> bool {
-        self.nvml_gpu_clock.is_some() ||
-        self.nvml_gpu_clock_reset.is_some() ||
+        self.nvml_gpu_freq.is_some() ||
+        self.nvml_gpu_freq_reset.is_some() ||
         self.nvml_power_limit.is_some()
     }
 
