@@ -28,11 +28,11 @@ pub enum CardId {
 
 #[derive(Debug)]
 pub struct Cli {
-    pub quiet: Option<()>,
     pub show_cpu: Option<()>,
     pub show_intel_pstate: Option<()>,
     pub show_drm: Option<()>,
     pub show_nvml: Option<()>,
+    pub quiet: Option<()>,
     pub cpu: Option<Vec<u64>>,
     pub cpu_on: Option<bool>,
     pub cpu_on_each: Option<Vec<(u64, bool)>>,

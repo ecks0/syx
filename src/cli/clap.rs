@@ -235,11 +235,11 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
     use crate::cli::parse;
 
     Ok(Cli {
-        quiet: flag("quiet", &m),
         show_cpu: flag("show-cpu", &m),
         show_intel_pstate: flag("show-pstate", &m),
         show_drm: flag("show-drm", &m),
         show_nvml: flag("show-nvml", &m),
+        quiet: flag("quiet", &m),
         cpu: arg("cpu", &m, parse::cpu)?,
         cpu_on: arg("cpu-on", &m, parse::cpu_on)?,
         cpu_on_each: arg("cpu-on-each", &m, parse::cpu_on_each)?,
