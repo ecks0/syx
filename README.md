@@ -73,8 +73,6 @@ knobs --nvml 0,1 --nvml-gpu-clock 600,2.2ghz
 
 ## Output values
 
-_(Assembled using output from several systems in order to show all available tables.)_
-
 ```
  CPU  Online  Governor   Cur      Min      Max      CPU min  CPU max
  ---  ------  --------   ---      ---      ---      -------  -------
