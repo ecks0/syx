@@ -1,7 +1,5 @@
 # knobs
 
-## About
-
 Display and set Linux system tunables:
 
 - cpu: online/offline
