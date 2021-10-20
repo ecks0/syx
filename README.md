@@ -9,68 +9,6 @@ Display and set Linux system tunables:
   - i915: min/max/boost frequencies
 - nvidia: gpu clock min/max frequency, power limit
 
-## Example usage
-
----
-
-### Set cpufreq min/max frequency
-
-**For all CPUs**
-
-```
-knobs -n 800 -x 4.4ghz
-```
-...or with long args...
-```
-knobs --cpufreq-min 800 --cpufreq-max 4.4ghz
-```
-
-**For the first 4 CPUs only**
-
-```
-knobs -c 0-3 -n 800 -x 4.4ghz
-```
-...or with long args...
-```
-knobs --cpu 0-3 --cpufreq-min 800 --cpufreq-max 4.4ghz
-```
-
----
-
-### Set intel_pstate epb
-
-**For all CPUs**
-
-```
-knobs --pstate-epb 6
-```
-
-**For the first 4 CPUs only**
-
-```
-knobs -c 0-3 --pstate-epb 6
-```
-...or with long args...
-```
-knobs --cpu 0-3 --pstate-epb 6
-```
-
----
-
-### Set nvidia min/max GPU frequency
-
-**For all GPUs**
-
-```
-knobs --nvml-gpu-clock 600,2.2ghz
-```
-
-**For the first 2 GPUs only**
-
-```
-knobs --nvml 0,1 --nvml-gpu-clock 600,2.2ghz
-```
-
 ## Output values
 
 ```
@@ -177,3 +115,66 @@ OPTIONS:
 
     The KNOBS_LOG env var may be set to trace, debug, info, warn, or error (default).
 ```
+
+## Example usage
+
+---
+
+### Set cpufreq min/max frequency
+
+**For all CPUs**
+
+```
+knobs -n 800 -x 4.4ghz
+```
+...or with long args...
+```
+knobs --cpufreq-min 800 --cpufreq-max 4.4ghz
+```
+
+**For the first 4 CPUs only**
+
+```
+knobs -c 0-3 -n 800 -x 4.4ghz
+```
+...or with long args...
+```
+knobs --cpu 0-3 --cpufreq-min 800 --cpufreq-max 4.4ghz
+```
+
+---
+
+### Set intel_pstate epb
+
+**For all CPUs**
+
+```
+knobs --pstate-epb 6
+```
+
+**For the first 4 CPUs only**
+
+```
+knobs -c 0-3 --pstate-epb 6
+```
+...or with long args...
+```
+knobs --cpu 0-3 --pstate-epb 6
+```
+
+---
+
+### Set nvidia min/max GPU frequency
+
+**For all GPUs**
+
+```
+knobs --nvml-gpu-clock 600,2.2ghz
+```
+
+**For the first 2 GPUs only**
+
+```
+knobs --nvml 0,1 --nvml-gpu-clock 600,2.2ghz
+```
+
