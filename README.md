@@ -9,7 +9,7 @@ Display and set Linux system tunables:
 - intel_pstate: epb, epp
 - drm
   - i915: min/max/boost frequencies
-- nvidia: GPU clock min/max frequency, power limit
+- nvidia: gpu clock min/max frequency, power limit
 
 ## Example usage
 
@@ -133,42 +133,45 @@ USAGE:
     knobs [OPTIONS]
 
 OPTIONS:
-        --show-cpu                          Print cpu and cpufreq values
-        --show-pstate                       Print intel_pstate values
-        --show-drm                          Print drm values
-        --show-nvml                         Print nvidia management values
-    -c, --cpu <INDICES>                     Target cpu ids, default all, ex. 0,1,3-5
-    -o, --cpu-on <0|1>                      Set cpu online status per --cpu
-    -O, --cpu-on-each <TOGGLES>             Set cpu online status, ex. 10-1 → 0=ON 1=OFF 2=SKIP 3=ON
-    -g, --cpufreq-gov <NAME>                Set cpufreq governor per --cpu
-    -n, --cpufreq-min <FREQ>                Set cpufreq min freq per --cpu, ex. 1200 or 1.2ghz
-    -x, --cpufreq-max <FREQ>                Set cpufreq max freq per --cpu, ex. 1200 or 1.2ghz
-        --pstate-epb <0-15>                 Set intel_pstate energy/performance bias per --cpu
-        --pstate-epp <NAME>                 Set intel_pstate energy/performance pref per --cpu
-        --drm-i915 <INDICES>                Target i915 card ids or pci ids, default all, ex. 0,1,3-5
-        --drm-i915-min <FREQ>               Set i915 min frequency per --drm-i915, ex. 1200 or 1.2ghz
-        --drm-i915-max <FREQ>               Set i915 max frequency per --drm-i915, ex. 1200 or 1.2ghz
-        --drm-i915-boost <FREQ>             Set i915 boost frequency per --drm-i915, ex. 1200 or 1.2ghz
-        --nvml <INDICES>                    Target nvidia card ids or pci ids, default all, ex. 0,1,3-5
-        --nvml-gpu-freq <FREQ,FREQ|FREQ>    Set nvidia gpu min,max frequency per --nvml, ex. 800,1.2ghz
-        --nvml-gpu-freq-reset               Reset nvidia gpu frequency to default per --nvml
-        --nvml-power-limit <POWER>          Set nvidia card power limit per --nvml, ex. 260 or 0.26kw
-    -h, --help                              Prints help information
+        --show-cpu                       Print cpu and cpufreq values
+        --show-pstate                    Print intel_pstate values
+        --show-drm                       Print drm values
+        --show-nvml                      Print nvidia management values
+    -q, --quiet                          Do not print values
+    -c, --cpu <INDICES>                  Target cpu ids, default all, ex. 0,1,3-5
+    -o, --cpu-on <0|1>                   Set cpu online status per --cpu
+    -O, --cpu-on-each <TOGGLES>          Set cpu online status, ex. 10-1 → 0=ON 1=OFF 2=SKIP 3=ON
+    -g, --cpufreq-gov <NAME>             Set cpufreq governor per --cpu
+    -n, --cpufreq-min <FREQ>             Set cpufreq min freq per --cpu, ex. 1200 or 1.2ghz
+    -x, --cpufreq-max <FREQ>             Set cpufreq max freq per --cpu, ex. 1200 or 1.2ghz
+        --pstate-epb <0-15>              Set intel_pstate energy/performance bias per --cpu
+        --pstate-epp <NAME>              Set intel_pstate energy/performance pref per --cpu
+        --drm-i915 <INDICES>             Target i915 card ids or pci ids, default all, ex. 0,1,3-5
+        --drm-i915-min <FREQ>            Set i915 min frequency per --drm-i915, ex. 1200 or 1.2ghz
+        --drm-i915-max <FREQ>            Set i915 max frequency per --drm-i915, ex. 1200 or 1.2ghz
+        --drm-i915-boost <FREQ>          Set i915 boost frequency per --drm-i915, ex. 1200 or 1.2ghz
+        --nvml <INDICES>                 Target nvidia card ids or pci ids, default all, ex. 0,1,3-5
+        --nvml-gpu-freq <FREQ[,FREQ]>    Set nvidia gpu min,max frequency per --nvml, ex. 800,1.2ghz
+        --nvml-gpu-freq-reset            Reset nvidia gpu frequency to default per --nvml
+        --nvml-power-limit <POWER>       Set nvidia card power limit per --nvml, ex. 260 or 0.26kw
+    -h, --help                           Prints help information
 
-    Units and special values are handled uniformly for all arguments.
+    All present and supported subsystems are printed unless the --show-* or --quiet flags are used.
+
+    The following special values and units are handled uniformly for all arguments.
 
         INDICES   A comma-delimited sequence of integers and/or integer ranges.
 
         TOGGLES   An enumeration of 0 (deactivate), 1 (activate) or - (skip) characters, where the
                   character is an action, and the character's position is an ID on which to act.
 
-    Floating point values may be given for the following units.
-
-           FREQ     Default: megahertz when unspecified
+          FREQ*     Default: megahertz when unspecified
                   Supported: hz/h - khz/k - mhz/m - ghz/g - thz/t
 
-          POWER     Default: watts when unspecified
+         POWER*     Default: watts when unspecified
                   Supported: mw/m - w - kw/k
+
+        * Floating point values may be given for these units.
 
     All flags may be expressed as env vars. For example:
 

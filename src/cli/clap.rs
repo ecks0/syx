@@ -2,20 +2,22 @@ use clap::{App, AppSettings, Arg, ArgMatches, crate_version};
 use log::debug;
 use crate::cli::{Cli, Result};
 
-const AFTER_HELP: &str = r#"    Units and special values are handled uniformly for all arguments.
+const AFTER_HELP: &str = r#"    All present and supported subsystems are printed unless the --show-* or --quiet flags are used.
+
+    The following special values and units are handled uniformly for all arguments.
 
         INDICES   A comma-delimited sequence of integers and/or integer ranges.
 
         TOGGLES   An enumeration of 0 (deactivate), 1 (activate) or - (skip) characters, where the
                   character is an action, and the character's position is an ID on which to act.
 
-    Floating point values may be given for the following units.
-
-           FREQ     Default: megahertz when unspecified
+          FREQ*     Default: megahertz when unspecified
                   Supported: hz/h - khz/k - mhz/m - ghz/g - thz/t
 
-          POWER     Default: watts when unspecified
+         POWER*     Default: watts when unspecified
                   Supported: mw/m - w - kw/k
+
+        * Floating point values may be given for these units.
 
     All flags may be expressed as env vars. For example:
 
@@ -71,7 +73,7 @@ where
         None =>
             match std::env::var(&env_name(name)) {
                 Ok(v) => {
-                    debug!("--{}: using value from environment", name);
+                    debug!("--{}: using value from environment: {}", name, v);
                     v
                 },
                 _ => return Ok(None),
@@ -115,6 +117,12 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .long("show-nvml")
             .takes_value(false)
             .help("Print nvidia management values"))
+
+        .arg(Arg::with_name("quiet")
+            .short("q")
+            .long("quiet")
+            .takes_value(false)
+            .help("Do not print values"))
 
         .arg(Arg::with_name("cpu")
             .short("c")
@@ -206,7 +214,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
         .arg(Arg::with_name("nvml-gpu-freq")
             .long("nvml-gpu-freq")
             .takes_value(true)
-            .value_name("FREQ,FREQ|FREQ")
+            .value_name("FREQ[,FREQ]")
             .conflicts_with("nvml-gpu-freq-reset")
             .help("Set nvidia gpu min,max frequency per --nvml, ex. 800,1.2ghz"))
 
@@ -227,6 +235,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
     use crate::cli::parse;
 
     Ok(Cli {
+        quiet: flag("quiet", &m),
         show_cpu: flag("show-cpu", &m),
         show_intel_pstate: flag("show-pstate", &m),
         show_drm: flag("show-drm", &m),

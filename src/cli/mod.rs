@@ -28,6 +28,7 @@ pub enum CardId {
 
 #[derive(Debug)]
 pub struct Cli {
+    pub quiet: Option<()>,
     pub show_cpu: Option<()>,
     pub show_intel_pstate: Option<()>,
     pub show_drm: Option<()>,
@@ -119,6 +120,8 @@ impl Cli {
 
     pub fn run(&self) {
         self.apply();
-        self.show();
+        if self.quiet.is_none() {
+            self.show();
+        }
     }
 }
