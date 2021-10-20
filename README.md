@@ -7,9 +7,12 @@ Display and set Linux system tunables:
 - intel_pstate: epb, epp
 - drm
   - i915: min/max/boost frequencies
-- nvidia: gpu clock min/max frequency, power limit
+- nvml
+  - nvidia gpu clock min/max frequency, power limit
+  - requires nvidia management library at runtime, usually installed with the proprietary driver
+  - enabled via the `nvml` feature flag
 
-## Output values
+## Output
 
 ```
  CPU  Online  Governor   Cur      Min      Max      CPU min  CPU max

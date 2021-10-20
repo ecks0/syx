@@ -3,13 +3,16 @@ name = "knobs"
 version = "0.2.0"
 edition = "2018"
 
+[features]
+nvml = ["nvml-facade"]
+
 [dependencies]
 clap = "2.33"
 comfy-table = "4.1"
 env_logger = "0.9"
 log = "0.4"
 measurements = "0.10"
-nvml-facade = { git = "https://github.com/ecks0/nvml-facade" }
+nvml-facade = { git = "https://github.com/ecks0/nvml-facade", optional = true }
 regex = "1.5"
 thiserror = "1"
 zysfs = { git = "https://github.com/ecks0/zysfs", features = ["blocking", "types"] }

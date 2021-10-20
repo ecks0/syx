@@ -13,8 +13,10 @@ mod cpu;
 mod cpufreq;
 mod drm;
 mod intel_pstate;
+#[cfg(feature = "nvml")]
 mod nvml;
 
+#[cfg(feature = "nvml")]
 use nvml::Nvml;
 
 #[derive(Debug, Default)]
@@ -23,6 +25,7 @@ pub struct Policy {
     cpufreq: Option<Cpufreq>,
     intel_pstate: Option<IntelPstate>,
     drm: Option<Drm>,
+    #[cfg(feature = "nvml")]
     nvml: Option<Nvml>,
 }
 
@@ -32,6 +35,7 @@ impl Policy {
         if let Some(cpufreq) = &self.cpufreq { cpufreq.write(); }
         if let Some(intel_pstate) = &self.intel_pstate { intel_pstate.write(); }
         if let Some(drm) = &self.drm { drm.write(); }
+        #[cfg(feature = "nvml")]
         if let Some(nvml) = &self.nvml { nvml.write(); }
     }
 }
@@ -43,6 +47,7 @@ impl From<&Cli> for Policy {
             cpufreq: cli.into(),
             drm: cli.into(),
             intel_pstate: cli.into(),
+            #[cfg(feature = "nvml")]
             nvml: cli.into(),
         }
     }

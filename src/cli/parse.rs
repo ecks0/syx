@@ -1,4 +1,6 @@
-use measurements::{Frequency, Power};
+use measurements::Frequency;
+#[cfg(feature = "nvml")]
+use measurements::Power;
 use crate::cli::{Error, CardId, Result};
 
 fn parse_bool(flag: &'static str, s: &str) -> Result<bool> {
@@ -40,6 +42,7 @@ fn parse_frequency(flag: &'static str, s: &str) -> Result<Frequency> {
     }
 }
 
+#[cfg(feature = "nvml")]
 fn parse_frequency_min_max(flag: &'static str, s: &str) -> Result<(Frequency, Frequency)> {
     let s: Vec<&str> = s.split(',').collect();
     match &s[..] {
@@ -55,6 +58,7 @@ fn parse_frequency_min_max(flag: &'static str, s: &str) -> Result<(Frequency, Fr
     }
 }
 
+#[cfg(feature = "nvml")]
 fn parse_power(flag: &'static str, s: &str) -> Result<Power> {
     let mut pos = None;
     for (i, c) in s.chars().enumerate() {
@@ -199,14 +203,17 @@ pub fn drm_i915_boost(s: &str) -> Result<Frequency> {
     parse_frequency("--i915-freq-boost", s)
 }
 
+#[cfg(feature = "nvml")]
 pub fn nvml(s: &str) -> Result<Vec<CardId>> {
     parse_card_ids("--nvml", s)
 }
 
+#[cfg(feature = "nvml")]
 pub fn nvml_gpu_clock(s: &str) -> Result<(Frequency, Frequency)> {
     parse_frequency_min_max("--nvml-gpu-clock", s)
 }
 
+#[cfg(feature = "nvml")]
 pub fn nvml_power_limit(s: &str) -> Result<Power> {
     parse_power("--nvml-power-limit", s)
 }

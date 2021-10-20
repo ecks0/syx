@@ -87,7 +87,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
 
     crate::cli::logging::configure();
 
-    let m = App::new(argv0(argv))
+    let a = App::new(argv0(argv))
 
         .setting(AppSettings::DeriveDisplayOrder)
         .setting(AppSettings::DisableHelpSubcommand)
@@ -200,8 +200,10 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .long("drm-i915-boost")
             .takes_value(true)
             .value_name("FREQ")
-            .help("Set i915 boost frequency per --drm-i915, ex. 1200 or 1.2ghz"))
+            .help("Set i915 boost frequency per --drm-i915, ex. 1200 or 1.2ghz"));
 
+    #[cfg(feature = "nvml")]
+    let a = a
         .arg(Arg::with_name("nvml")
             .long("nvml")
             .takes_value(true)
@@ -228,9 +230,9 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .long("nvml-power-limit")
             .takes_value(true)
             .value_name("POWER")
-            .help("Set nvidia card power limit per --nvml, ex. 260 or 0.26kw"))
+            .help("Set nvidia card power limit per --nvml, ex. 260 or 0.26kw"));
 
-        .get_matches_from(argv);
+    let m = a.get_matches_from(argv);
 
     use crate::cli::parse;
 
@@ -252,9 +254,13 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
         drm_i915_min: arg("drm-i915-min", &m, parse::drm_i915_min)?,
         drm_i915_max: arg("drm-i915-max", &m, parse::drm_i915_max)?,
         drm_i915_boost: arg("drm-i915-boost", &m, parse::drm_i915_boost)?,
+        #[cfg(feature = "nvml")]
         nvml: arg("nvml", &m, parse::nvml)?,
+        #[cfg(feature = "nvml")]
         nvml_gpu_freq: arg("nvml-gpu-freq", &m, parse::nvml_gpu_clock)?,
+        #[cfg(feature = "nvml")]
         nvml_gpu_freq_reset: flag("nvml-gpu-freq-reset", &m),
+        #[cfg(feature = "nvml")]
         nvml_power_limit: arg("nvml-power-limit", &m, parse::nvml_power_limit)?,
     })
 }

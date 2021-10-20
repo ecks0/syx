@@ -4,11 +4,13 @@ use std::fmt::Display;
 mod cpu;
 mod drm;
 mod intel_pstate;
+#[cfg(feature = "nvml")]
 mod nvml;
 
 pub use cpu::format as cpu;
 pub use intel_pstate::format as intel_pstate;
 pub use drm::format as drm;
+#[cfg(feature = "nvml")]
 pub use nvml::format as nvml;
 
 fn dot() -> String { "\u{2022}".to_string() }

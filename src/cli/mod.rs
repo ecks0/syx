@@ -1,4 +1,6 @@
-use measurements::{Frequency, Power};
+use measurements::Frequency;
+#[cfg(feature = "nvml")]
+use measurements::Power;
 use crate::{format, policy::Policy};
 
 mod clap;
@@ -45,9 +47,13 @@ pub struct Cli {
     pub drm_i915_min: Option<Frequency>,
     pub drm_i915_max: Option<Frequency>,
     pub drm_i915_boost: Option<Frequency>,
+    #[cfg(feature = "nvml")]
     pub nvml: Option<Vec<CardId>>,
+    #[cfg(feature = "nvml")]
     pub nvml_gpu_freq: Option<(Frequency, Frequency)>,
+    #[cfg(feature = "nvml")]
     pub nvml_gpu_freq_reset: Option<()>,
+    #[cfg(feature = "nvml")]
     pub nvml_power_limit: Option<Power>,
 }
 
@@ -89,6 +95,7 @@ impl Cli {
         self.has_drm_i915_args()
     }
 
+    #[cfg(feature = "nvml")]
     pub fn has_nvml_args(&self) -> bool {
         self.nvml_gpu_freq.is_some() ||
         self.nvml_gpu_freq_reset.is_some() ||
@@ -112,7 +119,9 @@ impl Cli {
         if show_all || self.show_drm.is_some() {
             if let Some(ss) = format::drm() { s.push(ss); }
         }
+        #[cfg(feature = "nvml")]
         if show_all || self.show_nvml.is_some() {
+            println!("FOO");
             if let Some(ss) = format::nvml() { s.push(ss); }
         }
         if !s.is_empty() { println!("{}", s.join("\n")); }
