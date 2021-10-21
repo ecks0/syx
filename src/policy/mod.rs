@@ -1,5 +1,5 @@
 use zysfs::types::{
-    blocking::Write as _,
+    std::Write as _,
     devices::system::cpu::{
         Cpu,
         cpufreq::Cpufreq,

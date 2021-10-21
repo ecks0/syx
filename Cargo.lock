@@ -618,8 +618,8 @@ dependencies = [
 
 [[package]]
 name = "zysfs"
-version = "0.1.0"
-source = "git+https://github.com/ecks0/zysfs#fe54737738d5a0dd90965bb5066627091b84b062"
+version = "0.2.0"
+source = "git+https://github.com/ecks0/zysfs#0ee7907b08e2bc9659e15a388e6baa84208b2ac6"
 dependencies = [
  "log",
  "nix",

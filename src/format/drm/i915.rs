@@ -1,5 +1,5 @@
 use measurements::Frequency;
-use zysfs::types::blocking::Read as _;
+use zysfs::types::std::Read as _;
 use zysfs::types::class::drm::{Card, DriverPolicy};
 use crate::format::{Table, dot};
 

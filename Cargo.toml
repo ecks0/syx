@@ -15,4 +15,4 @@ measurements = "0.10"
 nvml-facade = { git = "https://github.com/ecks0/nvml-facade", optional = true }
 regex = "1.5"
 thiserror = "1"
-zysfs = { git = "https://github.com/ecks0/zysfs", features = ["blocking", "types"] }
+zysfs = { git = "https://github.com/ecks0/zysfs", features = ["logging", "std", "types"] }

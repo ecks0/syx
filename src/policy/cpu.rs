@@ -1,5 +1,5 @@
 use zysfs::types::devices::system::cpu::{Cpu, Policy};
-use zysfs::types::blocking::Read as _;
+use zysfs::types::std::Read as _;
 use crate::cli::Cli;
 
 impl From<&Cli> for Option<Cpu> {

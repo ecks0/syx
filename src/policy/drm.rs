@@ -1,6 +1,6 @@
-use zysfs::io::class::drm::blocking::driver as drm_driver;
+use zysfs::io::class::drm::std::driver as drm_driver;
 use zysfs::types::class::drm::{Card, DriverPolicy, Drm, I915};
-use zysfs::types::blocking::Read as _;
+use zysfs::types::std::Read as _;
 use crate::cli::{CardId, Cli};
 
 fn card_ids(ids: Vec<CardId>) -> Option<Vec<u64>> {

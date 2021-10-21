@@ -1,5 +1,5 @@
 use measurements::Frequency;
-use zysfs::types::blocking::Read as _;
+use zysfs::types::std::Read as _;
 use zysfs::types::devices::system::cpu::Policy as CpuPolicy;
 use zysfs::types::devices::system::cpu::cpufreq::Policy as CpufreqPolicy;
 use crate::format::{dot, Table};

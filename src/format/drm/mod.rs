@@ -1,5 +1,5 @@
-use zysfs::io::class::drm::blocking::driver;
-use zysfs::types::blocking::Read as _;
+use zysfs::io::class::drm::std::driver;
+use zysfs::types::std::Read as _;
 use zysfs::types::class::drm::Card;
 
 mod i915;

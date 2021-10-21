@@ -1,6 +1,6 @@
 use crate::cli::Cli;
 use zysfs::types::devices::system::cpu::intel_pstate::{IntelPstate, Policy};
-use zysfs::types::blocking::Read as _;
+use zysfs::types::std::Read as _;
 
 impl From<&Cli> for Option<IntelPstate> {
     fn from(cli: &Cli) -> Self {

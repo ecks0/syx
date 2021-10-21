@@ -1,6 +1,6 @@
 use crate::cli::Cli;
 use zysfs::types::devices::system::cpu::cpufreq::{Cpufreq, Policy};
-use zysfs::types::blocking::Read as _;
+use zysfs::types::std::Read as _;
 
 impl From<&Cli> for Option<Cpufreq> {
     fn from(cli: &Cli) -> Self {
