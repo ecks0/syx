@@ -23,9 +23,8 @@ fn bytes(b: u64) -> String {
     else { format!("{:.1} TB", b as f64/(1000u64.pow(4) as f64)) }
 }
 
-const WIDTH: i64 = 19; // width of the widest label we expect to display
-
 fn pad(s: &str, left: bool) -> String {
+    const WIDTH: i64 = 19; // width of the widest label we expect to display
     let len: i64 = s.len().try_into().unwrap();
     let pad = (WIDTH-len).max(0) as usize;
     if left {
@@ -75,9 +74,8 @@ impl<'a> NvmlTable<'a> {
     }
 }
 
-const DEVICES_PER_TABLE: usize = 2;
-
 pub fn format() -> Option<String> {
+    const DEVICES_PER_TABLE: usize = 2;
     let devices = Nvml::devices()?;
     let spam = regex::Regex::new("(?i)nvidia ").unwrap();
     let mut s = vec![];

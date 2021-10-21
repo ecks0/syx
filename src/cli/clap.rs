@@ -17,7 +17,7 @@ const AFTER_HELP: &str = r#"    All present and supported subsystems are printed
          POWER*     Default: watts when unspecified
                   Supported: mw/m - w - kw/k
 
-        * Floating point values may be given for these units.
+        * → Floating point values may be given for these units.
 
     All flags may be expressed as env vars. For example:
 
@@ -257,7 +257,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
         #[cfg(feature = "nvml")]
         nvml: arg("nvml", &m, parse::nvml)?,
         #[cfg(feature = "nvml")]
-        nvml_gpu_freq: arg("nvml-gpu-freq", &m, parse::nvml_gpu_clock)?,
+        nvml_gpu_freq: arg("nvml-gpu-freq", &m, parse::nvml_gpu_freq)?,
         #[cfg(feature = "nvml")]
         nvml_gpu_freq_reset: flag("nvml-gpu-freq-reset", &m),
         #[cfg(feature = "nvml")]

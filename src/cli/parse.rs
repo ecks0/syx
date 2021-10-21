@@ -209,8 +209,8 @@ pub fn nvml(s: &str) -> Result<Vec<CardId>> {
 }
 
 #[cfg(feature = "nvml")]
-pub fn nvml_gpu_clock(s: &str) -> Result<(Frequency, Frequency)> {
-    parse_frequency_min_max("--nvml-gpu-clock", s)
+pub fn nvml_gpu_freq(s: &str) -> Result<(Frequency, Frequency)> {
+    parse_frequency_min_max("--nvml-gpu-freq", s)
 }
 
 #[cfg(feature = "nvml")]
