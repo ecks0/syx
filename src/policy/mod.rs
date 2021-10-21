@@ -1,7 +1,7 @@
 use zysfs::types::{
     std::Write as _,
-    devices::system::cpu::{
-        Cpu,
+    devices::system::{
+        cpu::Cpu,
         cpufreq::Cpufreq,
         intel_pstate::IntelPstate,
     },

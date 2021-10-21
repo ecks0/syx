@@ -1,6 +1,6 @@
-use zysfs::io::devices::system::cpu::intel_pstate::std::status;
+use zysfs::io::devices::system::intel_pstate::std::status;
+use zysfs::types::devices::system::intel_pstate::Policy;
 use zysfs::types::std::Read as _;
-use zysfs::types::devices::system::cpu::intel_pstate::Policy;
 use crate::format::{Table, dot};
 
 fn format_status(status: &str) -> Option<String> {

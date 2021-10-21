@@ -202,7 +202,7 @@ dependencies = [
 
 [[package]]
 name = "knobs"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "clap",
  "comfy-table",
@@ -619,7 +619,7 @@ dependencies = [
 [[package]]
 name = "zysfs"
 version = "0.2.0"
-source = "git+https://github.com/ecks0/zysfs#0ee7907b08e2bc9659e15a388e6baa84208b2ac6"
+source = "git+https://github.com/ecks0/zysfs#1307d2e709d5676b21675c0e995dfadeb859008c"
 dependencies = [
  "log",
  "nix",
