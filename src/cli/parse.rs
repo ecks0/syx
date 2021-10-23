@@ -134,7 +134,7 @@ fn parse_toggles(flag: &'static str, s: &str) -> Result<Vec<(u64, bool)>> {
             (
                 i as u64,
                 match c {
-                    '-' => continue,
+                    '-' | '_' => continue,
                     '0' => false,
                     '1' => true,
                     _ => return Err(Error::parse(flag, "expected sequence of 0, 1, or -")),

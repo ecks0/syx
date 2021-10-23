@@ -8,7 +8,7 @@ const AFTER_HELP: &str = r#"    All present and supported subsystems are printed
 
         INDICES   A comma-delimited sequence of integers and/or integer ranges.
 
-        TOGGLES   An enumeration of 0 (deactivate), 1 (activate) or - (skip) characters, where the
+        TOGGLES   An enumeration of 0 (deactivate), 1 (activate) or _ (skip) characters, where the
                   character is an action, and the character's position is an ID on which to act.
 
           FREQ*     Default: megahertz when unspecified
@@ -143,7 +143,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .long("cpu-on-each")
             .takes_value(true)
             .value_name("TOGGLES")
-            .help("Set cpu online status, ex. 10-1 → 0=ON 1=OFF 2=SKIP 3=ON"))
+            .help("Set cpu online status, ex. 10_1 → 0=ON 1=OFF 2=SKIP 3=ON"))
 
         .arg(Arg::with_name("cpufreq-gov")
             .short("g")
