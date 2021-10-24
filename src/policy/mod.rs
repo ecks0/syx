@@ -1,12 +1,10 @@
-use zysfs::types::{
-    std::Write as _,
-    devices::system::{
-        cpu::Cpu,
-        cpufreq::Cpufreq,
-        intel_pstate::IntelPstate,
-    },
-    class::drm::Drm,
+use zysfs::types::class::drm::Drm;
+use zysfs::types::devices::system::{
+    cpu::Cpu,
+    cpufreq::Cpufreq,
+    intel_pstate::IntelPstate,
 };
+use zysfs::types::std::Write as _;
 use crate::cli::Cli;
 
 mod cpu;
@@ -31,9 +29,14 @@ pub struct Policy {
 
 impl Policy {
     pub fn apply(&self) {
+        if self.cpufreq.is_some() || self.intel_pstate.is_some() {
+            if let Some(cpu_prev_state) = cpu::set_all_cpus_online() {
+                if let Some(cpufreq) = &self.cpufreq { cpufreq.write(); }
+                if let Some(intel_pstate) = &self.intel_pstate { intel_pstate.write(); }
+                cpu::set_cpus_online(cpu_prev_state);
+            }
+        }
         if let Some(cpu) = &self.cpu { cpu.write(); }
-        if let Some(cpufreq) = &self.cpufreq { cpufreq.write(); }
-        if let Some(intel_pstate) = &self.intel_pstate { intel_pstate.write(); }
         if let Some(drm) = &self.drm { drm.write(); }
         #[cfg(feature = "nvml")]
         if let Some(nvml) = &self.nvml { nvml.write(); }

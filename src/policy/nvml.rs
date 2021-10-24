@@ -63,7 +63,9 @@ fn card_ids(ids: Vec<CardId>) -> Option<Vec<u32>> {
 impl From<&Cli> for Option<Nvml> {
     fn from(cli: &Cli) -> Self {
         if !cli.has_nvml_args() { return None; }
-        let ids = if let Some(ids) = cli.nvml.clone() { card_ids(ids)? } else { nvml_facade::Nvml::ids()? };
+        let ids = cli.nvml.clone()
+            .and_then(card_ids)
+            .or_else(nvml_facade::Nvml::ids)?;
         let gpu_clock = cli
             .nvml_gpu_freq
             .map(|(min, max)| (

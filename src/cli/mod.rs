@@ -58,6 +58,11 @@ pub struct Cli {
 }
 
 impl Cli {
+    pub fn new() -> Result<Self> {
+        let args: Vec<String> = std::env::args().collect();
+        Self::from_args(&args)
+    }
+
     pub fn from_args(argv: &[String]) -> Result<Self> {
         clap::parse(argv)
     }

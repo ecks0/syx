@@ -210,6 +210,7 @@ dependencies = [
  "log",
  "measurements",
  "nvml-facade",
+ "once_cell",
  "regex",
  "thiserror",
  "zysfs",

@@ -210,9 +210,6 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .value_name("INDICES")
             .help("Target nvidia card ids or pci ids, default all, ex. 0,1,3-5"))
 
-        // It is preferred to have separate min and max arguments, however this is not straightforwardly
-        // possible with nvml. `nvml-wrapper` exposes methods to set both the min/max gpu clock at once,
-        // but does not seem to provide a way to get the current min/max gpu clock constraints.
         .arg(Arg::with_name("nvml-gpu-freq")
             .long("nvml-gpu-freq")
             .takes_value(true)
