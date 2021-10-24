@@ -30,11 +30,10 @@ pub struct Policy {
 impl Policy {
     pub fn apply(&self) {
         if self.cpufreq.is_some() || self.intel_pstate.is_some() {
-            if let Some(offline_cpus) = cpu::set_all_cpus_online() {
-                if let Some(cpufreq) = &self.cpufreq { cpufreq.write(); }
-                if let Some(intel_pstate) = &self.intel_pstate { intel_pstate.write(); }
-                cpu::set_cpus_offline(offline_cpus);
-            }
+            let onlined_cpus = cpu::set_all_cpus_online();
+            if let Some(cpufreq) = &self.cpufreq { cpufreq.write(); }
+            if let Some(intel_pstate) = &self.intel_pstate { intel_pstate.write(); }
+            if let Some(ids) = onlined_cpus { cpu::set_cpus_offline(ids); }
         }
         if let Some(cpu) = &self.cpu { cpu.write(); }
         if let Some(drm) = &self.drm { drm.write(); }
