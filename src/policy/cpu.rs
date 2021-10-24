@@ -1,36 +1,32 @@
 use once_cell::sync::Lazy;
-use zysfs::io::devices::system::cpu::std::{cpu_online, set_cpu_online};
+use zysfs::io::devices::system::cpu::std::{cpus, cpu_online, set_cpu_online};
 use zysfs::types::devices::system::cpu::{Cpu, Policy};
 use crate::cli::Cli;
 
-static CPU_IDS: Lazy<Option<Vec<u64>>> = Lazy::new(|| {
-    zysfs::io::devices::system::cpu::std::cpus().ok()
-});
+static CPU_IDS: Lazy<Option<Vec<u64>>> = Lazy::new(|| cpus().ok());
 
 fn cpu_ids() -> Option<Vec<u64>> { CPU_IDS.clone() }
 
-pub(super) fn set_all_cpus_online() -> Option<Vec<(u64, Option<bool>)>> {
-    if let Some(cpu_ids) = cpu_ids() {
-        let cpu_id_online: Vec<(u64, Option<bool>)> = cpu_ids
-            .into_iter()
-            .map(|id| (id, cpu_online(id).ok()))
-            .collect();
-        for (id, online) in cpu_id_online.clone() {
-            if let Some(v) = online {
-                if !v { let _ = set_cpu_online(id, true); }
-            }
-        }
-        Some(cpu_id_online)
-    } else {
-        None
-    }
+pub(super) fn set_all_cpus_online() -> Option<Vec<u64>> {
+    cpu_ids().map(|ids| ids
+        .into_iter()
+        .filter_map(|id|
+            cpu_online(id).ok()
+                .and_then(|online|
+                    if online {
+                        None
+                    } else {
+                        set_cpu_online(id, true).ok().map(|_| id)
+                    }
+                )
+        )
+        .collect()
+    )
 }
 
-pub(super) fn set_cpus_online(cpu_id_online: Vec<(u64, Option<bool>)>) {
-    for (id, online) in cpu_id_online {
-        if let Some(v) = online {
-            if !v { let _ = set_cpu_online(id, false); }
-        }
+pub(super) fn set_cpus_offline(cpu_ids: Vec<u64>) {
+    for id in cpu_ids {
+        let _ = set_cpu_online(id, false);
     }
 }
 
