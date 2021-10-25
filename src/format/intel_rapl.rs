@@ -6,7 +6,7 @@ use crate::format::{dot, Table};
 pub fn format() -> Option<String> {
     let pols = Policy::all()?;
     if pols.is_empty() { return None; }
-    let mut tab = Table::new(&["Name", "Pkg", "Zone", "C0 Lim", "C1 Lim", "C0 Win", "C1 Win", "Energy", "Max"]);
+    let mut tab = Table::new(&["Name", "Pkg:Zone", "C0 Lim", "C1 Lim", "C0 Win", "C1 Win", "Energy", "Max"]);
     for pol in pols {
         let id = if let Some(id) = pol.id { id } else { continue; };
         let c0 = pol.constraints
@@ -21,8 +21,11 @@ pub fn format() -> Option<String> {
                 .find(|p| matches!(p.id, Some(1))));
         tab.row(&[
             pol.name.clone().unwrap_or_else(dot),
-            id.zone.to_string(),
-            id.subzone.map(|v| v.to_string()).unwrap_or_else(dot),
+            format!(
+                "{}{}",
+                id.zone,
+                id.subzone.map(|v| format!(":{}", v)).unwrap_or_else(String::new)
+            ),
             c0
                 .and_then(|v| v.power_limit_uw)
                 .map(|v| format!("{:.0}", Power::from_microwatts(v as f64)))
