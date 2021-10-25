@@ -1,7 +1,7 @@
-use zysfs::types::class::drm::Drm;
-use zysfs::types::devices::system::{
+use zysfs::types::{
     cpu::Cpu,
     cpufreq::Cpufreq,
+    drm::Drm,
     intel_pstate::IntelPstate,
 };
 use zysfs::types::std::Write as _;

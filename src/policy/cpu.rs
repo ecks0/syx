@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
-use zysfs::io::devices::system::cpu::std::{cpus, cpu_online, set_cpu_online};
-use zysfs::types::devices::system::cpu::{Cpu, Policy};
+use zysfs::io::cpu::std::{cpus, cpu_online, set_cpu_online};
+use zysfs::types::cpu::{Cpu, Policy};
 use crate::cli::Cli;
 
 static CPU_IDS: Lazy<Option<Vec<u64>>> = Lazy::new(|| cpus().ok());

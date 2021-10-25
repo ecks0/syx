@@ -1,5 +1,5 @@
-use zysfs::io::devices::system::intel_pstate::std::status;
-use zysfs::types::devices::system::intel_pstate::Policy;
+use zysfs::io::intel_pstate::std::status;
+use zysfs::types::intel_pstate::Policy;
 use zysfs::types::std::Read as _;
 use crate::format::{Table, dot};
 

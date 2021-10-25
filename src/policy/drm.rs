@@ -1,5 +1,5 @@
-use zysfs::io::class::drm::std::driver as drm_driver;
-use zysfs::types::class::drm::{Card, DriverPolicy, Drm, I915};
+use zysfs::io::drm::std::driver as drm_driver;
+use zysfs::types::drm::{Card, DriverPolicy, Drm, I915};
 use zysfs::types::std::Read as _;
 use crate::cli::{CardId, Cli};
 

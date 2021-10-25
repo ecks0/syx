@@ -1,6 +1,6 @@
 use measurements::Frequency;
+use zysfs::types::drm::{Card, DriverPolicy};
 use zysfs::types::std::Read as _;
-use zysfs::types::class::drm::{Card, DriverPolicy};
 use crate::format::{Table, dot};
 
 pub(crate) fn mhz(mhz: u64) -> String {

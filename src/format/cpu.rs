@@ -1,5 +1,5 @@
 use measurements::Frequency;
-use zysfs::types::devices::system::{
+use zysfs::types::{
     cpu::Policy as CpuPolicy,
     cpufreq::Policy as CpufreqPolicy,
 };

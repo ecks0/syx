@@ -1,6 +1,6 @@
-use zysfs::io::class::drm::std::driver;
+use zysfs::io::drm::std::driver;
 use zysfs::types::std::Read as _;
-use zysfs::types::class::drm::Card;
+use zysfs::types::drm::Card;
 
 mod i915;
 
