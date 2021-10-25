@@ -189,7 +189,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .long("rapl-package")
             .takes_value(true)
             .value_name("INT")
-            .help("Target intel-rapl package"))
+            .help("Target intel-rapl package, default 0"))
 
         .arg(Arg::with_name("rapl-zone")
             .short("z")
@@ -210,7 +210,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .long("rapl-limit")
             .takes_value(true)
             .value_name("POWER")
-            .requires_all(&["rapl-package", "rapl-constraint"])
+            .requires_all(&["rapl-constraint"])
             .help("Set intel-rapl power limit per --rapl-package/zone/constraint"))
 
         .arg(Arg::with_name("rapl-window")
@@ -218,7 +218,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .long("rapl-window")
             .takes_value(true)
             .value_name("DURATION")
-            .requires_all(&["rapl-package", "rapl-constraint"])
+            .requires_all(&["rapl-constraint"])
             .help("Set intel-rapl time window per --rapl-package/zone/constraint"))
 
         .arg(Arg::with_name("drm-i915")
@@ -291,7 +291,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
         cpufreq_max: arg("cpufreq-max", &m, parse::cpufreq_max)?,
         pstate_epb: arg("pstate-epb", &m, parse::pstate_epb)?,
         pstate_epp: arg("pstate-epp", &m, parse::pstate_epp)?,
-        rapl_package: arg("rapl-package", &m, parse::rapl_package)?,
+        rapl_package: arg("rapl-package", &m, parse::rapl_package)?.or(Some(0)),
         rapl_zone: arg("rapl-zone", &m, parse::rapl_zone)?,
         rapl_constraint: arg("rapl-constraint", &m, parse::rapl_constraint)?,
         rapl_limit: arg("rapl-limit", &m, parse::rapl_limit)?,
