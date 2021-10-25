@@ -53,7 +53,7 @@ fn parse_frequency_min_max(flag: &'static str, s: &str) -> Result<(Frequency, Fr
             parse_frequency(flag, min)?,
             parse_frequency(flag, max)?,
         )),
-        _ => Err(Error::parse(flag, "Expected frequency min/max, ex. 800mhz,1.2ghz)")),
+        _ => Err(Error::parse(flag, "Expected frequency min/max, ex. 800,1.2ghz)")),
     }
 }
 
@@ -156,7 +156,7 @@ fn parse_toggles(flag: &'static str, s: &str) -> Result<Vec<(u64, bool)>> {
 
 fn parse_u64(flag: &'static str, s: &str) -> Result<u64> {
     s.parse::<u64>()
-        .map_err(|_| Error::parse(flag, "expected 64-bit integer value"))
+        .map_err(|_| Error::parse(flag, "expected 64-bit unsigned integer value"))
 }
 
 pub fn cpu(s: &str) -> Result<Vec<u64>> {

@@ -37,13 +37,13 @@ Display and set Linux system tunables:
  ---  ------------------------
  all  default performance balance_performance balance_power power
 
- Powercap    Pkg  Zone  Enabled  Long-term  Short-term  Cur      Max
- --------    ---  ----  -------  ---------  ----------  ---      ---
- intel-rapl  0    •     true     4.0 W      6.0 W       381.1 J  262.1 kJ
- intel-rapl  0    0     false    0.0 fW     •           232.4 J  262.1 kJ
- intel-rapl  0    1     false    0.0 fW     •           1.0 J    262.1 kJ
- intel-rapl  0    2     false    0.0 fW     •           43.7 J   262.1 kJ
- intel-rapl  1    •     false    0.0 fW     0.0 fW      10.5 J   262.1 kJ
+ Name       Pkg  Zone  Enabled  Long-term  Short-term  Cur      Max
+ ----       ---  ----  -------  ---------  ----------  ---      ---
+ package-0  0    •     true     4.0 W      6.0 W       926.5 J  262.1 kJ
+ core       0    0     false    0.0 fW     •           333.9 J  262.1 kJ
+ uncore     0    1     false    0.0 fW     •           1.0 J    262.1 kJ
+ dram       0    2     false    0.0 fW     •           121.8 J  262.1 kJ
+ psys       1    •     false    0.0 fW     0.0 fW      56.7 J   262.1 kJ
 
  Card  Driver  Actual   Req'd    Min      Max      Boost    GPU min  GPU max
  ----  ------  ------   -----    ---      ---      -----    -------  -------
@@ -65,25 +65,31 @@ Display and set Linux system tunables:
 ## Help
 
 ```
-knobs 0.2.0
+knobs 0.2.3
 
 USAGE:
     knobs [OPTIONS]
 
 OPTIONS:
         --show-cpu                       Print cpu and cpufreq values
-        --show-pstate                    Print intel_pstate values
+        --show-pstate                    Print intel-pstate values
+        --show-rapl                      Print intel-rapl values
         --show-drm                       Print drm values
         --show-nvml                      Print nvidia management values
     -q, --quiet                          Do not print values
     -c, --cpu <INDICES>                  Target cpu ids, default all, ex. 0,1,3-5
     -o, --cpu-on <0|1>                   Set cpu online status per --cpu
-    -O, --cpu-on-each <TOGGLES>          Set cpu online status, ex. 10-1 → 0=ON 1=OFF 2=SKIP 3=ON
+    -O, --cpu-on-each <TOGGLES>          Set cpu online status, ex. 10_1 → 0=ON 1=OFF 2=SKIP 3=ON
     -g, --cpufreq-gov <NAME>             Set cpufreq governor per --cpu
     -n, --cpufreq-min <FREQ>             Set cpufreq min freq per --cpu, ex. 1200 or 1.2ghz
     -x, --cpufreq-max <FREQ>             Set cpufreq max freq per --cpu, ex. 1200 or 1.2ghz
-        --pstate-epb <0-15>              Set intel_pstate energy/performance bias per --cpu
-        --pstate-epp <NAME>              Set intel_pstate energy/performance pref per --cpu
+        --pstate-epb <0-15>              Set intel-pstate energy/performance bias per --cpu
+        --pstate-epp <NAME>              Set intel-pstate energy/performance pref per --cpu
+    -p, --rapl-package <INT>             Target intel-rapl package
+    -z, --rapl-zone <INT>                Target intel-rapl zone
+    -C, --rapl-constraint <INT>          Target intel-rapl constraint
+    -l, --rapl-limit <POWER>             Set intel-rapl power limit per --rapl-package/zone/constraint
+    -w, --rapl-window <DURATION>         Set intel-rapl time window per --rapl-package/zone/constraint
         --drm-i915 <INDICES>             Target i915 card ids or pci ids, default all, ex. 0,1,3-5
         --drm-i915-min <FREQ>            Set i915 min frequency per --drm-i915, ex. 1200 or 1.2ghz
         --drm-i915-max <FREQ>            Set i915 max frequency per --drm-i915, ex. 1200 or 1.2ghz
@@ -91,25 +97,26 @@ OPTIONS:
         --nvml <INDICES>                 Target nvidia card ids or pci ids, default all, ex. 0,1,3-5
         --nvml-gpu-freq <FREQ[,FREQ]>    Set nvidia gpu min,max frequency per --nvml, ex. 800,1.2ghz
         --nvml-gpu-freq-reset            Reset nvidia gpu frequency to default per --nvml
-        --nvml-power-limit <POWER>       Set nvidia card power limit per --nvml, ex. 260 or 0.26kw
+        --nvml-power-limit <POWER>       Set nvidia card power limit per --nvml
     -h, --help                           Prints help information
 
-    All present and supported subsystems are printed unless the --show-* or --quiet flags are used.
+         INDICES   A comma-delimited sequence of integers and/or integer ranges.
 
-    The following special values and units are handled uniformly for all arguments.
+         TOGGLES   An enumeration of 0 (offline), 1 (online) or _ (skip) characters.
+                   The character's position indicates the ID on which to act.
 
-        INDICES   A comma-delimited sequence of integers and/or integer ranges.
+            FREQ*    Default: megahertz when unspecified
+                   Supported: hz/h - khz/k - mhz/m - ghz/g - thz/t
 
-        TOGGLES   An enumeration of 0 (deactivate), 1 (activate) or - (skip) characters, where the
-                  character is an action, and the character's position is an ID on which to act.
+           POWER*    Default: milliwatts when unspecified
+                   Supported: uw/u - mw/m - w - kw/k
 
-          FREQ*     Default: megahertz when unspecified
-                  Supported: hz/h - khz/k - mhz/m - ghz/g - thz/t
-
-         POWER*     Default: watts when unspecified
-                  Supported: mw/m - w - kw/k
+        DURATION     Default: milliseconds when unspecified
+                   Supported: ns/n - us/u - ms/m - s
 
         * Floating point values may be given for these units.
+
+    Values for supported hardware are shown unless the --show-* or --quiet flags are used.
 
     All flags may be expressed as env vars. For example:
 

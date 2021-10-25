@@ -2,25 +2,23 @@ use clap::{App, AppSettings, Arg, ArgMatches, crate_version};
 use log::debug;
 use crate::cli::{Cli, Result};
 
-const AFTER_HELP: &str = r#"    All present and supported subsystems are printed unless the --show-* or --quiet flags are used.
+const AFTER_HELP: &str = r#"         INDICES   A comma-delimited sequence of integers and/or integer ranges.
 
-    The following special values and units are handled uniformly for all arguments.
+         TOGGLES   An enumeration of 0 (offline), 1 (online) or _ (skip) characters.
+                   The character's position indicates the ID on which to act.
 
-         INDICES   A comma-delimited sequence of integers and/or integer ranges.
-
-         TOGGLES   An enumeration of 0 (deactivate), 1 (activate) or _ (skip) characters, where the
-                   character is an action, and the character's position is an ID on which to act.
-
-           FREQ*     Default: megahertz when unspecified
+            FREQ*    Default: megahertz when unspecified
                    Supported: hz/h - khz/k - mhz/m - ghz/g - thz/t
 
-          POWER*     Default: milliwatts when unspecified
+           POWER*    Default: milliwatts when unspecified
                    Supported: uw/u - mw/m - w - kw/k
 
         DURATION     Default: milliseconds when unspecified
                    Supported: ns/n - us/u - ms/m - s
 
         * Floating point values may be given for these units.
+
+    Values for supported hardware are shown unless the --show-* or --quiet flags are used.
 
     All flags may be expressed as env vars. For example:
 
@@ -213,7 +211,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .takes_value(true)
             .value_name("POWER")
             .requires_all(&["rapl-package", "rapl-constraint"])
-            .help("Set intel-rapl power limit"))
+            .help("Set intel-rapl power limit per --rapl-package/zone/constraint"))
 
         .arg(Arg::with_name("rapl-window")
             .short("w")
@@ -221,7 +219,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .takes_value(true)
             .value_name("DURATION")
             .requires_all(&["rapl-package", "rapl-constraint"])
-            .help("Set intel-rapl time window"))
+            .help("Set intel-rapl time window per --rapl-package/zone/constraint"))
 
         .arg(Arg::with_name("drm-i915")
             .long("drm-i915")
