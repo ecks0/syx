@@ -206,7 +206,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .help("Set intel-rapl c0 power limit per --rapl-package/zone"))
 
         .arg(Arg::with_name("rapl-c1-limit")
-            .short("l")
+            .short("1")
             .long("rapl-c1-limit")
             .takes_value(true)
             .value_name("POWER")

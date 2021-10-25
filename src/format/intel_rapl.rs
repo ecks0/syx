@@ -5,7 +5,7 @@ use crate::format::{dot, Table};
 
 fn format_power(v: u64) -> String {
     match v {
-        0 => format!("0.0 W"),
+        0 => format!("0 W"),
         _ => format!("{}", Power::from_microwatts(v as f64)),
     }
 }
