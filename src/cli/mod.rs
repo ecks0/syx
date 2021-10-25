@@ -1,4 +1,5 @@
 use measurements::{Frequency, Power};
+use std::time::Duration;
 use crate::{format, policy::Policy};
 
 mod clap;
@@ -29,9 +30,9 @@ pub enum CardId {
 #[derive(Debug)]
 pub struct Cli {
     pub show_cpu: Option<()>,
-    pub show_intel_pstate: Option<()>,
+    pub show_pstate: Option<()>,
     pub show_drm: Option<()>,
-    pub show_intel_rapl: Option<()>,
+    pub show_rapl: Option<()>,
     pub show_nvml: Option<()>,
     pub quiet: Option<()>,
     pub cpu: Option<Vec<u64>>,
@@ -44,9 +45,10 @@ pub struct Cli {
     pub pstate_epp: Option<String>,
     pub rapl_package: Option<u64>,
     pub rapl_zone: Option<u64>,
-    pub rapl_constraint: Option<u64>,
-    pub rapl_limit: Option<Power>,
-    pub rapl_window: Option<std::time::Duration>,
+    pub rapl_c0_limit: Option<Power>,
+    pub rapl_c1_limit: Option<Power>,
+    pub rapl_c0_window: Option<Duration>,
+    pub rapl_c1_window: Option<Duration>,
     pub drm_i915: Option<Vec<CardId>>,
     pub drm_i915_min: Option<Frequency>,
     pub drm_i915_max: Option<Frequency>,
@@ -73,7 +75,7 @@ impl Cli {
 
     pub fn has_show_args(&self) -> bool {
         self.show_cpu.is_some() ||
-        self.show_intel_pstate.is_some() ||
+        self.show_pstate.is_some() ||
         self.show_drm.is_some() ||
         self.show_nvml.is_some()
     }
@@ -89,14 +91,16 @@ impl Cli {
         self.cpufreq_max.is_some()
     }
 
-    pub fn has_intel_pstate_args(&self) -> bool {
+    pub fn has_pstate_args(&self) -> bool {
         self.pstate_epb.is_some() ||
         self.pstate_epp.is_some()
     }
 
-    pub fn has_intel_rapl_args(&self) -> bool {
-        self.rapl_limit.is_some() ||
-        self.rapl_window.is_some()
+    pub fn has_rapl_args(&self) -> bool {
+        self.rapl_c0_limit.is_some() ||
+        self.rapl_c1_limit.is_some() ||
+        self.rapl_c0_window.is_some() ||
+        self.rapl_c1_window.is_some()
     }
 
     pub fn has_drm_i915_args(&self) -> bool {
@@ -127,10 +131,10 @@ impl Cli {
         if show_all || self.show_cpu.is_some() {
             if let Some(ss) = format::cpu() { s.push(ss); }
         }
-        if show_all || self.show_intel_pstate.is_some() {
+        if show_all || self.show_pstate.is_some() {
             if let Some(ss) = format::intel_pstate() { s.push(ss); }
         }
-        if show_all || self.show_intel_rapl.is_some() {
+        if show_all || self.show_rapl.is_some() {
             if let Some(ss) = format::intel_rapl() { s.push(ss); }
         }
         if show_all || self.show_drm.is_some() {
@@ -150,11 +154,3 @@ impl Cli {
         }
     }
 }
-
-/*
-
--p --rapl-package
--z --rapl-zone
--C --rapl-constraint
-
-*/

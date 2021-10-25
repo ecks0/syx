@@ -4,7 +4,7 @@ use zysfs::types::std::Read as _;
 
 impl From<&Cli> for Option<IntelPstate> {
     fn from(cli: &Cli) -> Self {
-        if !cli.has_intel_pstate_args() { return None; }
+        if !cli.has_pstate_args() { return None; }
         let policy_ids = cli.cpu.clone().or_else(Policy::ids)?;
         let mut policies = vec![];
         for policy_id in policy_ids {

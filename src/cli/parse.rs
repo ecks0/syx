@@ -204,16 +204,20 @@ pub fn rapl_zone(s: &str) -> Result<u64> {
     parse_u64("-z/--rapl-zone", s)
 }
 
-pub fn rapl_constraint(s: &str) -> Result<u64> {
-    parse_u64("-C/--rapl-constraint", s)
+pub fn rapl_c0_limit(s: &str) -> Result<Power> {
+    parse_power("-0/--rapl-c0-limit", s)
 }
 
-pub fn rapl_limit(s: &str) -> Result<Power> {
-    parse_power("-p/--rapl-package", s)
+pub fn rapl_c1_limit(s: &str) -> Result<Power> {
+    parse_power("-1/--rapl-c1-limit", s)
 }
 
-pub fn rapl_window(s: &str) -> Result<Duration> {
-    parse_duration("-w/--rapl-window", s)
+pub fn rapl_c0_window(s: &str) -> Result<Duration> {
+    parse_duration("--rapl-c0-window", s)
+}
+
+pub fn rapl_c1_window(s: &str) -> Result<Duration> {
+    parse_duration("--rapl-c1-window", s)
 }
 
 pub fn drm_i915(s: &str) -> Result<Vec<CardId>> {
