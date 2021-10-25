@@ -1,4 +1,3 @@
-use measurements::{Power, Energy};
 use zysfs::types::intel_rapl::Policy;
 use zysfs::types::std::Read as _;
 use crate::format::{dot, Table};
@@ -6,7 +5,7 @@ use crate::format::{dot, Table};
 pub fn format() -> Option<String> {
     let pols = Policy::all()?;
     if pols.is_empty() { return None; }
-    let mut tab = Table::new(&["Name", "ID", "C0 Lim", "C1 Lim", "C0 Win", "C1 Win", "Energy", "Max"]);
+    let mut tab = Table::new(&["Name", "ID", "C0 lim", "C1 lim", "C0 max", "C1 max", "C0 win", "C1 win"]);
     for pol in pols {
         let id = if let Some(id) = pol.id { id } else { continue; };
         let c0 = pol.constraints
@@ -28,25 +27,27 @@ pub fn format() -> Option<String> {
             ),
             c0
                 .and_then(|v| v.power_limit_uw)
-                .map(|v| format!("{} uw", v))
+                .map(|v| v.to_string())
                 .unwrap_or_else(dot),
             c1
                 .and_then(|v| v.power_limit_uw)
-                .map(|v| format!("{} uw", v))
+                .map(|v| v.to_string())
+                .unwrap_or_else(dot),
+            c0
+                .and_then(|v| v.max_power_uw)
+                .map(|v| v.to_string())
+                .unwrap_or_else(dot),
+            c1
+                .and_then(|v| v.max_power_uw)
+                .map(|v| v.to_string())
                 .unwrap_or_else(dot),
             c0
                 .and_then(|v| v.time_window_us)
-                .map(|v| format!("{} us", v))
+                .map(|v| v.to_string())
                 .unwrap_or_else(dot),
             c1
                 .and_then(|v| v.time_window_us)
-                .map(|v| format!("{} us", v))
-                .unwrap_or_else(dot),
-            pol.energy_uj
-                .map(|v| format!("{:.1}", Energy::from_joules((v as f64/10f64.powf(6.)) as f64)))
-                .unwrap_or_else(dot),
-            pol.max_energy_range_uj
-                .map(|v| format!("{:.1}", Energy::from_joules((v as f64/10f64.powf(6.)) as f64)))
+                .map(|v| v.to_string())
                 .unwrap_or_else(dot),
         ]);
     }
