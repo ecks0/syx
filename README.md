@@ -18,18 +18,10 @@ Display and set Linux system tunables:
 ```
  CPU  Online  Governor   Cur      Min      Max      CPU min  CPU max
  ---  ------  --------   ---      ---      ---      -------  -------
- 0    •       powersave  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 1    true    powersave  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 2    true    powersave  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 3    true    powersave  4.3 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 4    true    powersave  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 5    true    powersave  4.3 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 6    true    powersave  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 7    true    powersave  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 8    true    powersave  4.1 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 9    true    powersave  4.1 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 10   true    powersave  4.4 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
- 11   true    powersave  4.2 GHz  800 MHz  4.4 GHz  800 MHz  5.0 GHz
+ 0    •       powersave  993 MHz  400 MHz  1.8 GHz  400 MHz  3.4 GHz
+ 1    true    powersave  629 MHz  400 MHz  1.8 GHz  400 MHz  3.4 GHz
+ 2    true    powersave  600 MHz  400 MHz  1.8 GHz  400 MHz  3.4 GHz
+ 3    true    powersave  600 MHz  400 MHz  1.8 GHz  400 MHz  3.4 GHz
 
  CPU  Available governors
  ---  -------------------
@@ -44,6 +36,14 @@ Display and set Linux system tunables:
  CPU  Available EP preferences
  ---  ------------------------
  all  default performance balance_performance balance_power power
+
+ Powercap    Pkg  Zone  Enabled  Long-term  Short-term  Cur      Max
+ --------    ---  ----  -------  ---------  ----------  ---      ---
+ intel-rapl  0    •     true     4.0 W      6.0 W       381.1 J  262.1 kJ
+ intel-rapl  0    0     false    0.0 fW     •           232.4 J  262.1 kJ
+ intel-rapl  0    1     false    0.0 fW     •           1.0 J    262.1 kJ
+ intel-rapl  0    2     false    0.0 fW     •           43.7 J   262.1 kJ
+ intel-rapl  1    •     false    0.0 fW     0.0 fW      10.5 J   262.1 kJ
 
  Card  Driver  Actual   Req'd    Min      Max      Boost    GPU min  GPU max
  ----  ------  ------   -----    ---      ---      -----    -------  -------
