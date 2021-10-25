@@ -10,6 +10,7 @@ pub fn format() -> Option<String> {
     for pol in pols {
         let id = if let Some(id) = pol.id { id } else { continue; };
         tab.row(&[
+            pol.name.clone().unwrap_or_else(dot),
             id.zone.to_string(),
             id.subzone.map(|v| v.to_string()).unwrap_or_else(dot),
             pol.enabled.map(|v| v.to_string()).unwrap_or_else(dot),
