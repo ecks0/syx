@@ -19,16 +19,26 @@ pub fn format() -> Option<String> {
                 .and_then(|v| v
                     .iter()
                     .find(|p| matches!(p.name.as_deref(), Some("long_term")))
-                    .and_then(|v| v.power_limit_uw)
-                    .map(|v| format!("{:.1}", Power::from_microwatts(v as f64))))
+                    .map(|v| {
+                        let id = v.id.map(|v| v.to_string()).unwrap_or_else(dot);
+                        let v = v.power_limit_uw
+                            .map(|v| format!("{:.1}", Power::from_microwatts(v as f64)))
+                            .unwrap_or_else(dot);
+                        format!("{}: {}", id, v)
+                    }))
                 .unwrap_or_else(dot),
             pol.constraints
                 .as_deref()
                 .and_then(|v| v
                     .iter()
                     .find(|p| matches!(p.name.as_deref(), Some("short_term")))
-                    .and_then(|v| v.power_limit_uw)
-                    .map(|v| format!("{:.1}", Power::from_microwatts(v as f64))))
+                    .map(|v| {
+                        let id = v.id.map(|v| v.to_string()).unwrap_or_else(dot);
+                        let v = v.power_limit_uw
+                            .map(|v| format!("{:.1}", Power::from_microwatts(v as f64)))
+                            .unwrap_or_else(dot);
+                        format!("{}: {}", id, v)
+                    }))
                 .unwrap_or_else(dot),
             pol.energy_uj
                 .map(|v| format!("{:.1}", Energy::from_joules((v as f64/10f64.powf(6.)) as f64)))
