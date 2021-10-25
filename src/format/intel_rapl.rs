@@ -6,7 +6,7 @@ use crate::format::{dot, Table};
 pub fn format() -> Option<String> {
     let pols = Policy::all()?;
     if pols.is_empty() { return None; }
-    let mut tab = Table::new(&["Name", "Pkg:Zone", "C0 Lim", "C1 Lim", "C0 Win", "C1 Win", "Energy", "Max"]);
+    let mut tab = Table::new(&["Name", "ID", "C0 Lim", "C1 Lim", "C0 Win", "C1 Win", "Energy", "Max"]);
     for pol in pols {
         let id = if let Some(id) = pol.id { id } else { continue; };
         let c0 = pol.constraints
