@@ -1,6 +1,4 @@
-use measurements::Frequency;
-#[cfg(feature = "nvml")]
-use measurements::Power;
+use measurements::{Frequency, Power};
 use crate::{format, policy::Policy};
 
 mod clap;
@@ -33,6 +31,7 @@ pub struct Cli {
     pub show_cpu: Option<()>,
     pub show_intel_pstate: Option<()>,
     pub show_drm: Option<()>,
+    pub show_intel_rapl: Option<()>,
     pub show_nvml: Option<()>,
     pub quiet: Option<()>,
     pub cpu: Option<Vec<u64>>,
@@ -43,6 +42,11 @@ pub struct Cli {
     pub cpufreq_max: Option<Frequency>,
     pub pstate_epb: Option<u64>,
     pub pstate_epp: Option<String>,
+    pub rapl_package: Option<u64>,
+    pub rapl_zone: Option<u64>,
+    pub rapl_constraint: Option<u64>,
+    pub rapl_limit: Option<Power>,
+    pub rapl_window: Option<std::time::Duration>,
     pub drm_i915: Option<Vec<CardId>>,
     pub drm_i915_min: Option<Frequency>,
     pub drm_i915_max: Option<Frequency>,
@@ -90,6 +94,11 @@ impl Cli {
         self.pstate_epp.is_some()
     }
 
+    pub fn has_intel_rapl_args(&self) -> bool {
+        self.rapl_limit.is_some() ||
+        self.rapl_window.is_some()
+    }
+
     pub fn has_drm_i915_args(&self) -> bool {
         self.drm_i915_min.is_some() ||
         self.drm_i915_max.is_some() ||
@@ -121,6 +130,9 @@ impl Cli {
         if show_all || self.show_intel_pstate.is_some() {
             if let Some(ss) = format::intel_pstate() { s.push(ss); }
         }
+        if show_all || self.show_intel_rapl.is_some() {
+            if let Some(ss) = format::intel_rapl() { s.push(ss); }
+        }
         if show_all || self.show_drm.is_some() {
             if let Some(ss) = format::drm() { s.push(ss); }
         }
@@ -138,3 +150,11 @@ impl Cli {
         }
     }
 }
+
+/*
+
+-p --rapl-package
+-z --rapl-zone
+-C --rapl-constraint
+
+*/

@@ -4,7 +4,8 @@ Display and set Linux system tunables:
 
 - cpu: online/offline
 - cpufreq: governor, min/max frequencies
-- intel_pstate: epb, epp
+- intel-pstate: epb, epp
+- intel-rapl: power limit, time window per zone/subzone/constraint
 - drm
   - i915: min/max/boost frequencies
 - nvml

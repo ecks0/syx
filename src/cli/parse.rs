@@ -1,6 +1,5 @@
-use measurements::Frequency;
-#[cfg(feature = "nvml")]
-use measurements::Power;
+use measurements::{Frequency, Power};
+use std::time::Duration;
 use crate::cli::{Error, CardId, Result};
 
 fn parse_bool(flag: &'static str, s: &str) -> Result<bool> {
@@ -11,18 +10,18 @@ fn parse_bool(flag: &'static str, s: &str) -> Result<bool> {
     }
 }
 
-fn parse_frequency(flag: &'static str, s: &str) -> Result<Frequency> {
-    let mut pos = None;
+fn start_of_unit(s: &str) -> Option<usize> {
     for (i, c) in s.chars().enumerate() {
         match c {
             '0'..='9' | '.' => continue,
-            _ => {
-                pos = Some(i);
-                break;
-            },
+            _ => return Some(i),
         }
     }
-    if let Some(pos) = pos {
+    None
+}
+
+fn parse_frequency(flag: &'static str, s: &str) -> Result<Frequency> {
+    if let Some(pos) = start_of_unit(s) {
         match s[..pos].parse::<f64>() {
             Ok(v) => match &s[pos..] {
                 "h" | "hz" => Ok(Frequency::from_hertz(v)),
@@ -30,14 +29,14 @@ fn parse_frequency(flag: &'static str, s: &str) -> Result<Frequency> {
                 "m" | "mhz" => Ok(Frequency::from_megahertz(v)),
                 "g" | "ghz" => Ok(Frequency::from_gigahertz(v)),
                 "t" | "thz" => Ok(Frequency::from_terahertz(v)),
-                _ => Err(Error::parse(flag, "unrecognized hertz magnitude")),
+                _ => Err(Error::parse(flag, "unrecognized frequency unit")),
             },
-            Err(_) => Err(Error::parse(flag, "expected hertz value, ex. 1200mhz, 1.2ghz")),
+            Err(_) => Err(Error::parse(flag, "expected hertz value, ex. 1200, 1200mhz, 1.2ghz")),
         }
     } else {
-        match s.parse::<u64>() {
-            Ok(v) => Ok(Frequency::from_megahertz(v as f64)),
-            Err(_) => Err(Error::parse(flag, "expected hertz value, ex. 1300mhz, 1.3ghz")),
+        match s.parse::<f64>() {
+            Ok(v) => Ok(Frequency::from_megahertz(v)),
+            Err(_) => Err(Error::parse(flag, "expected hertz value, ex. 1300, 1300mhz, 1.3ghz")),
         }
     }
 }
@@ -58,32 +57,42 @@ fn parse_frequency_min_max(flag: &'static str, s: &str) -> Result<(Frequency, Fr
     }
 }
 
-#[cfg(feature = "nvml")]
 fn parse_power(flag: &'static str, s: &str) -> Result<Power> {
-    let mut pos = None;
-    for (i, c) in s.chars().enumerate() {
-        match c {
-            '0'..='9' | '.' => continue,
-            _ => {
-                pos = Some(i);
-                break;
-            }
-        }
-    }
-    if let Some(pos) = pos {
+    if let Some(pos) = start_of_unit(s) {
         match s[..pos].parse::<f64>() {
             Ok(v) => match &s[pos..] {
+                "u" | "uw" => Ok(Power::from_microwatts(v)),
                 "m" | "mw" => Ok(Power::from_milliwatts(v)),
                 "w" => Ok(Power::from_watts(v)),
                 "k" | "kw" => Ok(Power::from_kilowatts(v)),
-                _ => Err(Error::parse(flag, "unrecognized watts magnitude")),
+                _ => Err(Error::parse(flag, "unrecognized power unit")),
             },
-            Err(_) => Err(Error::parse(flag, "expected watts value, ex. 260w, 260000mw")),
+            Err(_) => Err(Error::parse(flag, "expected power value")),
         }
     } else {
-        match s.parse::<u32>() {
-            Ok(v) => Ok(Power::from_watts(v as f64)),
-            Err(_) => Err(Error::parse(flag, "expected watts value, ex. 270w, 270000mw")),
+        match s.parse::<f64>() {
+            Ok(v) => Ok(Power::from_watts(v)),
+            Err(_) => Err(Error::parse(flag, "expected power value")),
+        }
+    }
+}
+
+fn parse_duration(flag: &'static str, s: &str) -> Result<Duration> {
+    if let Some(pos) = start_of_unit(s) {
+        match s[..pos].parse::<u64>() {
+            Ok(v) => match &s[pos..] {
+                "n" | "ns" => Ok(Duration::from_nanos(v)),
+                "u" | "us" => Ok(Duration::from_micros(v)),
+                "m" | "ms" => Ok(Duration::from_millis(v)),
+                "s" => Ok(Duration::from_secs(v)),
+                _ => Err(Error::parse(flag, "unrecognized duration unit")),
+            },
+            Err(_) => Err(Error::parse(flag, "expected duration value, ex. 2000, 2000ms, 2s")),
+        }
+    } else {
+        match s.parse::<u64>() {
+            Ok(v) => Ok(Duration::from_millis(v)),
+            Err(_) => Err(Error::parse(flag, "expected duration value, ex. 3000, 3000ms, 3s")),
         }
     }
 }
@@ -185,6 +194,26 @@ pub fn pstate_epb(s: &str) -> Result<u64> {
 
 pub fn pstate_epp(s: &str) -> Result<String> {
     Ok(s.to_string())
+}
+
+pub fn rapl_package(s: &str) -> Result<u64> {
+    parse_u64("-p/--rapl-package", s)
+}
+
+pub fn rapl_zone(s: &str) -> Result<u64> {
+    parse_u64("-z/--rapl-zone", s)
+}
+
+pub fn rapl_constraint(s: &str) -> Result<u64> {
+    parse_u64("-C/--rapl-constraint", s)
+}
+
+pub fn rapl_limit(s: &str) -> Result<Power> {
+    parse_power("-p/--rapl-package", s)
+}
+
+pub fn rapl_window(s: &str) -> Result<Duration> {
+    parse_duration("-w/--rapl-window", s)
 }
 
 pub fn drm_i915(s: &str) -> Result<Vec<CardId>> {

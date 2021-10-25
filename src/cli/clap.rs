@@ -6,18 +6,21 @@ const AFTER_HELP: &str = r#"    All present and supported subsystems are printed
 
     The following special values and units are handled uniformly for all arguments.
 
-        INDICES   A comma-delimited sequence of integers and/or integer ranges.
+         INDICES   A comma-delimited sequence of integers and/or integer ranges.
 
-        TOGGLES   An enumeration of 0 (deactivate), 1 (activate) or _ (skip) characters, where the
-                  character is an action, and the character's position is an ID on which to act.
+         TOGGLES   An enumeration of 0 (deactivate), 1 (activate) or _ (skip) characters, where the
+                   character is an action, and the character's position is an ID on which to act.
 
-          FREQ*     Default: megahertz when unspecified
-                  Supported: hz/h - khz/k - mhz/m - ghz/g - thz/t
+           FREQ*     Default: megahertz when unspecified
+                   Supported: hz/h - khz/k - mhz/m - ghz/g - thz/t
 
-         POWER*     Default: watts when unspecified
-                  Supported: mw/m - w - kw/k
+          POWER*     Default: milliwatts when unspecified
+                   Supported: uw/u - mw/m - w - kw/k
 
-        * → Floating point values may be given for these units.
+        DURATION     Default: milliseconds when unspecified
+                   Supported: ns/n - us/u - ms/m - s
+
+        * Floating point values may be given for these units.
 
     All flags may be expressed as env vars. For example:
 
@@ -106,7 +109,12 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
         .arg(Arg::with_name("show-pstate")
             .long("show-pstate")
             .takes_value(false)
-            .help("Print intel_pstate values"))
+            .help("Print intel-pstate values"))
+
+        .arg(Arg::with_name("show-rapl")
+            .long("show-rapl")
+            .takes_value(false)
+            .help("Print intel-rapl values"))
 
         .arg(Arg::with_name("show-drm")
             .long("show-drm")
@@ -170,13 +178,50 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .long("pstate-epb")
             .takes_value(true)
             .value_name("0-15")
-            .help("Set intel_pstate energy/performance bias per --cpu"))
+            .help("Set intel-pstate energy/performance bias per --cpu"))
 
         .arg(Arg::with_name("pstate-epp")
             .long("pstate-epp")
             .takes_value(true)
             .value_name("NAME")
-            .help("Set intel_pstate energy/performance pref per --cpu"))
+            .help("Set intel-pstate energy/performance pref per --cpu"))
+
+        .arg(Arg::with_name("rapl-package")
+            .short("p")
+            .long("rapl-package")
+            .takes_value(true)
+            .value_name("INT")
+            .help("Target intel-rapl package"))
+
+        .arg(Arg::with_name("rapl-zone")
+            .short("z")
+            .long("rapl-zone")
+            .takes_value(true)
+            .value_name("INT")
+            .help("Target intel-rapl zone"))
+
+        .arg(Arg::with_name("rapl-constraint")
+            .short("C")
+            .long("rapl-constraint")
+            .takes_value(true)
+            .value_name("INT")
+            .help("Target intel-rapl constraint"))
+
+        .arg(Arg::with_name("rapl-limit")
+            .short("l")
+            .long("rapl-limit")
+            .takes_value(true)
+            .value_name("POWER")
+            .requires_all(&["rapl-package", "rapl-constraint"])
+            .help("Set intel-rapl power limit"))
+
+        .arg(Arg::with_name("rapl-window")
+            .short("w")
+            .long("rapl-window")
+            .takes_value(true)
+            .value_name("DURATION")
+            .requires_all(&["rapl-package", "rapl-constraint"])
+            .help("Set intel-rapl time window"))
 
         .arg(Arg::with_name("drm-i915")
             .long("drm-i915")
@@ -227,7 +272,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .long("nvml-power-limit")
             .takes_value(true)
             .value_name("POWER")
-            .help("Set nvidia card power limit per --nvml, ex. 260 or 0.26kw"));
+            .help("Set nvidia card power limit per --nvml"));
 
     let m = a.get_matches_from(argv);
 
@@ -237,6 +282,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
         show_cpu: flag("show-cpu", &m),
         show_intel_pstate: flag("show-pstate", &m),
         show_drm: flag("show-drm", &m),
+        show_intel_rapl: flag("show-rapl", &m),
         show_nvml: flag("show-nvml", &m),
         quiet: flag("quiet", &m),
         cpu: arg("cpu", &m, parse::cpu)?,
@@ -247,6 +293,11 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
         cpufreq_max: arg("cpufreq-max", &m, parse::cpufreq_max)?,
         pstate_epb: arg("pstate-epb", &m, parse::pstate_epb)?,
         pstate_epp: arg("pstate-epp", &m, parse::pstate_epp)?,
+        rapl_package: arg("rapl-package", &m, parse::rapl_package)?,
+        rapl_zone: arg("rapl-zone", &m, parse::rapl_zone)?,
+        rapl_constraint: arg("rapl-constraint", &m, parse::rapl_constraint)?,
+        rapl_limit: arg("rapl-limit", &m, parse::rapl_limit)?,
+        rapl_window: arg("rapl-window", &m, parse::rapl_window)?,
         drm_i915: arg("drm-i915", &m, parse::drm_i915)?,
         drm_i915_min: arg("drm-i915-min", &m, parse::drm_i915_min)?,
         drm_i915_max: arg("drm-i915-max", &m, parse::drm_i915_max)?,

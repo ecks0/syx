@@ -3,6 +3,7 @@ use zysfs::types::{
     cpufreq::Cpufreq,
     drm::Drm,
     intel_pstate::IntelPstate,
+    intel_rapl::IntelRapl,
 };
 use zysfs::types::std::Write as _;
 use crate::cli::Cli;
@@ -11,6 +12,7 @@ mod cpu;
 mod cpufreq;
 mod drm;
 mod intel_pstate;
+mod intel_rapl;
 #[cfg(feature = "nvml")]
 mod nvml;
 
@@ -21,8 +23,9 @@ use nvml::Nvml;
 pub struct Policy {
     cpu: Option<Cpu>,
     cpufreq: Option<Cpufreq>,
-    intel_pstate: Option<IntelPstate>,
     drm: Option<Drm>,
+    intel_pstate: Option<IntelPstate>,
+    intel_rapl: Option<IntelRapl>,
     #[cfg(feature = "nvml")]
     nvml: Option<Nvml>,
 }
@@ -36,6 +39,7 @@ impl Policy {
             if let Some(ids) = onlined_cpus { cpu::set_cpus_offline(ids); }
         }
         if let Some(cpu) = &self.cpu { cpu.write(); }
+        if let Some(intel_rapl) = &self.intel_rapl { intel_rapl.write(); }
         if let Some(drm) = &self.drm { drm.write(); }
         #[cfg(feature = "nvml")]
         if let Some(nvml) = &self.nvml { nvml.write(); }
@@ -49,6 +53,7 @@ impl From<&Cli> for Policy {
             cpufreq: cli.into(),
             drm: cli.into(),
             intel_pstate: cli.into(),
+            intel_rapl: cli.into(),
             #[cfg(feature = "nvml")]
             nvml: cli.into(),
         }

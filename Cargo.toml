@@ -1,6 +1,6 @@
 [package]
 name = "knobs"
-version = "0.2.1"
+version = "0.2.3"
 edition = "2018"
 
 [features]

@@ -4,12 +4,14 @@ use std::fmt::Display;
 mod cpu;
 mod drm;
 mod intel_pstate;
+mod intel_rapl;
 #[cfg(feature = "nvml")]
 mod nvml;
 
 pub use cpu::format as cpu;
 pub use intel_pstate::format as intel_pstate;
 pub use drm::format as drm;
+pub use intel_rapl::format as intel_rapl;
 #[cfg(feature = "nvml")]
 pub use nvml::format as nvml;
 
