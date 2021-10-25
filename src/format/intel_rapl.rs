@@ -3,6 +3,13 @@ use zysfs::types::intel_rapl::Policy;
 use zysfs::types::std::Read as _;
 use crate::format::{dot, Table};
 
+fn format_power(v: u64) -> String {
+    match v {
+        0 => format!("0.0 W"),
+        _ => format!("{}", Power::from_microwatts(v as f64)),
+    }
+}
+
 pub fn format() -> Option<String> {
     let pols = Policy::all()?;
     if pols.is_empty() { return None; }
@@ -28,11 +35,11 @@ pub fn format() -> Option<String> {
             ),
             c0
                 .and_then(|v| v.power_limit_uw)
-                .map(|v| format!("{:.3}", Power::from_microwatts(v as f64)))
+                .map(format_power)
                 .unwrap_or_else(dot),
             c1
                 .and_then(|v| v.power_limit_uw)
-                .map(|v| format!("{:.3}", Power::from_microwatts(v as f64)))
+                .map(format_power)
                 .unwrap_or_else(dot),
             c0
                 .and_then(|v| v.max_power_uw)
