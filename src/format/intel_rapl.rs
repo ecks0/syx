@@ -1,3 +1,4 @@
+use measurements::Power;
 use zysfs::types::intel_rapl::Policy;
 use zysfs::types::std::Read as _;
 use crate::format::{dot, Table};
@@ -27,27 +28,27 @@ pub fn format() -> Option<String> {
             ),
             c0
                 .and_then(|v| v.power_limit_uw)
-                .map(|v| v.to_string())
+                .map(|v| format!("{:.3}", Power::from_microwatts(v as f64)))
                 .unwrap_or_else(dot),
             c1
                 .and_then(|v| v.power_limit_uw)
-                .map(|v| v.to_string())
+                .map(|v| format!("{:.3}", Power::from_microwatts(v as f64)))
                 .unwrap_or_else(dot),
             c0
                 .and_then(|v| v.max_power_uw)
-                .map(|v| v.to_string())
+                .map(|v| format!("{} uw", v))
                 .unwrap_or_else(dot),
             c1
                 .and_then(|v| v.max_power_uw)
-                .map(|v| v.to_string())
+                .map(|v| format!("{} uw", v))
                 .unwrap_or_else(dot),
             c0
                 .and_then(|v| v.time_window_us)
-                .map(|v| v.to_string())
+                .map(|v| format!("{} us", v))
                 .unwrap_or_else(dot),
             c1
                 .and_then(|v| v.time_window_us)
-                .map(|v| v.to_string())
+                .map(|v| format!("{} us", v))
                 .unwrap_or_else(dot),
         ]);
     }
