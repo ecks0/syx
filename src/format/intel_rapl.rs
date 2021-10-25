@@ -6,11 +6,11 @@ use crate::format::{dot, Table};
 pub fn format() -> Option<String> {
     let pols = Policy::all()?;
     if pols.is_empty() { return None; }
-    let mut tab = Table::new(&["Powercap", "Pkg", "Zone", "Enabled", "Long-term", "Short-term", "Cur", "Max"]);
+    let mut tab = Table::new(&["Name", "Pkg", "Zone", "Enabled", "Long-term", "Short-term", "Cur", "Max"]);
     for pol in pols {
         let id = if let Some(id) = pol.id { id } else { continue; };
         tab.row(&[
-            "intel-rapl".to_string(),
+            pol.name.clone().unwrap_or_else(dot),
             id.zone.to_string(),
             id.subzone.map(|v| v.to_string()).unwrap_or_else(dot),
             pol.enabled.map(|v| v.to_string()).unwrap_or_else(dot),
