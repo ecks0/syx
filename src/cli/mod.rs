@@ -77,7 +77,8 @@ impl Cli {
         self.show_cpu.is_some() ||
         self.show_pstate.is_some() ||
         self.show_drm.is_some() ||
-        self.show_nvml.is_some()
+        self.show_nvml.is_some() ||
+        self.show_rapl.is_some()
     }
 
     pub fn has_cpu_args(&self) -> bool {
