@@ -1,12 +1,8 @@
-use measurements::Frequency;
 use zysfs::types::drm::{Card, DriverPolicy};
 use zysfs::types::std::Read as _;
-use crate::format::{Table, dot};
+use crate::format::{Table, dot, format_hz};
 
-pub(crate) fn mhz(mhz: u64) -> String {
-    let f = Frequency::from_megahertz(mhz as f64);
-    if mhz >= 1000 { format!("{:.1}", f) } else { format!("{:.0}", f) }
-}
+fn mhz(mhz: u64) -> String { format_hz(mhz * 10u64.pow(6)) }
 
 pub fn format(id_driver: &[(u64, String)]) -> Option<String> {
     let cards: Vec<Card> = id_driver

@@ -1,15 +1,11 @@
-use measurements::Frequency;
 use zysfs::types::{
     cpu::Policy as CpuPolicy,
     cpufreq::Policy as CpufreqPolicy,
 };
 use zysfs::types::std::Read as _;
-use crate::format::{dot, Table};
+use crate::format::{Table, dot, format_hz};
 
-fn khz(khz: u64) -> String {
-    let f = Frequency::from_kilohertz(khz as f64);
-    if khz >= 1000u64.pow(2) { format!("{:.1}", f) } else { format!("{:.0}", f) }
-}
+fn khz(khz: u64) -> String { format_hz(khz * 10u64.pow(3)) }
 
 fn format_governors(policies: &[CpufreqPolicy]) -> Option<String> {
     let mut govs: Vec<String> = policies

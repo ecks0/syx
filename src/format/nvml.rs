@@ -1,27 +1,13 @@
-use measurements::{Frequency, Power};
 use nvml_facade::{
     Nvml,
     device::{Device, Clock as _},
 };
 use std::convert::TryInto;
-use crate::format::{Table, dot};
+use crate::format::{Table, dot, format_bytes, format_hz, format_uw};
 
-fn mhz(mhz: u32) -> String {
-    let f = Frequency::from_megahertz(mhz as f64);
-    if mhz >= 1000 { format!("{:.1}", f) } else { format!("{:.0}", f) }
-}
+fn mhz(mhz: u32) -> String { format_hz(mhz as u64 * 10u64.pow(6)) }
 
-fn milliwatts(mw: u32) -> String {
-    format!("{:.0}", Power::from_milliwatts(mw as f64))
-}
-
-fn bytes(b: u64) -> String {
-    if b < 1000 { format!("{} B", b) }
-    else if b < 1000u64.pow(2) { format!("{:.1} kB", b as f64/1000f64) }
-    else if b < 1000u64.pow(3) { format!("{:.1} MB", b as f64/(1000u64.pow(2) as f64)) }
-    else if b < 10000u64.pow(4) { format!("{:.1} GB", b as f64/(1000u64.pow(3) as f64)) }
-    else { format!("{:.1} TB", b as f64/(1000u64.pow(4) as f64)) }
-}
+fn mw(mw: u32) -> String { format_uw(mw as u64 * 10u64.pow(3)) }
 
 fn pad(s: &str, left: bool) -> String {
     const WIDTH: i64 = 19; // width of the widest label we expect to display
@@ -116,22 +102,22 @@ pub fn format() -> Option<String> {
         tab.row("Memory used/total", |d| {
             format!(
                 "{} / {}",
-                d.memory().used().map(bytes).unwrap_or_else(dot),
-                d.memory().total().map(bytes).unwrap_or_else(dot),
+                d.memory().used().map(format_bytes).unwrap_or_else(dot),
+                d.memory().total().map(format_bytes).unwrap_or_else(dot),
             )
         });
         tab.row("Power used/limit", |d| {
             format!(
                 "{} / {}",
-                d.power().usage().map(milliwatts).unwrap_or_else(dot),
-                d.power().limit().map(milliwatts).unwrap_or_else(dot),
+                d.power().usage().map(mw).unwrap_or_else(dot),
+                d.power().limit().map(mw).unwrap_or_else(dot),
             )
         });
         tab.row("Power limit min/max", |d| {
             format!(
                 "{} / {}",
-                d.power().min().map(milliwatts).unwrap_or_else(dot),
-                d.power().max().map(milliwatts).unwrap_or_else(dot),
+                d.power().min().map(mw).unwrap_or_else(dot),
+                d.power().max().map(mw).unwrap_or_else(dot),
             )
         });
         s.push(tab.into_table().to_string())

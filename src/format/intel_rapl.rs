@@ -1,19 +1,11 @@
-use measurements::{Energy, Power};
 use zysfs::types::intel_rapl::Policy;
 use zysfs::types::std::Read as _;
-use crate::format::{dot, Table};
-
-fn format_power(v: u64) -> String {
-    match v {
-        0 => "0 W".to_string(),
-        _ => format!("{}", Power::from_microwatts(v as f64)),
-    }
-}
+use crate::format::{Table, dot, format_uj, format_uw};
 
 pub fn format() -> Option<String> {
     let pols = Policy::all()?;
     if pols.is_empty() { return None; }
-    let mut tab = Table::new(&["Name", "ID", "C0 limit", "C1 limit", "C0 window", "C1 window", "Energy"]);
+    let mut tab = Table::new(&["Name", "Zone", "C0 limit", "C1 limit", "C0 window", "C1 window", "Energy"]);
     for pol in pols {
         let id = if let Some(id) = pol.id { id } else { continue; };
         let c0 = pol.constraints
@@ -35,11 +27,11 @@ pub fn format() -> Option<String> {
             ),
             c0
                 .and_then(|v| v.power_limit_uw)
-                .map(format_power)
+                .map(format_uw)
                 .unwrap_or_else(dot),
             c1
                 .and_then(|v| v.power_limit_uw)
-                .map(format_power)
+                .map(format_uw)
                 .unwrap_or_else(dot),
             c0
                 .and_then(|v| v.time_window_us)
@@ -50,7 +42,7 @@ pub fn format() -> Option<String> {
                 .map(|v| format!("{} us", v))
                 .unwrap_or_else(dot),
             pol.energy_uj
-                .map(|v| Energy::from_joules((v as f64)/10f64.powf(6.)).to_string())
+                .map(format_uj)
                 .unwrap_or_else(dot),
         ]);
     }
