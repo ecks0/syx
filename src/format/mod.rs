@@ -46,32 +46,22 @@ impl std::fmt::Display for Table {
     }
 }
 
-fn truncate(v: u64, offset: u32) -> u64 {
-    // We want to be able to display units with precision, but only when the precision is non-zero,
-    // and then only a bit of precision, since we're space-constrainted. Without a format specifier,
-    // the system will eliminate trailing zeros, but will not limit precision. With a format specifier,
-    // precision can be limited, but trailing zeros will always be displayed. We let the system do the
-    // formatting in order to remove trailing zeros, but limit the values we give to the system to
-    // three decimal places to limit precision of the displayed value.
-    let scale = 10u64.pow(
-        match v {
-            v if v > 10u64.pow(18) => 15 + offset,
-            v if v > 10u64.pow(15) => 12 + offset,
-            v if v > 10u64.pow(12) => 9 + offset,
-            v if v > 10u64.pow(9) => 6 + offset,
-            v if v > 10u64.pow(6) => 3 + offset,
-            _ => offset,
-        }
-    );
-    (v/scale) * scale
-}
-
 fn format_uw(uw: u64) -> String {
     match uw {
         0 => "0 W".to_string(),
         _ => {
-            let uw = truncate(uw, 0) as f64;
-            Power::from_microwatts(uw).to_string()
+            let scale = 10u64.pow(
+                match uw {
+                    v if v > 10u64.pow(18) => 15,
+                    v if v > 10u64.pow(15) => 12,
+                    v if v > 10u64.pow(12) => 9,
+                    v if v > 10u64.pow(9) => 6,
+                    v if v > 10u64.pow(6) => 3,
+                    _ => 0,
+                }
+            );
+            let uw = (uw/scale) * scale;
+            Power::from_microwatts(uw as f64).to_string()
         }
     }
 }
@@ -80,9 +70,8 @@ fn format_uj(uj: u64) -> String {
     match uj {
         0 => "0 J".to_string(),
         _ => {
-            let uj = truncate(uj, 0) as f64;
             let j = uj as f64 * 10f64.powf(-6.);
-            Energy::from_joules(j).to_string()
+            format!("{:.3}", Energy::from_joules(j))
         },
     }
 }
