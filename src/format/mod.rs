@@ -49,6 +49,7 @@ impl std::fmt::Display for Table {
 fn truncate(v: u64, offset: u32) -> u64 {
     let scale = 10u64.pow(
         match v {
+            v if v > 10u64.pow(18) => 15 + offset,
             v if v > 10u64.pow(15) => 12 + offset,
             v if v > 10u64.pow(12) => 9 + offset,
             v if v > 10u64.pow(9) => 6 + offset,
