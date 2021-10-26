@@ -4,13 +4,13 @@ use crate::cli::{Cli, Result};
 
 const AFTER_HELP: &str = r#"         INDICES   A comma-delimited sequence of integers and/or integer ranges.
 
-         TOGGLES   An enumeration of 0 (offline), 1 (online) or _ (skip) characters.
+         TOGGLES   An enumeration of 0 (off), 1 (on) or _ (skip) characters.
                    The character's position indicates the ID on which to act.
 
             FREQ*    Default: megahertz when unspecified
                    Supported: hz/h - khz/k - mhz/m - ghz/g - thz/t
 
-           POWER*    Default: milliwatts when unspecified
+           WATTS*    Default: milliwatts when unspecified
                    Supported: uw/u - mw/m - w - kw/k
 
         DURATION     Default: milliseconds when unspecified
@@ -185,44 +185,44 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .help("Set intel-pstate energy/performance pref per --cpu"))
 
         .arg(Arg::with_name("rapl-package")
-            .short("p")
+            .short("P")
             .long("rapl-package")
             .takes_value(true)
             .value_name("INT")
             .help("Target intel-rapl package, default 0"))
 
         .arg(Arg::with_name("rapl-zone")
-            .short("z")
+            .short("Z")
             .long("rapl-zone")
             .takes_value(true)
             .value_name("INT")
-            .help("Target intel-rapl zone"))
+            .help("Target intel-rapl sub-zone"))
 
         .arg(Arg::with_name("rapl-c0-limit")
             .short("0")
             .long("rapl-c0-limit")
             .takes_value(true)
-            .value_name("POWER")
-            .help("Set intel-rapl c0 power limit per --rapl-package/zone"))
+            .value_name("WATTS")
+            .help("Set intel-rapl c0 power limit per --rapl-{package,zone}"))
 
         .arg(Arg::with_name("rapl-c1-limit")
             .short("1")
             .long("rapl-c1-limit")
             .takes_value(true)
-            .value_name("POWER")
-            .help("Set intel-rapl c1 power limit per --rapl-package/zone"))
+            .value_name("WATTS")
+            .help("Set intel-rapl c1 power limit per --rapl-{package,zone}"))
 
         .arg(Arg::with_name("rapl-c0-window")
             .long("rapl-c0-window")
             .takes_value(true)
             .value_name("DURATION")
-            .help("Set intel-rapl c0 time window per --rapl-package/zone"))
+            .help("Set intel-rapl c0 time window per --rapl-{package,zone}"))
 
         .arg(Arg::with_name("rapl-c1-window")
             .long("rapl-c1-winodw")
             .takes_value(true)
             .value_name("DURATION")
-            .help("Set intel-rapl c1 time window per --rapl-package/zone"))
+            .help("Set intel-rapl c1 time window per --rapl-{package,zone}"))
 
         .arg(Arg::with_name("drm-i915")
             .long("drm-i915")
@@ -272,7 +272,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
         .arg(Arg::with_name("nvml-power-limit")
             .long("nvml-power-limit")
             .takes_value(true)
-            .value_name("POWER")
+            .value_name("WATTS")
             .help("Set nvidia card power limit per --nvml"));
 
     let m = a.get_matches_from(argv);
