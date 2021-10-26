@@ -47,6 +47,12 @@ impl std::fmt::Display for Table {
 }
 
 fn truncate(v: u64, offset: u32) -> u64 {
+    // We want to be able to display units with precision, but only when the precision is non-zero,
+    // and then only a bit of precision, since we're space-constrainted. Without a format specifier,
+    // the system will eliminate trailing zeros, but will not limit precision. With a format specifier,
+    // precision can be limited, but trailing zeros will always be displayed. We let the system do the
+    // formatting in order to remove trailing zeros, but limit the values we give to the system to
+    // three decimal places to limit precision of the displayed value.
     let scale = 10u64.pow(
         match v {
             v if v > 10u64.pow(18) => 15 + offset,
@@ -85,8 +91,12 @@ fn format_hz(hz: u64) -> String {
     match hz {
         0 => "0 Hz".to_string(),
         _ => {
-            //let hz = truncate(hz, 2) as f64;
-            format!("{:.1}", Frequency::from_hertz(hz as f64))
+            let f = Frequency::from_hertz(hz as f64);
+            if hz < 10u64.pow(9) {
+                format!("{:.0}", f)
+            } else {
+                format!("{:.1}", f)
+            }
         },
     }
 }
