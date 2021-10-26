@@ -2,19 +2,11 @@ use clap::{App, AppSettings, Arg, ArgMatches, crate_version};
 use log::debug;
 use crate::cli::{Cli, Result};
 
-const AFTER_HELP: &str = r#"         INDICES   A comma-delimited sequence of integers and/or integer ranges.
-
-         TOGGLES   An enumeration of 0 (off), 1 (on) or _ (skip) characters.
-                   The character's position indicates the ID on which to act.
-
-            FREQ*    Default: megahertz when unspecified
-                   Supported: hz/h - khz/k - mhz/m - ghz/g - thz/t
-
-           WATTS*    Default: milliwatts when unspecified
-                   Supported: uw/u - mw/m - w - kw/k
-
-        DURATION     Default: milliseconds when unspecified
-                   Supported: ns/n - us/u - ms/m - s
+const AFTER_HELP: &str = r#"             IDS   A comma-delimited sequence of integers and/or integer ranges.
+         TOGGLES   An sequence of 0 (off), 1 (on) or _ (skip) characters.
+              HZ*  mhz when unspecified: hz/h - khz/k - mhz/m - ghz/g - thz/t
+           WATTS*  mw when unspecified: uw/u - mw/m - w - kw/k
+            SECS   ms when unspecified: ns/n - us/u - ms/m - s
 
         * Floating point values may be given for these units.
 
@@ -134,7 +126,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .short("c")
             .long("cpu")
             .takes_value(true)
-            .value_name("INDICES")
+            .value_name("IDS")
             .help("Target cpu ids, default all, ex. 0,1,3-5"))
 
         .arg(Arg::with_name("cpu-on")
@@ -155,21 +147,21 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .short("g")
             .long("cpufreq-gov")
             .takes_value(true)
-            .value_name("NAME")
+            .value_name("STR")
             .help("Set cpufreq governor per --cpu"))
 
         .arg(Arg::with_name("cpufreq-min")
             .short("n")
             .long("cpufreq-min")
             .takes_value(true)
-            .value_name("FREQ")
+            .value_name("HZ")
             .help("Set cpufreq min freq per --cpu, ex. 1200 or 1.2ghz"))
 
         .arg(Arg::with_name("cpufreq-max")
             .short("x")
             .long("cpufreq-max")
             .takes_value(true)
-            .value_name("FREQ")
+            .value_name("HZ")
             .help("Set cpufreq max freq per --cpu, ex. 1200 or 1.2ghz"))
 
         .arg(Arg::with_name("pstate-epb")
@@ -181,7 +173,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
         .arg(Arg::with_name("pstate-epp")
             .long("pstate-epp")
             .takes_value(true)
-            .value_name("NAME")
+            .value_name("STR")
             .help("Set intel-pstate energy/performance pref per --cpu"))
 
         .arg(Arg::with_name("rapl-package")
@@ -196,7 +188,7 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
             .long("rapl-zone")
             .takes_value(true)
             .value_name("INT")
-            .help("Target intel-rapl sub-zone"))
+            .help("Target intel-rapl sub-zone, default none"))
 
         .arg(Arg::with_name("rapl-c0-limit")
             .short("0")
@@ -215,37 +207,37 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
         .arg(Arg::with_name("rapl-c0-window")
             .long("rapl-c0-window")
             .takes_value(true)
-            .value_name("DURATION")
+            .value_name("SECS")
             .help("Set intel-rapl c0 time window per --rapl-{package,zone}"))
 
         .arg(Arg::with_name("rapl-c1-window")
             .long("rapl-c1-winodw")
             .takes_value(true)
-            .value_name("DURATION")
+            .value_name("SECS")
             .help("Set intel-rapl c1 time window per --rapl-{package,zone}"))
 
         .arg(Arg::with_name("drm-i915")
             .long("drm-i915")
             .takes_value(true)
-            .value_name("INDICES")
+            .value_name("IDS")
             .help("Target i915 card ids or pci ids, default all, ex. 0,1,3-5"))
 
         .arg(Arg::with_name("drm-i915-min")
             .long("drm-i915-min")
             .takes_value(true)
-            .value_name("FREQ")
+            .value_name("HZ")
             .help("Set i915 min frequency per --drm-i915, ex. 1200 or 1.2ghz"))
 
         .arg(Arg::with_name("drm-i915-max")
             .long("drm-i915-max")
             .takes_value(true)
-            .value_name("FREQ")
+            .value_name("HZ")
             .help("Set i915 max frequency per --drm-i915, ex. 1200 or 1.2ghz"))
 
         .arg(Arg::with_name("drm-i915-boost")
             .long("drm-i915-boost")
             .takes_value(true)
-            .value_name("FREQ")
+            .value_name("HZ")
             .help("Set i915 boost frequency per --drm-i915, ex. 1200 or 1.2ghz"));
 
     #[cfg(feature = "nvml")]
@@ -253,13 +245,13 @@ pub fn parse(argv: &[String]) -> Result<Cli> {
         .arg(Arg::with_name("nvml")
             .long("nvml")
             .takes_value(true)
-            .value_name("INDICES")
+            .value_name("IDS")
             .help("Target nvidia card ids or pci ids, default all, ex. 0,1,3-5"))
 
         .arg(Arg::with_name("nvml-gpu-freq")
             .long("nvml-gpu-freq")
             .takes_value(true)
-            .value_name("FREQ[,FREQ]")
+            .value_name("HZ[,HZ]")
             .conflicts_with("nvml-gpu-freq-reset")
             .help("Set nvidia gpu min,max frequency per --nvml, ex. 800,1.2ghz"))
 

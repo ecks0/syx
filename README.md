@@ -1,11 +1,13 @@
 # knobs
 
-Display and set Linux system tunables:
+A command-line utility for viewing and setting Linux system power and performance values.
+
+Supported knobs:
 
 - cpu: online/offline
 - cpufreq: governor, min/max frequencies
 - intel-pstate: epb, epp
-- intel-rapl: power limit, time window per zone/subzone/constraint
+- intel-rapl: power limit, time window - per zone/subzone/constraint
 - drm
   - i915: min/max/boost frequencies
 - nvml
@@ -14,6 +16,8 @@ Display and set Linux system tunables:
   - enabled via the `nvml` feature flag
 
 ## Output
+
+A contrived example showing all available tables:
 
 ```
  CPU  Online  Governor   Cur      Min      Max      CPU min  CPU max
@@ -37,13 +41,13 @@ Display and set Linux system tunables:
  ---  ------------------------
  all  default performance balance_performance balance_power power
 
- Name       Pkg  Zone  Enabled  Long-term  Short-term  Cur      Max
- ----       ---  ----  -------  ---------  ----------  ---      ---
- package-0  0    •     true     4.0 W      6.0 W       926.5 J  262.1 kJ
- core       0    0     false    0.0 fW     •           333.9 J  262.1 kJ
- uncore     0    1     false    0.0 fW     •           1.0 J    262.1 kJ
- dram       0    2     false    0.0 fW     •           121.8 J  262.1 kJ
- psys       1    •     false    0.0 fW     0.0 fW      56.7 J   262.1 kJ
+ Zone name  Zone  C0 limit  C1 limit  C0 window    C1 window  Energy
+ ---------  ----  --------  --------  ---------    ---------  ------
+ package-0  0     4 W       6 W       27983872 us  2440 us    17.763 kJ
+ core       0:0   0 W       •         976 us       •          1.760 kJ
+ uncore     0:1   0 W       •         976 us       •          944.211 mJ
+ dram       0:2   0 W       •         976 us       •          2.704 kJ
+ psys       1     0 W       0 W       27983872 us  976 us     1.812 kJ
 
  Card  Driver  Actual   Req'd    Min      Max      Boost    GPU min  GPU max
  ----  ------  ------   -----    ---      ---      -----    -------  -------
@@ -71,48 +75,41 @@ USAGE:
     knobs [OPTIONS]
 
 OPTIONS:
-        --show-cpu                       Print cpu and cpufreq values
-        --show-pstate                    Print intel-pstate values
-        --show-rapl                      Print intel-rapl values
-        --show-drm                       Print drm values
-        --show-nvml                      Print nvidia management values
-    -q, --quiet                          Do not print values
-    -c, --cpu <INDICES>                  Target cpu ids, default all, ex. 0,1,3-5
-    -o, --cpu-on <0|1>                   Set cpu online status per --cpu
-    -O, --cpu-on-each <TOGGLES>          Set cpu online status, ex. 10_1 → 0=ON 1=OFF 2=SKIP 3=ON
-    -g, --cpufreq-gov <NAME>             Set cpufreq governor per --cpu
-    -n, --cpufreq-min <FREQ>             Set cpufreq min freq per --cpu, ex. 1200 or 1.2ghz
-    -x, --cpufreq-max <FREQ>             Set cpufreq max freq per --cpu, ex. 1200 or 1.2ghz
-        --pstate-epb <0-15>              Set intel-pstate energy/performance bias per --cpu
-        --pstate-epp <NAME>              Set intel-pstate energy/performance pref per --cpu
-    -p, --rapl-package <INT>             Target intel-rapl package
-    -z, --rapl-zone <INT>                Target intel-rapl zone
-    -C, --rapl-constraint <INT>          Target intel-rapl constraint
-    -l, --rapl-limit <POWER>             Set intel-rapl power limit per --rapl-package/zone/constraint
-    -w, --rapl-window <DURATION>         Set intel-rapl time window per --rapl-package/zone/constraint
-        --drm-i915 <INDICES>             Target i915 card ids or pci ids, default all, ex. 0,1,3-5
-        --drm-i915-min <FREQ>            Set i915 min frequency per --drm-i915, ex. 1200 or 1.2ghz
-        --drm-i915-max <FREQ>            Set i915 max frequency per --drm-i915, ex. 1200 or 1.2ghz
-        --drm-i915-boost <FREQ>          Set i915 boost frequency per --drm-i915, ex. 1200 or 1.2ghz
-        --nvml <INDICES>                 Target nvidia card ids or pci ids, default all, ex. 0,1,3-5
-        --nvml-gpu-freq <FREQ[,FREQ]>    Set nvidia gpu min,max frequency per --nvml, ex. 800,1.2ghz
-        --nvml-gpu-freq-reset            Reset nvidia gpu frequency to default per --nvml
-        --nvml-power-limit <POWER>       Set nvidia card power limit per --nvml
-    -h, --help                           Prints help information
+        --show-cpu                    Print cpu and cpufreq values
+        --show-pstate                 Print intel-pstate values
+        --show-rapl                   Print intel-rapl values
+        --show-drm                    Print drm values
+        --show-nvml                   Print nvidia management values
+    -q, --quiet                       Do not print values
+    -c, --cpu <IDS>                   Target cpu ids, default all, ex. 0,1,3-5
+    -o, --cpu-on <0|1>                Set cpu online status per --cpu
+    -O, --cpu-on-each <TOGGLES>       Set cpu online status, ex. 10_1 → 0=ON 1=OFF 2=SKIP 3=ON
+    -g, --cpufreq-gov <STR>           Set cpufreq governor per --cpu
+    -n, --cpufreq-min <HZ>            Set cpufreq min freq per --cpu, ex. 1200 or 1.2ghz
+    -x, --cpufreq-max <HZ>            Set cpufreq max freq per --cpu, ex. 1200 or 1.2ghz
+        --pstate-epb <0-15>           Set intel-pstate energy/performance bias per --cpu
+        --pstate-epp <STR>            Set intel-pstate energy/performance pref per --cpu
+    -P, --rapl-package <INT>          Target intel-rapl package, default 0
+    -Z, --rapl-zone <INT>             Target intel-rapl sub-zone, default none
+    -0, --rapl-c0-limit <WATTS>       Set intel-rapl c0 power limit per --rapl-{package,zone}
+    -1, --rapl-c1-limit <WATTS>       Set intel-rapl c1 power limit per --rapl-{package,zone}
+        --rapl-c0-window <SECS>       Set intel-rapl c0 time window per --rapl-{package,zone}
+        --rapl-c1-winodw <SECS>       Set intel-rapl c1 time window per --rapl-{package,zone}
+        --drm-i915 <IDS>              Target i915 card ids or pci ids, default all, ex. 0,1,3-5
+        --drm-i915-min <HZ>           Set i915 min frequency per --drm-i915, ex. 1200 or 1.2ghz
+        --drm-i915-max <HZ>           Set i915 max frequency per --drm-i915, ex. 1200 or 1.2ghz
+        --drm-i915-boost <HZ>         Set i915 boost frequency per --drm-i915, ex. 1200 or 1.2ghz
+        --nvml <IDS>                  Target nvidia card ids or pci ids, default all, ex. 0,1,3-5
+        --nvml-gpu-freq <HZ[,HZ]>     Set nvidia gpu min,max frequency per --nvml, ex. 800,1.2ghz
+        --nvml-gpu-freq-reset         Reset nvidia gpu frequency to default per --nvml
+        --nvml-power-limit <WATTS>    Set nvidia card power limit per --nvml
+    -h, --help                        Prints help information
 
-         INDICES   A comma-delimited sequence of integers and/or integer ranges.
-
-         TOGGLES   An enumeration of 0 (offline), 1 (online) or _ (skip) characters.
-                   The character's position indicates the ID on which to act.
-
-            FREQ*    Default: megahertz when unspecified
-                   Supported: hz/h - khz/k - mhz/m - ghz/g - thz/t
-
-           POWER*    Default: milliwatts when unspecified
-                   Supported: uw/u - mw/m - w - kw/k
-
-        DURATION     Default: milliseconds when unspecified
-                   Supported: ns/n - us/u - ms/m - s
+             IDS   A comma-delimited sequence of integers and/or integer ranges.
+         TOGGLES   An sequence of 0 (off), 1 (on) or _ (skip) characters.
+              HZ*  mhz when unspecified: hz/h - khz/k - mhz/m - ghz/g - thz/t
+           WATTS*  mw when unspecified: uw/u - mw/m - w - kw/k
+            SECS   ms when unspecified: ns/n - us/u - ms/m - s
 
         * Floating point values may be given for these units.
 
@@ -131,7 +128,10 @@ OPTIONS:
 
 ---
 
-### Set cpufreq min/max frequency
+### Set cpu min/max frequency
+
+- set cpu minimum frequency → 800 MHz
+- set cpu maximum frequency → 4.4 GHz
 
 **For all CPUs**
 
@@ -155,27 +155,45 @@ knobs --cpu 0-3 --cpufreq-min 800 --cpufreq-max 4.4ghz
 
 ---
 
-### Set intel_pstate epb
+### Set intel-pstate epb and epp
+
+- set intel-pstate energy/performance bias → 6
+- set intel-pstate energy/performance preference → balance_performance
 
 **For all CPUs**
 
 ```
-knobs --pstate-epb 6
+knobs --pstate-epb 6 --pstate-epp balance_performance
 ```
 
 **For the first 4 CPUs only**
 
 ```
-knobs -c 0-3 --pstate-epb 6
+knobs -c 0-3 --pstate-epb 6 --pstate-epp balance_performance
+```
+
+---
+
+### Set intel-rapl power constraints
+
+- set package 0 constraint 0 (long-term) → 28 watts
+- set package 0 constraint 1 (short-term) → 35 watts
+- (0 is the default value for `--rapl-package`, while `--rapl-zone` has no default.)
+
+```
+knobs -0 28w -1 35w
 ```
 ...or with long args...
 ```
-knobs --cpu 0-3 --pstate-epb 6
+knobs --rapl-c0-limit 28w --rapl-c1-limit 35w
 ```
 
 ---
 
 ### Set nvidia min/max GPU frequency
+
+- set gpu minimum frequency → 600 MHz
+- set gpu maximum frequency - 2.2 GHz
 
 **For all GPUs**
 
