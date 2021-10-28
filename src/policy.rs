@@ -1,6 +1,7 @@
 use zysfs::io::cpu::tokio::{cpu_online, set_cpu_online};
 use zysfs::types::{self as sysfs, tokio::Read as _};
 use tokio::sync::OnceCell;
+use std::time::Duration;
 
 static CPU_IDS: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
 
@@ -24,7 +25,6 @@ pub async fn drm_ids_cached() -> Option<Vec<u64>> {
 pub async fn drm_ids_i915_cached() -> Option<Vec<u64>> {
     async fn ids() -> Option<Vec<u64>> {
         use zysfs::io::drm::tokio::driver;
-
         let mut ids = vec![];
         if let Some(drm_ids) = drm_ids_cached().await {
             for id in drm_ids {
@@ -44,6 +44,8 @@ pub async fn nvml_ids_cached() -> Option<Vec<u64>> {
     NVML_IDS.get_or_init(ids).await.clone()
 }
 
+const CPU_ONOFF_MILLIS: u64 = 200;
+
 pub async fn set_all_cpus_online() -> Vec<u64> {
     let cpu_ids = cpu_ids_cached().await.unwrap_or_else(Vec::new);
     let mut onlined = vec![];
@@ -54,12 +56,18 @@ pub async fn set_all_cpus_online() -> Vec<u64> {
             }
         }
     }
+    if !onlined.is_empty() {
+        tokio::time::sleep(Duration::from_millis(CPU_ONOFF_MILLIS)).await;
+    }
     onlined
 }
 
 pub async fn set_cpus_offline(cpu_ids: Vec<u64>) {
-    for id in cpu_ids {
-        let _ = set_cpu_online(id, false).await;
+    if !cpu_ids.is_empty() {
+        for id in cpu_ids {
+            let _ = set_cpu_online(id, false).await;
+        }
+        tokio::time::sleep(Duration::from_millis(CPU_ONOFF_MILLIS)).await;
     }
 }
 

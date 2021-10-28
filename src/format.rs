@@ -468,28 +468,3 @@ impl Format for sysfs::intel_rapl::IntelRapl {
         Ok(())
     }
 }
-
-// #[async_trait]
-// impl Format for Knobs {
-//     type Err = Error;
-
-//     async fn format_values<W: AsyncWrite + Send + Unpin>(&self, w: &mut W) -> Result<()> {
-//         if let Some(cpu) = sysfs::cpu::Cpu::read(()).await {
-//             if let Some(cpufreq) = sysfs::cpufreq::Cpufreq::read(()).await {
-//                 (cpu, cpufreq).format_values(&mut w).await?;
-//             }
-//         }
-//         if let Some(intel_pstate) = sysfs::intel_pstate::IntelPstate::read(()).await {
-//             intel_pstate.format_values(&mut w).await?;
-//         }
-//         if let Some(intel_rapl) = sysfs::intel_rapl::IntelRapl::read(()).await {
-//             intel_rapl.format_values(&mut w).await?;
-//         }
-//         if let Some(drm) = sysfs::drm::Drm::read(()).await {
-//             drm.format_values(&mut w).await?;
-//         }
-//         #[cfg(feature = "nvml")]
-//         nvml::Nvml.format_values(&mut w).await?;
-//         Ok(())
-//     }
-// }

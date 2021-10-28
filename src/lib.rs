@@ -575,7 +575,7 @@ impl Knobs {
         use sysfs::tokio::Write as _;
 
         let onlined =
-            match self.has_cpu_or_related_values() {
+            match self.has_cpufreq_values() || self.has_pstate_values() {
                 true => Some(policy::set_all_cpus_online().await),
                 false => None,
             };
