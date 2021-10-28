@@ -1,6 +1,6 @@
 # knobs
 
-A command-line utility for viewing and setting Linux power and performance values.
+A command-line utility and library for viewing and setting Linux power and performance values.
 
 Supported knobs:
 
@@ -132,7 +132,7 @@ ARGS:
 
 ## Example usage
 
-```sh
+```bash
 ### set cpu minimum frequency → 800 MHz
 ### set cpu maximum frequency → 4.4 GHz
 
@@ -203,4 +203,75 @@ knobs -c 1-3 -o true -- -c 4-7 -o false
 
 knobs --nvml 0 --nvml-gpu-min 1800 --nvml-gpu-max 2.2ghz -- \
       --nvml 1 --nvml-gpu-min 600  --nvml-gpu-max 1000
+
+### chains can be arbitarily long
+
+knobs -c 0 -x 4.0ghz -- -c 1 -x 4.1ghz -- -c 2 -x 4.2ghz -- -c 3 -x 4.3ghz # and so on
+
+### enable debug logging with -q/--quiet to see what commands are doing
+
+KNOBS_LOG=debug knobs -q -x 4400
+Chain 0
+OK sysfs w /sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq 4400000
+OK sysfs w /sys/devices/system/cpu/cpufreq/policy1/scaling_max_freq 4400000
+OK sysfs w /sys/devices/system/cpu/cpufreq/policy2/scaling_max_freq 4400000
+OK sysfs w /sys/devices/system/cpu/cpufreq/policy3/scaling_max_freq 4400000
+
+KNOBS_LOG=debug knobs -q \
+    --rapl-c0-limit 10w --rapl-c1-limit 13w -- \
+    --drm-i915-min 300mhz --drm-i915-max 900mhz
+OK sysfs l /sys/class/drm/card0/device/driver ../../../bus/pci/drivers/i915
+Chain 0
+OK sysfs w /sys/devices/virtual/powercap/intel-rapl/intel-rapl:0/constraint_0_power_limit_uw 10000000
+OK sysfs w /sys/devices/virtual/powercap/intel-rapl/intel-rapl:0/constraint_1_power_limit_uw 13000000
+Chain 1
+OK sysfs w /sys/class/drm/card0/gt_max_freq_mhz 900
+OK sysfs w /sys/class/drm/card0/gt_min_freq_mhz 300
+
+### each chain's instance is printed to the trace logging channel
+
+KNOBS_LOG=trace knobs -q -x 4400
+Chain 0
+Knobs {
+    cpu: Some(
+        [
+            0,
+            1,
+            2,
+            3,
+        ],
+    ),
+    cpu_on: None,
+    cpus_on: None,
+    cpufreq_gov: None,
+    cpufreq_min: None,
+    cpufreq_max: Some(
+        Frequency {
+            hertz: 4400000000.0,
+        },
+    ),
+    drm_i915: None,
+    drm_i915_min: None,
+    drm_i915_max: None,
+    drm_i915_boost: None,
+    nvml: None,
+    nvml_gpu_min: None,
+    nvml_gpu_max: None,
+    nvml_gpu_reset: None,
+    nvml_power_limit: None,
+    pstate_epb: None,
+    pstate_epp: None,
+    rapl_package: Some(
+        0,
+    ),
+    rapl_zone: None,
+    rapl_c0_limit: None,
+    rapl_c1_limit: None,
+    rapl_c0_window: None,
+    rapl_c1_window: None,
+}
+OK sysfs w /sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq 4400000
+OK sysfs w /sys/devices/system/cpu/cpufreq/policy1/scaling_max_freq 4400000
+OK sysfs w /sys/devices/system/cpu/cpufreq/policy2/scaling_max_freq 4400000
+OK sysfs w /sys/devices/system/cpu/cpufreq/policy3/scaling_max_freq 4400000
 ```
