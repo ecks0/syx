@@ -529,8 +529,7 @@ impl Knobs {
     pub fn has_cpu_or_related_values(&self) -> bool {
         self.has_cpu_values() ||
         self.has_cpufreq_values() ||
-        self.has_pstate_values() ||
-        self.has_rapl_values()
+        self.has_pstate_values()
     }
 
     pub fn has_cpufreq_values(&self) -> bool {
