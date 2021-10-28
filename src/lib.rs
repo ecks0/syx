@@ -1,6 +1,6 @@
 use measurements::{Frequency, Power};
 use serde::{Deserialize, Deserializer, de::Error as _};
-use zysfs::types::{self as sysfs};
+use zysfs::types as sysfs;
 use std::{
     str::FromStr,
     time::Duration
@@ -574,32 +574,24 @@ impl Knobs {
     async fn apply(&self) {
         use sysfs::tokio::Write as _;
 
-        let onlined =
-            match self.has_cpufreq_values() || self.has_pstate_values() {
-                true => Some(policy::set_all_cpus_online().await),
-                false => None,
-            };
-
-        let cpu: Option<sysfs::cpu::Cpu> = self.into();
-        if let Some(cpu) = cpu { cpu.write().await; }
-
         let cpufreq: Option<sysfs::cpufreq::Cpufreq> = self.into();
-        if let Some(cpufreq) = cpufreq { cpufreq.write().await; }
-
         let intel_pstate: Option<sysfs::intel_pstate::IntelPstate> = self.into();
-        if let Some(intel_pstate) = intel_pstate { intel_pstate.write().await; }
-
+        let cpu: Option<sysfs::cpu::Cpu> = self.into();
         let intel_rapl: Option<sysfs::intel_rapl::IntelRapl> = self.into();
-        if let Some(intel_rapl) = intel_rapl { intel_rapl.write().await; }
-
         let drm: Option<sysfs::drm::Drm> = self.into();
-        if let Some(drm) = drm { drm.write().await; }
+        #[cfg(feature = "nvml")]
+        let nvml: Option<policy::NvmlPolicies> = self.into();
 
-        if let Some(v) = onlined { policy::set_cpus_offline(v).await; }
-
-        #[cfg(feature = "nvml")] {
-            let nvml: Option<policy::NvmlPolicies> = self.into();
-            if let Some(nvml) = nvml { nvml.write(); }
+        if cpufreq.is_some() || intel_pstate.is_some() {
+            let onlined = policy::set_all_cpus_online().await;
+            if let Some(cpufreq) = cpufreq { cpufreq.write().await; }
+            if let Some(intel_pstate) = intel_pstate { intel_pstate.write().await; }
+            policy::set_cpus_offline(onlined).await;
         }
+        if let Some(cpu) = cpu { cpu.write().await; }
+        if let Some(intel_rapl) = intel_rapl { intel_rapl.write().await; }
+        if let Some(drm) = drm { drm.write().await; }
+        #[cfg(feature = "nvml")]
+        if let Some(nvml) = nvml { nvml.write(); }
     }
 }

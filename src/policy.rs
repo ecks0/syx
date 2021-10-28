@@ -44,7 +44,7 @@ pub async fn nvml_ids_cached() -> Option<Vec<u64>> {
     NVML_IDS.get_or_init(ids).await.clone()
 }
 
-const CPU_ONOFF_MILLIS: u64 = 200;
+const CPU_ONOFF_SLEEP: Duration = Duration::from_millis(200);
 
 pub async fn set_all_cpus_online() -> Vec<u64> {
     let cpu_ids = cpu_ids_cached().await.unwrap_or_else(Vec::new);
@@ -57,7 +57,7 @@ pub async fn set_all_cpus_online() -> Vec<u64> {
         }
     }
     if !onlined.is_empty() {
-        tokio::time::sleep(Duration::from_millis(CPU_ONOFF_MILLIS)).await;
+        tokio::time::sleep(CPU_ONOFF_SLEEP).await;
     }
     onlined
 }
@@ -67,7 +67,7 @@ pub async fn set_cpus_offline(cpu_ids: Vec<u64>) {
         for id in cpu_ids {
             let _ = set_cpu_online(id, false).await;
         }
-        tokio::time::sleep(Duration::from_millis(CPU_ONOFF_MILLIS)).await;
+        tokio::time::sleep(CPU_ONOFF_SLEEP).await;
     }
 }
 
