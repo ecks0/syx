@@ -189,17 +189,17 @@ knobs --nvml 0,1 --nvml-gpu-min 600 --nvml-gpu-max 2.2ghz
 
 ### knobs calls can be chained
 
-### set cpus 1-3 online
-### set cpus 4-7 offline
+# set cpus 1-3 online
+# set cpus 4-7 offline
 
 knobs --cpu 1-3 --cpu-on true -- --cpu 4-7 --cpu-on false
 
 knobs -c 1-3 -o true -- -c 4-7 -o false
 
-### set nvidia card 0 gpu min frequency → 1.8 GHz
-### set nvidia card 0 gpu min frequency → 2.2 GHz
-### set nvidia card 1 gpu min frequency → 600 MHz
-### set nvidia card 1 gpu min frequency → 1000 MHz
+# set nvidia card 0 gpu min frequency → 1.8 GHz
+# set nvidia card 0 gpu min frequency → 2.2 GHz
+# set nvidia card 1 gpu min frequency → 600 MHz
+# set nvidia card 1 gpu min frequency → 1000 MHz
 
 knobs --nvml 0 --nvml-gpu-min 1800 --nvml-gpu-max 2.2ghz -- \
       --nvml 1 --nvml-gpu-min 600  --nvml-gpu-max 1000
@@ -210,12 +210,16 @@ knobs -c 0 -x 4.0ghz -- -c 1 -x 4.1ghz -- -c 2 -x 4.2ghz -- -c 3 -x 4.3ghz # and
 
 ### enable debug logging with -q/--quiet to see what commands are doing
 
+# ex. 1
+
 KNOBS_LOG=debug knobs -q -x 4400
 Chain 0
 OK sysfs w /sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq 4400000
 OK sysfs w /sys/devices/system/cpu/cpufreq/policy1/scaling_max_freq 4400000
 OK sysfs w /sys/devices/system/cpu/cpufreq/policy2/scaling_max_freq 4400000
 OK sysfs w /sys/devices/system/cpu/cpufreq/policy3/scaling_max_freq 4400000
+
+# ex, 2
 
 KNOBS_LOG=debug knobs -q \
     --rapl-c0-limit 10w --rapl-c1-limit 13w -- \
@@ -227,6 +231,15 @@ OK sysfs w /sys/devices/virtual/powercap/intel-rapl/intel-rapl:0/constraint_1_po
 Chain 1
 OK sysfs w /sys/class/drm/card0/gt_max_freq_mhz 900
 OK sysfs w /sys/class/drm/card0/gt_min_freq_mhz 300
+
+# ex, 3
+
+KNOBS_LOG=debug knobs -q --nvml-gpu-min 300 --nvml-gpu-max 2.2ghz
+OK nvml r init NVML
+OK nvml r Nvml::ids 1
+Chain 0
+OK nvml r Nvml::device_for_id Device { device: 0x7f6084539e58, nvml: NVML }
+OK nvml w Clocks::set_gpu_locked_clocks 0 ()
 
 ### each chain's instance is printed to the trace logging channel
 
