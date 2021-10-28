@@ -704,7 +704,7 @@ dependencies = [
 [[package]]
 name = "zysfs"
 version = "0.3.0"
-source = "git+https://github.com/ecks0/zysfs#a229bf449c7c357dd57294513e4af487e2feadf6"
+source = "git+https://github.com/ecks0/zysfs#741568cf417f959dc7b9279070c1ede3c3ea51c3"
 dependencies = [
  "async-trait",
  "log",
