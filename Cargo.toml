@@ -30,5 +30,6 @@ features = [
   "rt-multi-thread",
   "sync",
   "parking_lot",
+  "time",
   "macros",
 ]
