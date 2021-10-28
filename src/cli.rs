@@ -1,4 +1,4 @@
-use log::{debug, info};
+use log::{Level, debug, info, log_enabled};
 use zysfs::types::{self as sysfs};
 use std::{convert::TryFrom, str::FromStr};
 use tokio::io::AsyncWriteExt;
@@ -458,6 +458,7 @@ impl Cli {
 
         for (i, knobs) in self.chain.iter().enumerate() {
             info!("Chain {}", i);
+            if log_enabled!(Level::Debug) { debug!("{:#?}", knobs); }
             knobs.apply().await;
         }
         if self.quiet.is_none() {
