@@ -109,8 +109,8 @@ impl From<&crate::Knobs> for Option<sysfs::cpufreq::Cpufreq> {
         if !k.has_cpufreq_values() { return None; }
         let policy_ids = k.cpu.clone()?;
         if policy_ids.is_empty() { return None; }
-        let scaling_min_freq = k.cpufreq_min.map(|f| f.as_kilohertz() as u64);
-        let scaling_max_freq = k.cpufreq_max.map(|f| f.as_kilohertz() as u64);
+        let scaling_min_freq = k.cpufreq_min.map(|f| f.as_kilohertz().ceil() as u64);
+        let scaling_max_freq = k.cpufreq_max.map(|f| f.as_kilohertz().ceil() as u64);
         let mut policies = vec![];
         for policy_id in policy_ids {
             let policy = sysfs::cpufreq::Policy {
@@ -139,8 +139,8 @@ impl From<&crate::Knobs> for Option<sysfs::drm::Drm> {
                 if !i915_ids.is_empty() {
                     let driver_policy = sysfs::drm::DriverPolicy::I915(
                         sysfs::drm::I915 {
-                            min_freq_mhz: k.drm_i915_min.map(|f| f.as_megahertz() as u64),
-                            max_freq_mhz: k.drm_i915_max.map(|f| f.as_megahertz() as u64),
+                            min_freq_mhz: k.drm_i915_min.map(|f| f.as_megahertz().ceil() as u64),
+                            max_freq_mhz: k.drm_i915_max.map(|f| f.as_megahertz().ceil() as u64),
                             boost_freq_mhz: k.drm_i915_boost.map(|f| f.as_megahertz() as u64),
                             ..Default::default()
                         }
@@ -244,10 +244,10 @@ impl From<&crate::Knobs> for Option<NvmlPolicies> {
             .and_then(|min|
                 k.nvml_gpu_max
                     .map(|max|
-                        (min.as_megahertz() as u32, max.as_megahertz() as u32)));
+                        (min.as_megahertz() as u32, max.as_megahertz().ceil() as u32)));
         let power_limit = k
             .nvml_power_limit
-            .map(|p| p.as_milliwatts() as u32);
+            .map(|p| p.as_milliwatts().ceil() as u32);
         let mut policies = vec![];
         for id in ids {
             let pol = NvmlPolicy {
@@ -302,7 +302,7 @@ impl From<&crate::Knobs> for Option<sysfs::intel_rapl::IntelRapl> {
                 if limit.is_some() || window.is_some() {
                     let c = sysfs::intel_rapl::Constraint {
                         id: Some(*id),
-                        power_limit_uw: limit.map(|v| v.as_microwatts() as u64),
+                        power_limit_uw: limit.map(|v| v.as_microwatts().ceil() as u64),
                         time_window_us: window.map(|v| v.as_micros().try_into().unwrap()),
                         ..Default::default()
                     };
