@@ -344,9 +344,13 @@ impl Format for sysfs::intel_pstate::IntelPstate {
         }
 
         fn epb_epp(policies: &[sysfs::intel_pstate::Policy]) -> Option<String> {
-            let mut values: Vec<(Option<u64>, Option<String>)> = policies
+            let mut values: Vec<(u64, String)> = policies
                 .iter()
-                .map(|p| (p.energy_perf_bias, p.energy_performance_preference.clone()))
+                .filter_map(|p| p.energy_perf_bias
+                    .and_then(|epb| p.energy_performance_preference
+                        .as_ref()
+                        .map(|epp| (epb, epp.to_string())))
+                )
                 .collect();
             if values.is_empty() { return None; }
             values.sort_unstable();
@@ -356,8 +360,8 @@ impl Format for sysfs::intel_pstate::IntelPstate {
                 let values = values.into_iter().next().unwrap();
                 tab.row(&[
                     "all".to_string(),
-                    values.0.map(|v| v.to_string()).unwrap_or_else(dot),
-                    values.1.unwrap_or_else(dot),
+                    values.0.to_string(),
+                    values.1,
                 ]);
             } else {
                 for policy in policies {

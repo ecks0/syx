@@ -595,7 +595,7 @@ impl Knobs {
         let drm: Option<sysfs::drm::Drm> = self.into();
         if let Some(drm) = drm { drm.write().await; }
 
-        if let Some(v) = onlined { policy::set_cpus_offline(v); }
+        if let Some(v) = onlined { policy::set_cpus_offline(v).await; }
 
         #[cfg(feature = "nvml")] {
             let nvml: Option<policy::NvmlPolicies> = self.into();

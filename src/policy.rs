@@ -57,9 +57,9 @@ pub async fn set_all_cpus_online() -> Vec<u64> {
     onlined
 }
 
-pub fn set_cpus_offline(cpu_ids: Vec<u64>) {
+pub async fn set_cpus_offline(cpu_ids: Vec<u64>) {
     for id in cpu_ids {
-        let _ = set_cpu_online(id, false);
+        let _ = set_cpu_online(id, false).await;
     }
 }
 
