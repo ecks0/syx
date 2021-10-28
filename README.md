@@ -1,6 +1,6 @@
 # knobs
 
-A command-line utility for viewing and setting Linux system power and performance values.
+A command-line utility for viewing and setting Linux power and performance values.
 
 Supported knobs:
 
@@ -11,9 +11,10 @@ Supported knobs:
 - intel-pstate: epb, epp
 - intel-rapl: power limit, time window - per zone/subzone/constraint
 - nvml
-  - nvidia power limit, gpu clock min/max frequency
-  - requires nvidia management library at runtime, usually installed with the proprietary driver
+  - nvidia gpu clock min/max frequency, power limit
   - enabled via the `nvml` feature flag
+  - requires the nvidia management library at runtime, usually installed with the proprietary driver
+    - knobs will work correcly with `nvml` enabled even if there is no driver/library or nvidia hardware present
 
 ## Output
 
@@ -171,9 +172,9 @@ knobs -c 0-3 --pstate-epb 6 --pstate-epp balance_performance
 ### set intel-rapl package 0 constraint 1 (short-term) → 35 watts
 ### (0 is the default value for --rapl-package, while --rapl-zone has no default.)
 
-knobs -0 28w -1 35w
-
 knobs --rapl-c0-limit 28w --rapl-c1-limit 35w
+
+knobs -0 28w -1 35w
 
 # set nvidia gpu minimum frequency → 600 MHz
 # set nvidia gpu maximum frequency → 2.2 GHz
