@@ -574,6 +574,12 @@ impl Knobs {
     async fn apply(&self) {
         use sysfs::tokio::Write as _;
 
+        let onlined =
+            match self.has_cpu_or_related_values() {
+                true => Some(policy::set_all_cpus_online().await),
+                false => None,
+            };
+
         let cpu: Option<sysfs::cpu::Cpu> = self.into();
         if let Some(cpu) = cpu { cpu.write().await; }
 
@@ -588,6 +594,8 @@ impl Knobs {
 
         let drm: Option<sysfs::drm::Drm> = self.into();
         if let Some(drm) = drm { drm.write().await; }
+
+        if let Some(v) = onlined { policy::set_cpus_offline(v); }
 
         #[cfg(feature = "nvml")] {
             let nvml: Option<policy::NvmlPolicies> = self.into();
