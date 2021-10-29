@@ -1,14 +1,49 @@
 use log::{Level, debug, info, log_enabled, trace};
-use zysfs::types::{self as sysfs};
+use zysfs::types::{self as sysfs, tokio::Read as _};
 use std::{convert::TryFrom, str::FromStr};
-use tokio::io::AsyncWriteExt;
+use tokio::{io::AsyncWriteExt, sync::OnceCell};
 use crate::{Error, Result};
 
-const AFTER_HELP: &str = r#"             IDS   A comma-delimited sequence of integers and/or integer ranges.
-         TOGGLES   An sequence of 0 (off), 1 (on) or _ (skip) characters.
-              HZ*  mhz when unspecified: hz/h - khz/k - mhz/m - ghz/g - thz/t
-           WATTS*  mw when unspecified: uw/u - mw/m - w - kw/k
+const ARG_QUIET: &str            = "quiet";
+const ARG_SHOW_CPU: &str         = "show-cpu";
+const ARG_SHOW_DRM: &str         = "show-drm";
+#[cfg(feature = "nvml")]
+const ARG_SHOW_NVML: &str        = "show-nvml";
+const ARG_SHOW_PSTATE: &str      = "show-pstate";
+const ARG_SHOW_RAPL: &str        = "show-rapl";
+const ARG_CPU: &str              = "cpu";
+const ARG_CPU_ONLINE: &str       = "cpu-online";
+const ARG_CPUFREQ_GOV: &str      = "cpufreq-gov";
+const ARG_CPUFREQ_MIN: &str      = "cpufreq-min";
+const ARG_CPUFREQ_MAX: &str      = "cpufreq-max";
+const ARG_DRM_I915: &str         = "drm-i915";
+const ARG_DRM_I915_MIN: &str     = "drm-i915-min";
+const ARG_DRM_I915_MAX: &str     = "drm-i915-max";
+const ARG_DRM_I915_BOOST: &str   = "drm-i915-boost";
+#[cfg(feature = "nvml")]
+const ARG_NVML: &str             = "nvml";
+#[cfg(feature = "nvml")]
+const ARG_NVML_GPU_MIN: &str     = "nvml-gpu-min";
+#[cfg(feature = "nvml")]
+const ARG_NVML_GPU_MAX: &str     = "nvml-gpu-max";
+#[cfg(feature = "nvml")]
+const ARG_NVML_GPU_RESET: &str   = "nvml-gpu-reset";
+#[cfg(feature = "nvml")]
+const ARG_NVML_POWER_LIMIT: &str = "nvml-power-limit";
+const ARG_PSTATE_EPB: &str       = "pstate-epb";
+const ARG_PSTATE_EPP: &str       = "pstate-epp";
+const ARG_RAPL_PACKAGE: &str     = "rapl-package";
+const ARG_RAPL_ZONE: &str        = "rapl-zone";
+const ARG_RAPL_C0_LIMIT: &str    = "rapl-c0-limit";
+const ARG_RAPL_C1_LIMIT: &str    = "rapl-c1-limit";
+const ARG_RAPL_C0_WINDOW: &str   = "rapl-c0-window";
+const ARG_RAPL_C1_WINDOW: &str   = "rapl-c1-window";
+
+const AFTER_HELP: &str = r#"            BOOL   0, 1, true, or false
+             IDS   A comma-delimited sequence of integers and/or integer ranges.
+           HERTZ*  mhz when unspecified: hz/h - khz/k - mhz/m - ghz/g - thz/t
             SECS   ms when unspecified: ns/n - us/u - ms/m - s
+           WATTS*  mw when unspecified: uw/u - mw/m - w - kw/k
 
         * Floating point values may be given for these units.
 
@@ -39,198 +74,191 @@ fn app(argv0: &str) -> clap::App {
 
         .after_help(AFTER_HELP)
 
-        .arg(Arg::with_name("quiet")
+        .arg(Arg::with_name(ARG_QUIET)
             .short("q")
-            .long("quiet")
+            .long(ARG_QUIET)
             .takes_value(false)
             .help("Do not print values"))
 
-        .arg(Arg::with_name("show-cpu")
-            .long("show-cpu")
+        .arg(Arg::with_name(ARG_SHOW_CPU)
+            .long(ARG_SHOW_CPU)
             .takes_value(false)
             .help("Print cpu and cpufreq values"))
 
-        .arg(Arg::with_name("show-drm")
-            .long("show-drm")
+        .arg(Arg::with_name(ARG_SHOW_DRM)
+            .long(ARG_SHOW_DRM)
             .takes_value(false)
             .help("Print drm values"));
 
     #[cfg(feature = "nvml")]
     let a = a
 
-        .arg(Arg::with_name("show-nvml")
-            .long("show-nvml")
+        .arg(Arg::with_name(ARG_SHOW_NVML)
+            .long(ARG_SHOW_NVML)
             .takes_value(false)
             .help("Print nvidia management values"));
 
     let a = a
 
-        .arg(Arg::with_name("show-pstate")
-            .long("show-pstate")
+        .arg(Arg::with_name(ARG_SHOW_PSTATE)
+            .long(ARG_SHOW_PSTATE)
             .takes_value(false)
             .help("Print intel-pstate values"))
 
-        .arg(Arg::with_name("show-rapl")
-            .long("show-rapl")
+        .arg(Arg::with_name(ARG_SHOW_RAPL)
+            .long(ARG_SHOW_RAPL)
             .takes_value(false)
             .help("Print intel-rapl values"))
 
-        .arg(Arg::with_name("cpu")
+        .arg(Arg::with_name(ARG_CPU)
             .short("c")
-            .long("cpu")
+            .long(ARG_CPU)
             .takes_value(true)
             .value_name("IDS")
             .help("Target cpu ids, default all, ex. 0,1,3-5"))
 
-        .arg(Arg::with_name("cpu-on")
+        .arg(Arg::with_name(ARG_CPU_ONLINE)
             .short("o")
-            .long("cpu-on")
+            .long(ARG_CPU_ONLINE)
             .takes_value(true)
-            .value_name("0|1")
+            .value_name("BOOL")
             .help("Set cpu online status per --cpu"))
 
-        .arg(Arg::with_name("cpus-on")
-            .short("O")
-            .long("cpus-on")
-            .takes_value(true)
-            .value_name("TOGGLES")
-            .help("Set cpu online status, ex. 10_1 → 0=ON 1=OFF 2=SKIP 3=ON"))
-
-        .arg(Arg::with_name("cpufreq-gov")
+        .arg(Arg::with_name(ARG_CPUFREQ_GOV)
             .short("g")
-            .long("cpufreq-gov")
+            .long(ARG_CPUFREQ_GOV)
             .takes_value(true)
             .value_name("STR")
             .help("Set cpufreq governor per --cpu"))
 
-        .arg(Arg::with_name("cpufreq-min")
+        .arg(Arg::with_name(ARG_CPUFREQ_MIN)
             .short("n")
-            .long("cpufreq-min")
+            .long(ARG_CPUFREQ_MIN)
             .takes_value(true)
-            .value_name("HZ")
+            .value_name("HERTZ")
             .help("Set cpufreq min freq per --cpu, ex. 1200 or 1.2ghz"))
 
-        .arg(Arg::with_name("cpufreq-max")
+        .arg(Arg::with_name(ARG_CPUFREQ_MAX)
             .short("x")
-            .long("cpufreq-max")
+            .long(ARG_CPUFREQ_MAX)
             .takes_value(true)
-            .value_name("HZ")
+            .value_name("HERTZ")
             .help("Set cpufreq max freq per --cpu, ex. 1200 or 1.2ghz"))
 
-        .arg(Arg::with_name("drm-i915")
-            .long("drm-i915")
+        .arg(Arg::with_name(ARG_DRM_I915)
+            .long(ARG_DRM_I915)
             .takes_value(true)
             .value_name("IDS")
             .help("Target i915 card ids or pci ids, default all, ex. 0,1,3-5"))
 
-        .arg(Arg::with_name("drm-i915-min")
-            .long("drm-i915-min")
+        .arg(Arg::with_name(ARG_DRM_I915_MIN)
+            .long(ARG_DRM_I915_MIN)
             .takes_value(true)
-            .value_name("HZ")
+            .value_name("HERTZ")
             .help("Set i915 min frequency per --drm-i915, ex. 1200 or 1.2ghz"))
 
-        .arg(Arg::with_name("drm-i915-max")
-            .long("drm-i915-max")
+        .arg(Arg::with_name(ARG_DRM_I915_MAX)
+            .long(ARG_DRM_I915_MAX)
             .takes_value(true)
-            .value_name("HZ")
+            .value_name("HERTZ")
             .help("Set i915 max frequency per --drm-i915, ex. 1200 or 1.2ghz"))
 
-        .arg(Arg::with_name("drm-i915-boost")
-            .long("drm-i915-boost")
+        .arg(Arg::with_name(ARG_DRM_I915_BOOST)
+            .long(ARG_DRM_I915_BOOST)
             .takes_value(true)
-            .value_name("HZ")
+            .value_name("HERTZ")
             .help("Set i915 boost frequency per --drm-i915, ex. 1200 or 1.2ghz"));
 
     #[cfg(feature = "nvml")]
     let a = a
 
-        .arg(Arg::with_name("nvml")
-            .long("nvml")
+        .arg(Arg::with_name(ARG_NVML)
+            .long(ARG_NVML)
             .takes_value(true)
             .value_name("IDS")
             .help("Target nvidia card ids or pci ids, default all, ex. 0,1,3-5"))
 
-        .arg(Arg::with_name("nvml-gpu-min")
-            .long("nvml-gpu-min")
+        .arg(Arg::with_name(ARG_NVML_GPU_MIN)
+            .long(ARG_NVML_GPU_MIN)
             .takes_value(true)
-            .value_name("HZ")
-            .requires("nvml-gpu-max")
+            .value_name("HERTZ")
+            .requires(ARG_NVML_GPU_MAX)
             .help("Set nvidia gpu min frequency per --nvml, ex. 1200 or 1.2ghz"))
 
-        .arg(Arg::with_name("nvml-gpu-max")
-            .long("nvml-gpu-max")
+        .arg(Arg::with_name(ARG_NVML_GPU_MAX)
+            .long(ARG_NVML_GPU_MAX)
             .takes_value(true)
-            .value_name("HZ")
-            .requires("nvml-gpu-min")
+            .value_name("HERTZ")
+            .requires(ARG_NVML_GPU_MIN)
             .help("Set nvidia gpu max frequency per --nvml, ex. 1200 or 1.2ghz"))
 
-        .arg(Arg::with_name("nvml-gpu-reset")
-            .long("nvml-gpu-reset")
+        .arg(Arg::with_name(ARG_NVML_GPU_RESET)
+            .long(ARG_NVML_GPU_RESET)
             .takes_value(false)
             .conflicts_with("nvml-gpu-freq")
             .help("Reset nvidia gpu frequency to default per --nvml"))
 
-        .arg(Arg::with_name("nvml-power-limit")
-            .long("nvml-power-limit")
+        .arg(Arg::with_name(ARG_NVML_POWER_LIMIT)
+            .long(ARG_NVML_POWER_LIMIT)
             .takes_value(true)
             .value_name("WATTS")
             .help("Set nvidia card power limit per --nvml"));
 
     let a = a
 
-        .arg(Arg::with_name("pstate-epb")
-            .long("pstate-epb")
+        .arg(Arg::with_name(ARG_PSTATE_EPB)
+            .long(ARG_PSTATE_EPB)
             .takes_value(true)
             .value_name("0-15")
             .help("Set intel-pstate energy/performance bias per --cpu"))
 
-        .arg(Arg::with_name("pstate-epp")
-            .long("pstate-epp")
+        .arg(Arg::with_name(ARG_PSTATE_EPP)
+            .long(ARG_PSTATE_EPP)
             .takes_value(true)
             .value_name("STR")
             .help("Set intel-pstate energy/performance pref per --cpu"))
 
-        .arg(Arg::with_name("rapl-package")
+        .arg(Arg::with_name(ARG_RAPL_PACKAGE)
             .short("P")
-            .long("rapl-package")
+            .long(ARG_RAPL_PACKAGE)
             .takes_value(true)
             .value_name("INT")
             .help("Target intel-rapl package, default 0"))
 
-        .arg(Arg::with_name("rapl-zone")
+        .arg(Arg::with_name(ARG_RAPL_ZONE)
             .short("Z")
-            .long("rapl-zone")
+            .long(ARG_RAPL_ZONE)
             .takes_value(true)
             .value_name("INT")
             .help("Target intel-rapl sub-zone, default none"))
 
-        .arg(Arg::with_name("rapl-c0-limit")
+        .arg(Arg::with_name(ARG_RAPL_C0_LIMIT)
             .short("0")
-            .long("rapl-c0-limit")
+            .long(ARG_RAPL_C0_LIMIT)
             .takes_value(true)
             .value_name("WATTS")
             .help("Set intel-rapl c0 power limit per --rapl-{package,zone}"))
 
-        .arg(Arg::with_name("rapl-c1-limit")
+        .arg(Arg::with_name(ARG_RAPL_C1_LIMIT)
             .short("1")
-            .long("rapl-c1-limit")
+            .long(ARG_RAPL_C1_LIMIT)
             .takes_value(true)
             .value_name("WATTS")
             .help("Set intel-rapl c1 power limit per --rapl-{package,zone}"))
 
-        .arg(Arg::with_name("rapl-c0-window")
-            .long("rapl-c0-window")
+        .arg(Arg::with_name(ARG_RAPL_C0_WINDOW)
+            .long(ARG_RAPL_C0_WINDOW)
             .takes_value(true)
             .value_name("SECS")
             .help("Set intel-rapl c0 time window per --rapl-{package,zone}"))
 
-        .arg(Arg::with_name("rapl-c1-window")
+        .arg(Arg::with_name(ARG_RAPL_C1_WINDOW)
             .long("rapl-c1-winodw")
             .takes_value(true)
             .value_name("SECS")
             .help("Set intel-rapl c1 time window per --rapl-{package,zone}"))
 
-        .arg(Arg::with_name("chain")
+        .arg(Arg::with_name("CHAIN")
             .raw(true));
 
     a
@@ -313,43 +341,70 @@ impl<'a> TryFrom<clap::ArgMatches<'a>> for crate::Knobs {
 
     fn try_from(m: clap::ArgMatches<'a>) -> Result<Self> {
         let s = Self {
-            cpu: arg::<crate::Indices>("cpu", &m)?.map(|v| v.into()),
-            cpu_on: arg::<crate::BoolStr>("cpu-on", &m)?.map(|v| v.into()),
-            cpus_on: arg::<crate::Toggles>("cpus-on", &m)?.map(|v| v.into()),
-            cpufreq_gov: arg_str("cpufreq-gov", &m),
-            cpufreq_min: arg::<crate::FrequencyStr>("cpufreq-min", &m)?.map(|v| v.into()),
-            cpufreq_max: arg::<crate::FrequencyStr>("cpufreq-max", &m)?.map(|v| v.into()),
-            drm_i915: arg::<crate::CardIds>("drm-i915", &m)?.map(|v| v.into()),
-            drm_i915_min: arg::<crate::FrequencyStr>("drm-i915-min", &m)?.map(|v| v.into()),
-            drm_i915_max: arg::<crate::FrequencyStr>("drm-i915-max", &m)?.map(|v| v.into()),
-            drm_i915_boost: arg::<crate::FrequencyStr>("drm-i915-boost", &m)?.map(|v| v.into()),
-            #[cfg(feature = "nvml")] nvml: arg::<crate::CardIds>("nvml", &m)?.map(|v| v.into()),
-            #[cfg(feature = "nvml")] nvml_gpu_min: arg::<crate::FrequencyStr>("nvml-gpu-min", &m)?.map(|v| v.into()),
-            #[cfg(feature = "nvml")] nvml_gpu_max: arg::<crate::FrequencyStr>("nvml-gpu-max", &m)?.map(|v| v.into()),
-            #[cfg(feature = "nvml")] nvml_gpu_reset: flag("nvml-gpu-reset", &m).map(|_| true),
-            #[cfg(feature = "nvml")] nvml_power_limit: arg::<crate::PowerStr>("nvml-power-limit", &m)?.map(|v| v.into()),
-            pstate_epb: arg_int::<u64>("pstate-epb", &m)?,
-            pstate_epp: arg_str("pstate-epp", &m),
-            rapl_package: arg_int::<u64>("rapl-package", &m)?.or(Some(0)),
-            rapl_zone: arg_int::<u64>("rapl-zone", &m)?,
-            rapl_c0_limit: arg::<crate::PowerStr>("rapl-c0-limit", &m)?.map(|v| v.into()),
-            rapl_c1_limit: arg::<crate::PowerStr>("rapl-c1-limit", &m)?.map(|v| v.into()),
-            rapl_c0_window: arg::<crate::DurationStr>("rapl-c0-window", &m)?.map(|v| v.into()),
-            rapl_c1_window: arg::<crate::DurationStr>("rapl-c1-window", &m)?.map(|v| v.into()),
+            cpu: arg::<crate::Indices>(ARG_CPU, &m)?.map(|v| v.into()),
+            cpu_online: arg::<crate::BoolStr>(ARG_CPU_ONLINE, &m)?.map(|v| v.into()),
+            cpufreq_gov: arg_str(ARG_CPUFREQ_GOV, &m),
+            cpufreq_min: arg::<crate::FrequencyStr>(ARG_CPUFREQ_MIN, &m)?.map(|v| v.into()),
+            cpufreq_max: arg::<crate::FrequencyStr>(ARG_CPUFREQ_MAX, &m)?.map(|v| v.into()),
+            drm_i915: arg::<crate::CardIds>(ARG_DRM_I915, &m)?.map(|v| v.into()),
+            drm_i915_min: arg::<crate::FrequencyStr>(ARG_DRM_I915_MIN, &m)?.map(|v| v.into()),
+            drm_i915_max: arg::<crate::FrequencyStr>(ARG_DRM_I915_MAX, &m)?.map(|v| v.into()),
+            drm_i915_boost: arg::<crate::FrequencyStr>(ARG_DRM_I915_BOOST, &m)?.map(|v| v.into()),
+            #[cfg(feature = "nvml")]
+            nvml: arg::<crate::CardIds>(ARG_NVML, &m)?.map(|v| v.into()),
+            #[cfg(feature = "nvml")]
+            nvml_gpu_min: arg::<crate::FrequencyStr>(ARG_NVML_GPU_MIN, &m)?.map(|v| v.into()),
+            #[cfg(feature = "nvml")]
+            nvml_gpu_max: arg::<crate::FrequencyStr>(ARG_NVML_GPU_MAX, &m)?.map(|v| v.into()),
+            #[cfg(feature = "nvml")]
+            nvml_gpu_reset: flag(ARG_NVML_GPU_RESET, &m).map(|_| true),
+            #[cfg(feature = "nvml")]
+            nvml_power_limit: arg::<crate::PowerStr>(ARG_NVML_POWER_LIMIT, &m)?.map(|v| v.into()),
+            pstate_epb: arg_int::<u64>(ARG_PSTATE_EPB, &m)?,
+            pstate_epp: arg_str(ARG_PSTATE_EPP, &m),
+            rapl_package: arg_int::<u64>(ARG_RAPL_PACKAGE, &m)?.or(Some(0)),
+            rapl_zone: arg_int::<u64>(ARG_RAPL_ZONE, &m)?,
+            rapl_c0_limit: arg::<crate::PowerStr>(ARG_RAPL_C0_LIMIT, &m)?.map(|v| v.into()),
+            rapl_c1_limit: arg::<crate::PowerStr>(ARG_RAPL_C1_LIMIT, &m)?.map(|v| v.into()),
+            rapl_c0_window: arg::<crate::DurationStr>(ARG_RAPL_C0_WINDOW, &m)?.map(|v| v.into()),
+            rapl_c1_window: arg::<crate::DurationStr>(ARG_RAPL_C1_WINDOW, &m)?.map(|v| v.into()),
         };
         Ok(s)
    }
 }
 
 // Parse and return the knobs call chain.
+//
+// Knobs accepts an argument 'chain'. Each 'link' in the chain is a subset of knobs
+// arguments. Links are separated by the string `--`. Chains essentially let users
+// invoke knobs multiple times while invoking the binary only once.
+//
+// Any CLI argument which has an analogous field in the [`Knobs`] struct may participate
+// in a call chain. Arguments that do not have an analogous field in [`Knobs`], such as
+// `--show-*`, `--quiet`, etc. are parsed only once for the entire chain, and (at this
+// time) must appear in the first link.
+//
+// Chains are, in part, syntactic sugar for circumstances which necessarily require
+// multiple invocations. An easy example involves `--cpu-online`, which accepts a
+// boolean value. In a single invocation, a range of CPUs can be set online or offline
+// using `--cpu` and `--cpu-online` together, but setting some CPUs online and other
+// CPUs offline requires multiple invocations.
+//
+// More practically, chains reduce the amount of i/o that we must perform, because
+// the entire chain benefits from caching (e.g. `resolve()` in this module).
+//
+// Because chains result in a longer runtime, they give more time for samples to be
+// collected when calculating certain values (e.g. watts from energy_uj).
+//
 fn chain(a: clap::App, m: clap::ArgMatches) -> Result<Vec<crate::Knobs>> {
+    let mut chain: Vec<crate::Knobs> = vec![];
     let mut argv: Vec<String>;
     let mut m = m;
-    let mut chain: Vec<crate::Knobs> = vec![];
     loop {
-        chain.push(m.clone().try_into()?);
-        if !m.is_present("chain") { break; }
-        m = match m.values_of("chain") {
+        let k: crate::Knobs = m.clone().try_into()?;
+        if !k.is_default() { chain.push(k); }
+        if !m.is_present("CHAIN") { break; }
+        m = match m.values_of("CHAIN") {
             Some(c) => {
                 let chain_args: Vec<String> = c.map(String::from).collect();
                 if chain_args.is_empty() { break; }
@@ -363,14 +418,56 @@ fn chain(a: clap::App, m: clap::ArgMatches) -> Result<Vec<crate::Knobs>> {
     Ok(chain)
 }
 
-// Fetch any resource ids that need resolving.
+// Resolve resource ids. Some flags, e.g. --cpu, --nvml, accept a list of
+// resource ids, and will default to all resource ids when omitted. In the
+// latter case, this function will fill in the default resource ids as
+// required.
 async fn resolve(mut chain: Vec<crate::Knobs>) -> Result<Vec<crate::Knobs>> {
+    static CPU_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
+    static DRM_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
+    static DRM_I915_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
+    #[cfg(feature = "nvml")]
+    static NVML_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
+
+    pub async fn cpu_ids_cached() -> Option<Vec<u64>> {
+        async fn ids() -> Option<Vec<u64>> { sysfs::cpu::Policy::ids().await }
+        CPU_IDS_CACHED.get_or_init(ids).await.clone()
+    }
+
+    pub async fn drm_ids_cached() -> Option<Vec<u64>> {
+        async fn ids() -> Option<Vec<u64>> { sysfs::drm::Card::ids().await }
+        DRM_IDS_CACHED.get_or_init(ids).await.clone()
+    }
+
+    pub async fn drm_ids_i915_cached() -> Option<Vec<u64>> {
+        async fn ids() -> Option<Vec<u64>> {
+            use zysfs::io::drm::tokio::driver;
+
+            let mut ids = vec![];
+            if let Some(drm_ids) = drm_ids_cached().await {
+                for id in drm_ids {
+                    if let Ok("i915") = driver(id).await.as_deref() {
+                        ids.push(id);
+                    }
+                }
+            }
+            if ids.is_empty() { None } else { Some(ids) }
+        }
+        DRM_I915_IDS_CACHED.get_or_init(ids).await.clone()
+    }
+
+    #[cfg(feature = "nvml")]
+    pub async fn nvml_ids_cached() -> Option<Vec<u64>> {
+        async fn ids() -> Option<Vec<u64>> { nvml_facade::Nvml::ids().map(|ids| ids.into_iter().map(u64::from).collect()) }
+        NVML_IDS_CACHED.get_or_init(ids).await.clone()
+    }
+
     for k in chain.iter_mut() {
         if k.has_cpu_or_related_values() && k.cpu.is_none() {
-            k.cpu = crate::policy::cpu_ids_cached().await;
+            k.cpu = cpu_ids_cached().await;
         }
         if k.has_drm_i915_values() && k.drm_i915.is_none() {
-            k.drm_i915 = crate::policy::drm_ids_i915_cached().await
+            k.drm_i915 = drm_ids_i915_cached().await
                 .map(|ids| ids
                     .into_iter()
                     .map(crate::CardId::Id)
@@ -378,7 +475,7 @@ async fn resolve(mut chain: Vec<crate::Knobs>) -> Result<Vec<crate::Knobs>> {
         }
         #[cfg(feature = "nvml")]
         if k.has_nvml_values() && k.nvml.is_none() {
-            k.nvml = crate::policy::nvml_ids_cached().await
+            k.nvml = nvml_ids_cached().await
                 .map(|ids| ids
                     .into_iter()
                     .map(crate::CardId::Id)
@@ -431,12 +528,12 @@ impl Cli {
         let a = app(argv0(argv));
         let m = a.clone().get_matches_from_safe(argv)?;
         let s = Self {
-            quiet: flag("quiet", &m),
-            show_cpu: flag("show-cpu", &m),
-            show_drm: flag("show-drm", &m),
-            #[cfg(feature = "nvml")] show_nvml: flag("show-nvml", &m),
-            show_pstate: flag("show-pstate", &m),
-            show_rapl: flag("show-rapl", &m),
+            quiet: flag(ARG_QUIET, &m),
+            show_cpu: flag(ARG_SHOW_CPU, &m),
+            show_drm: flag(ARG_SHOW_DRM, &m),
+            #[cfg(feature = "nvml")] show_nvml: flag(ARG_SHOW_NVML, &m),
+            show_pstate: flag(ARG_SHOW_PSTATE, &m),
+            show_rapl: flag(ARG_SHOW_RAPL, &m),
             chain: resolve(chain(a, m)?).await?,
         };
         Ok(s)

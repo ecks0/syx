@@ -1,6 +1,7 @@
 use measurements::{Frequency, Power};
 use serde::{Deserialize, Deserializer, de::Error as _};
 use zysfs::types as sysfs;
+use tokio::time::sleep;
 use std::{
     str::FromStr,
     time::Duration
@@ -137,48 +138,48 @@ impl From<Indices> for Vec<u64> {
     fn from(i: Indices) -> Self { i.0 }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct Toggles(Vec<(u64, bool)>);
-
-impl Toggles {
-    pub fn into_vec(self) -> Vec<(u64, bool)> { self.0 }
-}
-
-impl FromStr for Toggles {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let mut toggles = vec![];
-        for (i, c) in s.chars().enumerate() {
-            toggles.push(
-                (
-                    i as u64,
-                    match c {
-                        '_' | '-' => continue,
-                        '0' => false,
-                        '1' => true,
-                        _ => return Err(Error::ParseValue("Expected sequence of 0, 1, or -".into())),
-                    },
-                )
-            );
-        }
-        Ok(Self(toggles))
-    }
-}
-
-impl<'de> Deserialize<'de> for Toggles {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s: &str = Deserialize::deserialize(deserializer)?;
-        Self::from_str(s).map_err(D::Error::custom)
-    }
-}
-
-impl From<Toggles> for Vec<(u64, bool)> {
-    fn from(t: Toggles) -> Self { t.0 }
-}
+// #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
+// pub struct Toggles(Vec<(u64, bool)>);
+//
+// impl Toggles {
+//     pub fn into_vec(self) -> Vec<(u64, bool)> { self.0 }
+// }
+//
+// impl FromStr for Toggles {
+//     type Err = Error;
+//
+//     fn from_str(s: &str) -> Result<Self> {
+//         let mut toggles = vec![];
+//         for (i, c) in s.chars().enumerate() {
+//             toggles.push(
+//                 (
+//                     i as u64,
+//                     match c {
+//                         '_' | '-' => continue,
+//                         '0' => false,
+//                         '1' => true,
+//                         _ => return Err(Error::ParseValue("Expected sequence of 0, 1, or -".into())),
+//                     },
+//                 )
+//             );
+//         }
+//         Ok(Self(toggles))
+//     }
+// }
+//
+// impl<'de> Deserialize<'de> for Toggles {
+//     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+//     where
+//         D: Deserializer<'de>,
+//     {
+//         let s: &str = Deserialize::deserialize(deserializer)?;
+//         Self::from_str(s).map_err(D::Error::custom)
+//     }
+// }
+//
+// impl From<Toggles> for Vec<(u64, bool)> {
+//     fn from(t: Toggles) -> Self { t.0 }
+// }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct FrequencyStr(Frequency);
@@ -407,13 +408,13 @@ where
     Ok(Some(b.into_bool()))
 }
 
-fn de_toggles<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<(u64, bool)>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let t: Toggles = Deserialize::deserialize(deserializer)?;
-    Ok(Some(t.into_vec()))
-}
+// fn de_toggles<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<(u64, bool)>>, D::Error>
+// where
+//     D: Deserializer<'de>,
+// {
+//     let t: Toggles = Deserialize::deserialize(deserializer)?;
+//     Ok(Some(t.into_vec()))
+// }
 
 fn de_frequency<'de, D>(deserializer: D) -> std::result::Result<Option<Frequency>, D::Error>
 where
@@ -454,10 +455,7 @@ pub struct Knobs {
     pub cpu: Option<Vec<u64>>,
 
     #[serde(deserialize_with = "de_bool")]
-    pub cpu_on: Option<bool>,
-
-    #[serde(deserialize_with = "de_toggles")]
-    pub cpus_on: Option<Vec<(u64, bool)>>,
+    pub cpu_online: Option<bool>,
 
     pub cpufreq_gov: Option<String>,
 
@@ -521,9 +519,12 @@ pub struct Knobs {
 }
 
 impl Knobs {
+    pub fn is_default(&self) -> bool {
+        self == &Self::default()
+    }
+
     pub fn has_cpu_values(&self) -> bool {
-        self.cpu_on.is_some() ||
-        self.cpus_on.is_some()
+        self.cpu_online.is_some()
     }
 
     pub fn has_cpu_or_related_values(&self) -> bool {
@@ -571,7 +572,11 @@ impl Knobs {
 
 impl Knobs {
 
-    async fn apply(&self) {
+    const WAIT_FOR_SYSFS: Duration = Duration::from_millis(200);
+
+    async fn wait_for_sysfs() { sleep(Self::WAIT_FOR_SYSFS).await }
+
+    pub async fn apply(&self) {
         use sysfs::tokio::Write as _;
 
         let cpufreq: Option<sysfs::cpufreq::Cpufreq> = self.into();
@@ -583,10 +588,16 @@ impl Knobs {
         let nvml: Option<policy::NvmlPolicies> = self.into();
 
         if cpufreq.is_some() || intel_pstate.is_some() {
-            let onlined = policy::set_all_cpus_online().await;
-            if let Some(cpufreq) = cpufreq { cpufreq.write().await; }
-            if let Some(intel_pstate) = intel_pstate { intel_pstate.write().await; }
-            policy::set_cpus_offline(onlined).await;
+            if let Some(cpu_ids) = self.cpu.clone() {
+                let cpu_ids = policy::set_cpus_online(cpu_ids).await;
+                if !cpu_ids.is_empty() { Self::wait_for_sysfs().await; }
+
+                if let Some(cpufreq) = cpufreq { cpufreq.write().await; }
+                if let Some(intel_pstate) = intel_pstate { intel_pstate.write().await; }
+
+                let cpu_ids = policy::set_cpus_offline(cpu_ids).await;
+                if !cpu_ids.is_empty() { Self::wait_for_sysfs().await; }
+            }
         }
         if let Some(cpu) = cpu { cpu.write().await; }
         if let Some(intel_rapl) = intel_rapl { intel_rapl.write().await; }

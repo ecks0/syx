@@ -1,53 +1,7 @@
 use zysfs::io::cpu::tokio::{cpu_online, set_cpu_online};
-use zysfs::types::{self as sysfs, tokio::Read as _};
-use tokio::sync::OnceCell;
-use std::time::Duration;
+use zysfs::types as sysfs;
 
-static CPU_IDS: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
-
-static DRM_IDS: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
-
-static DRM_I915_IDS: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
-
-#[cfg(feature = "nvml")]
-static NVML_IDS: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
-
-pub async fn cpu_ids_cached() -> Option<Vec<u64>> {
-    async fn ids() -> Option<Vec<u64>> { sysfs::cpu::Policy::ids().await }
-    CPU_IDS.get_or_init(ids).await.clone()
-}
-
-pub async fn drm_ids_cached() -> Option<Vec<u64>> {
-    async fn ids() -> Option<Vec<u64>> { sysfs::drm::Card::ids().await }
-    DRM_IDS.get_or_init(ids).await.clone()
-}
-
-pub async fn drm_ids_i915_cached() -> Option<Vec<u64>> {
-    async fn ids() -> Option<Vec<u64>> {
-        use zysfs::io::drm::tokio::driver;
-        let mut ids = vec![];
-        if let Some(drm_ids) = drm_ids_cached().await {
-            for id in drm_ids {
-                if let Ok("i915") = driver(id).await.as_deref() {
-                    ids.push(id);
-                }
-            }
-        }
-        if ids.is_empty() { None } else { Some(ids) }
-    }
-    DRM_I915_IDS.get_or_init(ids).await.clone()
-}
-
-#[cfg(feature = "nvml")]
-pub async fn nvml_ids_cached() -> Option<Vec<u64>> {
-    async fn ids() -> Option<Vec<u64>> { nvml_facade::Nvml::ids().map(|ids| ids.into_iter().map(u64::from).collect()) }
-    NVML_IDS.get_or_init(ids).await.clone()
-}
-
-const CPU_ONOFF_SLEEP: Duration = Duration::from_millis(200);
-
-pub async fn set_all_cpus_online() -> Vec<u64> {
-    let cpu_ids = cpu_ids_cached().await.unwrap_or_else(Vec::new);
+pub async fn set_cpus_online(cpu_ids: Vec<u64>) -> Vec<u64> {
     let mut onlined = vec![];
     for cpu_id in cpu_ids {
         if let Ok(online) = cpu_online(cpu_id).await {
@@ -56,57 +10,36 @@ pub async fn set_all_cpus_online() -> Vec<u64> {
             }
         }
     }
-    if !onlined.is_empty() {
-        tokio::time::sleep(CPU_ONOFF_SLEEP).await;
-    }
     onlined
 }
 
-pub async fn set_cpus_offline(cpu_ids: Vec<u64>) {
-    if !cpu_ids.is_empty() {
-        for id in cpu_ids {
-            let _ = set_cpu_online(id, false).await;
+pub async fn set_cpus_offline(cpu_ids: Vec<u64>) -> Vec<u64> {
+    let mut offlined = vec![];
+    for cpu_id in cpu_ids {
+        if let Ok(online) = cpu_online(cpu_id).await {
+            if online && set_cpu_online(cpu_id, false).await.is_ok() {
+                offlined.push(cpu_id);
+            }
         }
-        tokio::time::sleep(CPU_ONOFF_SLEEP).await;
     }
+    offlined
 }
 
 impl From<&crate::Knobs> for Option<sysfs::cpu::Cpu> {
     fn from(k: &crate::Knobs) -> Self {
         if !k.has_cpu_values() { return None; }
-        let cpu_ids = k.cpu.clone()?;
-        if cpu_ids.is_empty() { return None; }
-        let mut policies = vec![];
-        if let Some(cpu_on) = k.cpu_on {
-            for cpu_id in cpu_ids {
-                let policy = sysfs::cpu::Policy {
-                    id: Some(cpu_id),
-                    cpu_online: Some(cpu_on)
-                };
-                policies.push(policy);
-            }
-        }
-        if let Some(cpus_on) = k.cpus_on.clone() {
-            for (cpu_id, cpu_on) in cpus_on {
-                if let Some(policy) = policies
-                    .iter_mut()
-                    .find(|p| Some(cpu_id) == p.id)
-                {
-                    policy.cpu_online = Some(cpu_on);
-                }
-                else
-                {
-                    let policy = sysfs::cpu::Policy {
-                        id: Some(cpu_id),
-                        cpu_online: Some(cpu_on),
-                    };
-                    policies.push(policy);
-                }
-            }
-        }
-        policies.sort_unstable_by(|a, b| a.id.cmp(&b.id));
+        let policies: Option<Vec<sysfs::cpu::Policy>> =
+            k.cpu.clone().map(|ids| ids
+                .into_iter()
+                .map(|id|
+                    sysfs::cpu::Policy {
+                        id: Some(id),
+                        cpu_online: k.cpu_online,
+                    })
+                .collect());
+        if policies.as_ref().map(|p| p.is_empty()).unwrap_or(true) { return None; }
         let s = sysfs::cpu::Cpu {
-            policies: Some(policies),
+            policies,
         };
         Some(s)
     }
@@ -115,23 +48,23 @@ impl From<&crate::Knobs> for Option<sysfs::cpu::Cpu> {
 impl From<&crate::Knobs> for Option<sysfs::cpufreq::Cpufreq> {
     fn from(k: &crate::Knobs) -> Self {
         if !k.has_cpufreq_values() { return None; }
-        let policy_ids = k.cpu.clone()?;
-        if policy_ids.is_empty() { return None; }
         let scaling_min_freq = k.cpufreq_min.map(|f| f.as_kilohertz().ceil() as u64);
         let scaling_max_freq = k.cpufreq_max.map(|f| f.as_kilohertz().ceil() as u64);
-        let mut policies = vec![];
-        for policy_id in policy_ids {
-            let policy = sysfs::cpufreq::Policy {
-                id: Some(policy_id),
-                scaling_governor: k.cpufreq_gov.clone(),
-                scaling_min_freq,
-                scaling_max_freq,
-                ..Default::default()
-            };
-            policies.push(policy);
-        }
+        let policies: Option<Vec<sysfs::cpufreq::Policy>> =
+            k.cpu.clone().map(|ids| ids
+                .into_iter()
+                .map(|id|
+                    sysfs::cpufreq::Policy {
+                        id: Some(id),
+                        scaling_governor: k.cpufreq_gov.clone(),
+                        scaling_min_freq,
+                        scaling_max_freq,
+                        ..Default::default()
+                    })
+                .collect());
+        if policies.as_ref().map(|p| p.is_empty()).unwrap_or(true) { return None; }
         let s = sysfs::cpufreq::Cpufreq {
-            policies: Some(policies),
+            policies,
             ..Default::default()
         };
         Some(s)
@@ -141,33 +74,42 @@ impl From<&crate::Knobs> for Option<sysfs::cpufreq::Cpufreq> {
 impl From<&crate::Knobs> for Option<sysfs::drm::Drm> {
     fn from(k: &crate::Knobs) -> Self {
         if !k.has_drm_values() { return None; }
-        let mut cards = vec![];
-        if k.has_drm_i915_values() {
-            if let Some(i915_ids) = k.drm_i915.clone() {
-                if !i915_ids.is_empty() {
-                    let driver_policy = sysfs::drm::DriverPolicy::I915(
-                        sysfs::drm::I915 {
-                            min_freq_mhz: k.drm_i915_min.map(|f| f.as_megahertz().ceil() as u64),
-                            max_freq_mhz: k.drm_i915_max.map(|f| f.as_megahertz().ceil() as u64),
-                            boost_freq_mhz: k.drm_i915_boost.map(|f| f.as_megahertz() as u64),
-                            ..Default::default()
-                        }
-                    );
-                    for card_id in i915_ids {
-                        let card_id = match card_id {
-                            crate::CardId::Id(id) => id,
-                            crate::CardId::PciId(_) => panic!("PCI ID support is not yet implemente for drm-i915"),
-                        };
-                        let card = sysfs::drm::Card {
-                            id: Some(card_id),
-                            driver_policy: Some(driver_policy.clone()),
-                            ..Default::default()
-                        };
-                        cards.push(card);
-                    }
-                }
-            }
-        }
+        let cards = vec![
+
+            match k.has_drm_i915_values() {
+                true => {
+                    let min_freq_mhz = k.drm_i915_min.map(|f| f.as_megahertz().ceil() as u64);
+                    let max_freq_mhz = k.drm_i915_max.map(|f| f.as_megahertz().ceil() as u64);
+                    let boost_freq_mhz = k.drm_i915_boost.map(|f| f.as_megahertz().ceil() as u64);
+                    k.drm_i915.clone().map(|ids| ids
+                        .into_iter()
+                        .map(|id|
+                            sysfs::drm::Card {
+                                id: match id {
+                                    crate::CardId::Id(id) => Some(id),
+                                    crate::CardId::PciId(_) => panic!("Indexing drm-i915 cards by PCI ID is not yet implemented"),
+                                },
+                                driver_policy: Some(
+                                    sysfs::drm::DriverPolicy::I915(
+                                        sysfs::drm::I915 {
+                                            min_freq_mhz,
+                                            max_freq_mhz,
+                                            boost_freq_mhz,
+                                            ..Default::default()
+                                        },
+                                    )),
+                                ..Default::default()
+                            })
+                        .collect())
+                    .unwrap_or_else(Vec::new)
+                },
+                false => vec![],
+            },
+
+            // ... insert amd gpu support here ...
+        ];
+        let cards: Vec<sysfs::drm::Card> = cards.into_iter().flatten().collect();
+        if cards.is_empty() { return None; }
         let s = sysfs::drm::Drm {
             cards: Some(cards),
         };
@@ -219,55 +161,33 @@ impl NvmlPolicies {
 }
 
 #[cfg(feature = "nvml")]
-fn nvml_card_ids(ids: Vec<crate::CardId>) -> Option<Vec<u32>> {
-    fn card_id(id: crate::CardId) -> Option<u32> {
-        match id {
-            crate::CardId::Id(id) => Some(id as u32),
-            crate::CardId::PciId(id) => Some(nvml_facade::Nvml::device_for_pci_id(&id)?.card().id()?),
-        }
-    }
-    let mut indices = vec![];
-    for id in ids {
-        match card_id(id) {
-            Some(id) => indices.push(id),
-            _ => continue,
-        }
-    }
-    if indices.is_empty() { None } else {
-        indices.sort_unstable();
-        indices.dedup();
-        Some(indices)
-    }
-}
-
-#[cfg(feature = "nvml")]
 impl From<&crate::Knobs> for Option<NvmlPolicies> {
     fn from(k: &crate::Knobs) -> Self {
         if !k.has_nvml_values() { return None; }
-        let ids = k.nvml.clone()
-            .and_then(nvml_card_ids)
-            .or_else(nvml_facade::Nvml::ids)?;
-        if ids.is_empty() { return None; }
         let gpu_clock = k.nvml_gpu_min
             .and_then(|min|
                 k.nvml_gpu_max
                     .map(|max|
-                        (min.as_megahertz() as u32, max.as_megahertz().ceil() as u32)));
-        let power_limit = k
-            .nvml_power_limit
-            .map(|p| p.as_milliwatts().ceil() as u32);
-        let mut policies = vec![];
-        for id in ids {
-            let pol = NvmlPolicy {
-                id: Some(id),
-                gpu_clock,
-                gpu_clock_reset: k.nvml_gpu_reset.and_then(|v| if v { Some(()) } else { None }),
-                power_limit,
-            };
-            policies.push(pol);
-        }
+                        (min.as_megahertz().ceil() as u32, max.as_megahertz().ceil() as u32)));
+        let gpu_clock_reset = k.nvml_gpu_reset.and_then(|v| if v { Some(()) } else { None });
+        let power_limit = k.nvml_power_limit.map(|p| p.as_milliwatts().ceil() as u32);
+        let policies: Option<Vec<NvmlPolicy>> =
+            k.nvml.clone().map(|ids| ids
+                .into_iter()
+                .map(|id|
+                    NvmlPolicy {
+                        id: match id {
+                            crate::CardId::Id(id) => Some(id.try_into().unwrap()),
+                            crate::CardId::PciId(id) => nvml_facade::Nvml::device_for_pci_id(&id).and_then(|d| d.card().id()),
+                        },
+                        gpu_clock,
+                        gpu_clock_reset,
+                        power_limit,
+                    })
+                .collect());
+        if policies.as_ref().map(|p| p.is_empty()).unwrap_or(true) { return None; }
         let s = NvmlPolicies {
-            policies: Some(policies),
+            policies,
         };
         Some(s)
     }
@@ -276,20 +196,20 @@ impl From<&crate::Knobs> for Option<NvmlPolicies> {
 impl From<&crate::Knobs> for Option<sysfs::intel_pstate::IntelPstate> {
     fn from(k: &crate::Knobs) -> Self {
         if !k.has_pstate_values() { return None; }
-        let policy_ids = k.cpu.clone()?;
-        if policy_ids.is_empty() { return None; }
-        let mut policies = vec![];
-        for policy_id in policy_ids {
-            let policy = sysfs::intel_pstate::Policy {
-                id: Some(policy_id),
-                energy_perf_bias: k.pstate_epb,
-                energy_performance_preference: k.pstate_epp.clone(),
-                ..Default::default()
-            };
-            policies.push(policy);
-        }
+        let policies: Option<Vec<sysfs::intel_pstate::Policy>> =
+            k.cpu.clone().map(|ids| ids
+                .into_iter()
+                .map(|id|
+                    sysfs::intel_pstate::Policy {
+                        id: Some(id),
+                        energy_perf_bias: k.pstate_epb,
+                        energy_performance_preference: k.pstate_epp.clone(),
+                        ..Default::default()
+                    })
+                .collect());
+        if policies.as_ref().map(|p| p.is_empty()).unwrap_or(true) { return None; }
         let s = sysfs::intel_pstate::IntelPstate {
-            policies: Some(policies),
+            policies,
             ..Default::default()
         };
         Some(s)
