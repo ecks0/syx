@@ -517,20 +517,6 @@ pub struct Cli {
 
 impl Cli {
 
-    pub fn setup_logging() {
-        use std::io::Write;
-
-        use env_logger::{Builder, Env};
-        let env = Env::default()
-            .filter_or("KNOBS_LOG", "error")
-            .write_style_or("KNOBS_LOG_STYLE", "never");
-        Builder::from_env(env)
-            .format(|buf, record| {
-                writeln!(buf, "{}", record.args())
-            })
-            .init();
-    }
-
     pub async fn parse(argv: &[String]) -> Result<Self> {
         let a = app(argv0(argv));
         let m = a.clone().get_matches_from_safe(argv)?;
@@ -603,8 +589,23 @@ impl Cli {
 pub struct App;
 
 impl App {
+
+    pub fn setup_logging() {
+        use std::io::Write;
+
+        use env_logger::{Builder, Env};
+        let env = Env::default()
+            .filter_or("KNOBS_LOG", "error")
+            .write_style_or("KNOBS_LOG_STYLE", "never");
+        Builder::from_env(env)
+            .format(|buf, record| {
+                writeln!(buf, "{}", record.args())
+            })
+            .init();
+    }
+
     pub async fn run() -> Result<()> {
-        Cli::setup_logging();
+        Self::setup_logging();
         let args: Vec<String> = std::env::args().collect();
         match Cli::parse(&args).await {
             Ok(cli) => cli.run().await,

@@ -404,11 +404,9 @@ impl Format for sysfs::intel_pstate::IntelPstate {
             if !p.is_empty() {
                 if let Ok(status) = status().await {
                     w.write_all(system_status(&status).as_bytes()).await?;
-                    if status == "active" || status == "passive" {
+                    if status == "active" {
                         if let Some(s) = epb_epp(p) { w.write_all(s.as_bytes()).await?; }
-                        if status == "active" {
-                            if let Some(s) = epps(p) { w.write_all(s.as_bytes()).await?; }
-                        }
+                        if let Some(s) = epps(p) { w.write_all(s.as_bytes()).await?; }
                     }
                 }
             }
