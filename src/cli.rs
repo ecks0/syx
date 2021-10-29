@@ -182,15 +182,15 @@ fn app(argv0: &str) -> clap::App {
             .long(ARG_NVML_GPU_MIN)
             .takes_value(true)
             .value_name("HERTZ")
-            .requires(ARG_NVML_GPU_MAX)
-            .help("Set nvidia gpu min frequency per --nvml, ex. 1200 or 1.2ghz"))
+            .help("Set nvidia gpu min frequency per --nvml, ex. 1200 or 1.2ghz")
+            .requires(ARG_NVML_GPU_MAX))
 
         .arg(Arg::with_name(ARG_NVML_GPU_MAX)
             .long(ARG_NVML_GPU_MAX)
             .takes_value(true)
             .value_name("HERTZ")
-            .requires(ARG_NVML_GPU_MIN)
-            .help("Set nvidia gpu max frequency per --nvml, ex. 1200 or 1.2ghz"))
+            .help("Set nvidia gpu max frequency per --nvml, ex. 1200 or 1.2ghz")
+            .requires(ARG_NVML_GPU_MIN))
 
         .arg(Arg::with_name(ARG_NVML_GPU_RESET)
             .long(ARG_NVML_GPU_RESET)
@@ -237,26 +237,30 @@ fn app(argv0: &str) -> clap::App {
             .long(ARG_RAPL_LONG_LIMIT)
             .takes_value(true)
             .value_name("WATTS")
-            .help("Set intel-rapl long_term power limit per --rapl-package/zone"))
+            .help("Set intel-rapl long_term power limit per --rapl-package/zone")
+            .requires(ARG_RAPL_PACKAGE))
 
         .arg(Arg::with_name(ARG_RAPL_LONG_WINDOW)
             .long(ARG_RAPL_LONG_WINDOW)
             .takes_value(true)
             .value_name("SECS")
-            .help("Set intel-rapl long_term time window per --rapl-package/zone"))
+            .help("Set intel-rapl long_term time window per --rapl-package/zone")
+            .requires(ARG_RAPL_PACKAGE))
 
         .arg(Arg::with_name(ARG_RAPL_SHORT_LIMIT)
             .short("S")
             .long(ARG_RAPL_SHORT_LIMIT)
             .takes_value(true)
             .value_name("WATTS")
-            .help("Set intel-rapl short_term power limit per --rapl-package/zone"))
+            .help("Set intel-rapl short_term power limit per --rapl-package/zone")
+            .requires(ARG_RAPL_PACKAGE))
 
         .arg(Arg::with_name(ARG_RAPL_SHORT_WINDOW)
             .long(ARG_RAPL_SHORT_WINDOW)
             .takes_value(true)
             .value_name("SECS")
-            .help("Set intel-rapl short_term time window per --rapl-package/zone"))
+            .help("Set intel-rapl short_term time window per --rapl-package/zone")
+            .requires(ARG_RAPL_PACKAGE))
 
         .arg(Arg::with_name("CHAIN")
             .raw(true));
@@ -395,7 +399,6 @@ impl<'a> TryFrom<clap::ArgMatches<'a>> for crate::Knobs {
 //
 // Because chains result in a longer runtime, they give more time for samples to be
 // collected when calculating certain values (e.g. watts from energy_uj).
-//
 fn chain(a: clap::App, m: clap::ArgMatches) -> Result<crate::Chain> {
     let mut chain: Vec<crate::Knobs> = vec![];
     let mut argv: Vec<String>;
@@ -421,7 +424,7 @@ fn chain(a: clap::App, m: clap::ArgMatches) -> Result<crate::Chain> {
 // resource ids, and will default to all resource ids when omitted. In the
 // latter case, this function will fill in the default resource ids as
 // required.
-async fn resolve(mut chain: crate::Chain) -> Result<crate::Chain> {
+async fn resolve(mut chain: crate::Chain) -> crate::Chain {
 
     static CPU_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
     static DRM_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
@@ -458,7 +461,10 @@ async fn resolve(mut chain: crate::Chain) -> Result<crate::Chain> {
 
     #[cfg(feature = "nvml")]
     pub async fn nvml_ids_cached() -> Option<Vec<u64>> {
-        async fn ids() -> Option<Vec<u64>> { nvml_facade::Nvml::ids().map(|ids| ids.into_iter().map(u64::from).collect()) }
+        async fn ids() -> Option<Vec<u64>> {
+            nvml_facade::Nvml::ids()
+                .map(|ids| ids.into_iter().map(u64::from).collect())
+        }
         NVML_IDS_CACHED.get_or_init(ids).await.clone()
     }
 
@@ -482,7 +488,7 @@ async fn resolve(mut chain: crate::Chain) -> Result<crate::Chain> {
                     .collect());
         }
     }
-    Ok(chain)
+    chain
 }
 
 // Determine the binary name from argv[0].
@@ -502,7 +508,8 @@ pub struct Cli {
     pub quiet: Option<()>,
     pub show_cpu: Option<()>,
     pub show_drm: Option<()>,
-    #[cfg(feature = "nvml")] pub show_nvml: Option<()>,
+    #[cfg(feature = "nvml")]
+    pub show_nvml: Option<()>,
     pub show_pstate: Option<()>,
     pub show_rapl: Option<()>,
     pub chain: crate::Chain,
@@ -534,7 +541,7 @@ impl Cli {
             #[cfg(feature = "nvml")] show_nvml: flag(ARG_SHOW_NVML, &m),
             show_pstate: flag(ARG_SHOW_PSTATE, &m),
             show_rapl: flag(ARG_SHOW_RAPL, &m),
-            chain: resolve(chain(a, m)?).await?,
+            chain: resolve(chain(a, m)?).await,
         };
         Ok(s)
     }
