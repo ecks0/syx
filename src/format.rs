@@ -423,19 +423,19 @@ impl Format for sysfs::intel_rapl::IntelRapl {
     async fn format_values<W: AsyncWrite + Send + Unpin>(&self, w: &mut W) -> Result<()> {
         let policies = if let Some(p) = self.policies.as_ref() { p } else { return Ok(()); };
         if policies.is_empty() { return Ok(()); }
-        let mut tab = Table::new(&["Zone name", "Zone", "C0 limit", "C1 limit", "C0 window", "C1 window", "Energy"]);
+        let mut tab = Table::new(&["Zone name", "Zone", "Long lim", "Short lim", "Long win", "Short win", "Energy"]);
         for policy in policies {
             let id = if let Some(id) = policy.id { id } else { continue; };
-            let c0 = policy.constraints
+            let long = policy.constraints
                 .as_deref()
                 .and_then(|v| v
                     .iter()
-                    .find(|p| matches!(p.id, Some(0))));
-            let c1 = policy.constraints
+                    .find(|p| p.name.as_ref().map(|s| s == "long_term").unwrap_or(false)));
+            let short = policy.constraints
                 .as_deref()
                 .and_then(|v| v
                     .iter()
-                    .find(|p| matches!(p.id, Some(1))));
+                    .find(|p| p.name.as_ref().map(|s| s == "short_term").unwrap_or(false)));
             tab.row(&[
                 policy.name.clone().unwrap_or_else(dot),
                 format!(
@@ -443,19 +443,19 @@ impl Format for sysfs::intel_rapl::IntelRapl {
                     id.zone,
                     id.subzone.map(|v| format!(":{}", v)).unwrap_or_else(String::new)
                 ),
-                c0
+                long
                     .and_then(|v| v.power_limit_uw)
                     .map(format_uw)
                     .unwrap_or_else(dot),
-                c1
+                short
                     .and_then(|v| v.power_limit_uw)
                     .map(format_uw)
                     .unwrap_or_else(dot),
-                c0
+                long
                     .and_then(|v| v.time_window_us)
                     .map(|v| format!("{} us", v))
                     .unwrap_or_else(dot),
-                c1
+                short
                     .and_then(|v| v.time_window_us)
                     .map(|v| format!("{} us", v))
                     .unwrap_or_else(dot),
