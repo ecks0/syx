@@ -83,6 +83,7 @@ fn format_hz(hz: u64) -> String {
     }
 }
 
+#[cfg(feature = "nvml")]
 fn format_bytes(b: u64) -> String {
     if b < 1000 { format!("{} B", b) }
     else if b < 1000u64.pow(2) { format!("{:.1} kB", b as f64/1000f64) }

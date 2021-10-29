@@ -1,7 +1,7 @@
 use log::debug;
 use zysfs::types::{self as sysfs, tokio::Read as _};
 use std::{convert::TryFrom, str::FromStr};
-use tokio::{io::AsyncWriteExt, sync::OnceCell};
+use tokio::sync::OnceCell;
 use crate::{Error, Result};
 
 const ARG_QUIET: &str             = "quiet";
@@ -538,7 +538,8 @@ impl Cli {
             quiet: flag(ARG_QUIET, &m),
             show_cpu: flag(ARG_SHOW_CPU, &m),
             show_drm: flag(ARG_SHOW_DRM, &m),
-            #[cfg(feature = "nvml")] show_nvml: flag(ARG_SHOW_NVML, &m),
+            #[cfg(feature = "nvml")]
+            show_nvml: flag(ARG_SHOW_NVML, &m),
             show_pstate: flag(ARG_SHOW_PSTATE, &m),
             show_rapl: flag(ARG_SHOW_RAPL, &m),
             chain: resolve(chain(a, m)?).await,
@@ -565,7 +566,6 @@ impl Cli {
         if self.quiet.is_none() {
             let show_all = !self.has_show_args();
             let mut s = vec![];
-            s.write_all("\n".as_bytes()).await?;
             if show_all || self.show_cpu.is_some() {
                 if let Some(cpu) = sysfs::cpu::Cpu::read(()).await {
                     if let Some(cpufreq) = sysfs::cpufreq::Cpufreq::read(()).await {
@@ -593,7 +593,7 @@ impl Cli {
                 use nvml_facade::Nvml;
                 Nvml.format_values(&mut s).await?;
             }
-            print!("{}", String::from_utf8_lossy(&s));
+            println!("{}", String::from_utf8_lossy(&s).trim_end());
         }
         Ok(())
     }
