@@ -422,6 +422,7 @@ fn chain(a: clap::App, m: clap::ArgMatches) -> Result<crate::Chain> {
 // latter case, this function will fill in the default resource ids as
 // required.
 async fn resolve(mut chain: crate::Chain) -> Result<crate::Chain> {
+
     static CPU_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
     static DRM_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
     static DRM_I915_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();

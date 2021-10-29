@@ -615,6 +615,7 @@ impl Chain {
         for (i, k) in self.0.iter().enumerate() {
             info!("Group {} Pass 1", i);
             k.apply_cpu_values().await;
+            if k.has_cpu_values() { Self::pause_for_sysfs().await; }
             k.apply_rapl_values().await;
             k.apply_drm_values().await;
             #[cfg(feature = "nvml")]
