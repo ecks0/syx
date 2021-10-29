@@ -9,7 +9,7 @@ use crate::{Error, Result};
 
 pub const DOT: &str = "\u{2022}";
 
-pub fn dot() -> String { DOT.into() }
+pub fn dot() -> String { DOT.to_string() }
 
 #[derive(Debug)]
 pub struct Table(ct::Table);

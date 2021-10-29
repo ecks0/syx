@@ -146,13 +146,6 @@ knobs --cpu 0-3 --cpufreq-min 800 --cpufreq-max 4.4ghz
 
 knobs -c 0-3 -n 800 -x 4.4ghz
 
-### set cpus 1-3 online
-### set cpus 4-7 offline
-
-knobs --cpus-on _1110000
-
-knobs -O _1110000
-
 ### set intel-pstate energy/performance bias → 6
 ### set intel-pstate energy/performance preference → balance_performance
 
@@ -173,8 +166,8 @@ knobs --rapl-package 0 --rapl-long-limit 28w --rapl-short-limit 35w
 
 knobs -P 0 -L 28w -S 35w
 
-# set nvidia gpu minimum frequency → 600 MHz
-# set nvidia gpu maximum frequency → 2.2 GHz
+### set nvidia gpu minimum frequency → 600 MHz
+#### set nvidia gpu maximum frequency → 2.2 GHz
 
 # for all gpus
 
@@ -186,8 +179,8 @@ knobs --nvml 0,1 --nvml-gpu-min 600 --nvml-gpu-max 2.2ghz
 
 ### knobs calls can be chained
 
-# set cpus 1-3 online
-# set cpus 4-7 offline
+#### set cpus 1-3 online
+#### set cpus 4-7 offline
 
 knobs --cpu 1-3 --cpu-online true -- --cpu 4-7 --cpu-online false
 
