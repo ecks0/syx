@@ -219,17 +219,18 @@ impl From<&crate::Knobs> for Option<sysfs::intel_pstate::IntelPstate> {
 impl From<&crate::Knobs> for Option<sysfs::intel_rapl::IntelRapl> {
     fn from(k: &crate::Knobs) -> Self {
         if !k.has_rapl_values() { return None; }
+
         let id = sysfs::intel_rapl::ZoneId { zone: k.rapl_package?, subzone: k.rapl_zone };
         let constraints: Vec<sysfs::intel_rapl::Constraint> =
             [
-                (0, k.rapl_c0_limit, k.rapl_c0_window),
-                (1, k.rapl_c1_limit, k.rapl_c1_window),
+                ("long_term", k.rapl_long_limit, k.rapl_long_window),
+                ("short_term", k.rapl_short_limit, k.rapl_short_window),
             ]
             .iter()
-            .filter_map(|(id, limit, window)|
+            .filter_map(|(name, limit, window)|
                 if limit.is_some() || window.is_some() {
                     let c = sysfs::intel_rapl::Constraint {
-                        id: Some(*id),
+                        name: Some(name.to_string()),
                         power_limit_uw: limit.map(|v| v.as_microwatts().ceil() as u64),
                         time_window_us: window.map(|v| v.as_micros().try_into().unwrap()),
                         ..Default::default()

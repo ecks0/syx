@@ -1,11 +1,9 @@
+use log::{Level, info, log_enabled, trace};
 use measurements::{Frequency, Power};
 use serde::{Deserialize, Deserializer, de::Error as _};
-use zysfs::types as sysfs;
+use zysfs::types::{self as sysfs, tokio::Write as _};
 use tokio::time::sleep;
-use std::{
-    str::FromStr,
-    time::Duration
-};
+use std::{collections::HashSet, str::FromStr, time::Duration};
 
 pub mod cli;
 pub mod format;
@@ -60,10 +58,6 @@ fn start_of_unit(s: &str) -> Option<usize> {
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct BoolStr(bool);
 
-impl BoolStr {
-    pub fn into_bool(self) -> bool { self.0 }
-}
-
 impl FromStr for BoolStr {
     type Err = Error;
 
@@ -92,10 +86,6 @@ impl From<BoolStr> for bool {
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct Indices(Vec<u64>);
-
-impl Indices {
-    pub fn into_vec(self) -> Vec<u64> { self.0 }
-}
 
 impl FromStr for Indices {
     type Err = Error;
@@ -141,10 +131,6 @@ impl From<Indices> for Vec<u64> {
 // #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 // pub struct Toggles(Vec<(u64, bool)>);
 //
-// impl Toggles {
-//     pub fn into_vec(self) -> Vec<(u64, bool)> { self.0 }
-// }
-//
 // impl FromStr for Toggles {
 //     type Err = Error;
 //
@@ -183,10 +169,6 @@ impl From<Indices> for Vec<u64> {
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct FrequencyStr(Frequency);
-
-impl FrequencyStr {
-    pub fn into_frequency(self) -> Frequency { self.0 }
-}
 
 impl FromStr for FrequencyStr {
     type Err = Error;
@@ -230,10 +212,6 @@ impl From<FrequencyStr> for Frequency {
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct PowerStr(Power);
 
-impl PowerStr {
-    pub fn into_power(self) -> Power { self.0 }
-}
-
 impl FromStr for PowerStr {
     type Err = Error;
 
@@ -274,10 +252,6 @@ impl From<PowerStr> for Power {
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct DurationStr(Duration);
-
-impl DurationStr {
-    pub fn into_duration(self) -> Duration { self.0 }
-}
 
 impl FromStr for DurationStr {
     type Err = Error;
@@ -350,10 +324,6 @@ impl<'de> Deserialize<'de> for CardId {
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct CardIds(Vec<CardId>);
 
-impl CardIds {
-    pub fn into_vec(self) -> Vec<CardId> { self.0 }
-}
-
 impl FromStr for CardIds {
     type Err = Error;
 
@@ -368,7 +338,7 @@ impl FromStr for CardIds {
             }
         }
         let mut ids = vec![];
-        for id in Indices::from_str(&indices.join(","))?.into_vec() {
+        for id in Vec::from(Indices::from_str(&indices.join(","))?) {
             ids.push(CardId::Id(id));
         }
         for id in pci_ids {
@@ -397,7 +367,7 @@ where
     D: Deserializer<'de>,
 {
     let i: Indices = Deserialize::deserialize(deserializer)?;
-    Ok(Some(i.into_vec()))
+    Ok(Some(i.into()))
 }
 
 fn de_bool<'de, D>(deserializer: D) -> std::result::Result<Option<bool>, D::Error>
@@ -405,7 +375,7 @@ where
     D: Deserializer<'de>,
 {
     let b: BoolStr = Deserialize::deserialize(deserializer)?;
-    Ok(Some(b.into_bool()))
+    Ok(Some(b.into()))
 }
 
 // fn de_toggles<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<(u64, bool)>>, D::Error>
@@ -413,7 +383,7 @@ where
 //     D: Deserializer<'de>,
 // {
 //     let t: Toggles = Deserialize::deserialize(deserializer)?;
-//     Ok(Some(t.into_vec()))
+//     Ok(Some(Vec::from(t)))
 // }
 
 fn de_frequency<'de, D>(deserializer: D) -> std::result::Result<Option<Frequency>, D::Error>
@@ -421,7 +391,7 @@ where
     D: Deserializer<'de>,
 {
     let f: FrequencyStr = Deserialize::deserialize(deserializer)?;
-    Ok(Some(f.into_frequency()))
+    Ok(Some(f.into()))
 }
 
 fn de_card_ids<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<CardId>>, D::Error>
@@ -429,7 +399,7 @@ where
     D: Deserializer<'de>,
 {
     let c: CardIds = Deserialize::deserialize(deserializer)?;
-    Ok(Some(c.into_vec()))
+    Ok(Some(c.into()))
 }
 
 fn de_power<'de, D>(deserializer: D) -> std::result::Result<Option<Power>, D::Error>
@@ -437,7 +407,7 @@ where
     D: Deserializer<'de>,
 {
     let p: PowerStr = Deserialize::deserialize(deserializer)?;
-    Ok(Some(p.into_power()))
+    Ok(Some(p.into()))
 }
 
 fn de_duration<'de, D>(deserializer: D) -> std::result::Result<Option<Duration>, D::Error>
@@ -445,7 +415,7 @@ where
     D: Deserializer<'de>,
 {
     let d: DurationStr = Deserialize::deserialize(deserializer)?;
-    Ok(Some(d.into_duration()))
+    Ok(Some(d.into()))
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, PartialOrd)]
@@ -506,28 +476,24 @@ pub struct Knobs {
     pub rapl_zone: Option<u64>,
 
     #[serde(deserialize_with = "de_power")]
-    pub rapl_c0_limit: Option<Power>,
+    pub rapl_long_limit: Option<Power>,
+
+    #[serde(deserialize_with = "de_duration")]
+    pub rapl_long_window: Option<Duration>,
 
     #[serde(deserialize_with = "de_power")]
-    pub rapl_c1_limit: Option<Power>,
+    pub rapl_short_limit: Option<Power>,
 
     #[serde(deserialize_with = "de_duration")]
-    pub rapl_c0_window: Option<Duration>,
-
-    #[serde(deserialize_with = "de_duration")]
-    pub rapl_c1_window: Option<Duration>,
+    pub rapl_short_window: Option<Duration>,
 }
 
 impl Knobs {
-    pub fn is_default(&self) -> bool {
-        self == &Self::default()
-    }
-
     pub fn has_cpu_values(&self) -> bool {
         self.cpu_online.is_some()
     }
 
-    pub fn has_cpu_or_related_values(&self) -> bool {
+    pub fn has_cpu_related_values(&self) -> bool {
         self.has_cpu_values() ||
         self.has_cpufreq_values() ||
         self.has_pstate_values()
@@ -563,46 +529,115 @@ impl Knobs {
     }
 
     pub fn has_rapl_values(&self) -> bool {
-        self.rapl_c0_limit.is_some() ||
-        self.rapl_c1_limit.is_some() ||
-        self.rapl_c0_window.is_some() ||
-        self.rapl_c1_window.is_some()
+        self.rapl_long_limit.is_some() ||
+        self.rapl_long_window.is_some() ||
+        self.rapl_short_limit.is_some() ||
+        self.rapl_short_window.is_some()
+    }
+
+    pub async fn apply_cpu_values(&self) {
+        let cpu: Option<sysfs::cpu::Cpu> = self.into();
+        if let Some(cpu) = cpu { cpu.write().await; };
+    }
+
+    pub async fn apply_cpufreq_values(&self) {
+        let cpufreq: Option<sysfs::cpufreq::Cpufreq> = self.into();
+        if let Some(cpufreq) = cpufreq { cpufreq.write().await; };
+    }
+
+    pub async fn apply_drm_values(&self) {
+        let drm: Option<sysfs::drm::Drm> = self.into();
+        if let Some(drm) = drm { drm.write().await; };
+    }
+
+    #[cfg(feature = "nvml")]
+    pub async fn apply_nvml_values(&self) {
+        let nvml: Option<policy::NvmlPolicies> = self.into();
+        if let Some(nvml) = nvml { nvml.write(); }
+    }
+
+    pub async fn apply_pstate_values(&self) {
+        let intel_pstate: Option<sysfs::intel_pstate::IntelPstate> = self.into();
+        if let Some(intel_pstate) = intel_pstate { intel_pstate.write().await; }
+    }
+
+    pub async fn apply_rapl_values(&self) {
+        let intel_rapl: Option<sysfs::intel_rapl::IntelRapl> = self.into();
+        if let Some(intel_rapl) = intel_rapl { intel_rapl.write().await; }
     }
 }
 
-impl Knobs {
+#[derive(Clone, Debug)]
+pub struct Chain(Vec<Knobs>);
 
-    const WAIT_FOR_SYSFS: Duration = Duration::from_millis(200);
+impl Chain {
+    fn has_cpufreq_values(&self) -> bool { self.0.iter().any(|k| k.has_cpufreq_values()) }
 
-    async fn wait_for_sysfs() { sleep(Self::WAIT_FOR_SYSFS).await }
+    fn has_pstate_values(&self) -> bool { self.0.iter().any(|k| k.has_pstate_values()) }
 
-    pub async fn apply(&self) {
-        use sysfs::tokio::Write as _;
+    fn cpu(&self) -> Vec<u64> {
+        let mut ids: Vec<u64> = self.0
+            .iter()
+            .fold(
+                HashSet::new(),
+                |mut h, k| { if let Some(ids) = k.cpu.clone() { h.extend(ids.into_iter()); }; h })
+            .into_iter()
+            .collect();
+        ids.sort_unstable();
+        ids
+    }
 
-        let cpufreq: Option<sysfs::cpufreq::Cpufreq> = self.into();
-        let intel_pstate: Option<sysfs::intel_pstate::IntelPstate> = self.into();
-        let cpu: Option<sysfs::cpu::Cpu> = self.into();
-        let intel_rapl: Option<sysfs::intel_rapl::IntelRapl> = self.into();
-        let drm: Option<sysfs::drm::Drm> = self.into();
-        #[cfg(feature = "nvml")]
-        let nvml: Option<policy::NvmlPolicies> = self.into();
+    const PAUSE_FOR_SYSFS: Duration = Duration::from_millis(200);
 
-        if cpufreq.is_some() || intel_pstate.is_some() {
-            if let Some(cpu_ids) = self.cpu.clone() {
-                let cpu_ids = policy::set_cpus_online(cpu_ids).await;
-                if !cpu_ids.is_empty() { Self::wait_for_sysfs().await; }
+    async fn pause_for_sysfs() { sleep(Self::PAUSE_FOR_SYSFS).await }
 
-                if let Some(cpufreq) = cpufreq { cpufreq.write().await; }
-                if let Some(intel_pstate) = intel_pstate { intel_pstate.write().await; }
-
-                let cpu_ids = policy::set_cpus_offline(cpu_ids).await;
-                if !cpu_ids.is_empty() { Self::wait_for_sysfs().await; }
+    pub async fn apply_values(&self) {
+        if log_enabled!(Level::Trace) {
+            for (i, k) in self.iter().enumerate() {
+                trace!("Group {}", i);
+                trace!("{:#?}", k);
             }
         }
-        if let Some(cpu) = cpu { cpu.write().await; }
-        if let Some(intel_rapl) = intel_rapl { intel_rapl.write().await; }
-        if let Some(drm) = drm { drm.write().await; }
-        #[cfg(feature = "nvml")]
-        if let Some(nvml) = nvml { nvml.write(); }
+
+        if self.has_cpufreq_values() || self.has_pstate_values() {
+            let cpu_ids = policy::set_cpus_online(self.cpu()).await;
+            if !cpu_ids.is_empty() { Self::pause_for_sysfs().await; }
+
+            for (i, k) in self.0.iter().enumerate() {
+                info!("Group {} Pass 0", i);
+                k.apply_cpufreq_values().await;
+                k.apply_pstate_values().await;
+            }
+
+            let cpu_ids = policy::set_cpus_offline(cpu_ids).await;
+            if !cpu_ids.is_empty() { Self::pause_for_sysfs().await; }
+        }
+        for (i, k) in self.0.iter().enumerate() {
+            info!("Group {} Pass 1", i);
+            k.apply_cpu_values().await;
+            k.apply_rapl_values().await;
+            k.apply_drm_values().await;
+            #[cfg(feature = "nvml")]
+            k.apply_nvml_values().await;
+        }
     }
+
+    pub fn iter(&self) -> impl Iterator<Item=&Knobs> { self.0.iter() }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item=&mut Knobs> { self.0.iter_mut() }
+}
+
+impl From<Vec<Knobs>> for Chain {
+    fn from(v: Vec<Knobs>) -> Self { Self(v) }
+}
+
+impl From<Chain> for Vec<Knobs> {
+    fn from(c: Chain) -> Self { c.0 }
+}
+
+impl IntoIterator for Chain {
+    type Item = crate::Knobs;
+    type IntoIter = std::vec::IntoIter<Knobs>;
+
+    fn into_iter(self) -> Self::IntoIter { self.0.into_iter() }
 }

@@ -70,10 +70,10 @@ A contrived example showing all available tables:
 ## Help
 
 ```
-knobs 0.2.4
+knobs 0.2.5
 
 USAGE:
-    knobs [OPTIONS] [-- <chain>...]
+    knobs [OPTIONS] [-- <CHAIN>...]
 
 OPTIONS:
     -q, --quiet                       Do not print values
@@ -83,38 +83,37 @@ OPTIONS:
         --show-pstate                 Print intel-pstate values
         --show-rapl                   Print intel-rapl values
     -c, --cpu <IDS>                   Target cpu ids, default all, ex. 0,1,3-5
-    -o, --cpu-on <0|1>                Set cpu online status per --cpu
-    -O, --cpus-on <TOGGLES>           Set cpu online status, ex. 10_1 → 0=ON 1=OFF 2=SKIP 3=ON
+    -o, --cpu-online <BOOL>           Set cpu online status per --cpu
     -g, --cpufreq-gov <STR>           Set cpufreq governor per --cpu
-    -n, --cpufreq-min <HZ>            Set cpufreq min freq per --cpu, ex. 1200 or 1.2ghz
-    -x, --cpufreq-max <HZ>            Set cpufreq max freq per --cpu, ex. 1200 or 1.2ghz
+    -n, --cpufreq-min <HERTZ>         Set cpufreq min freq per --cpu, ex. 1200 or 1.2ghz
+    -x, --cpufreq-max <HERTZ>         Set cpufreq max freq per --cpu, ex. 1200 or 1.2ghz
         --drm-i915 <IDS>              Target i915 card ids or pci ids, default all, ex. 0,1,3-5
-        --drm-i915-min <HZ>           Set i915 min frequency per --drm-i915, ex. 1200 or 1.2ghz
-        --drm-i915-max <HZ>           Set i915 max frequency per --drm-i915, ex. 1200 or 1.2ghz
-        --drm-i915-boost <HZ>         Set i915 boost frequency per --drm-i915, ex. 1200 or 1.2ghz
+        --drm-i915-min <HERTZ>        Set i915 min frequency per --drm-i915, ex. 1200 or 1.2ghz
+        --drm-i915-max <HERTZ>        Set i915 max frequency per --drm-i915, ex. 1200 or 1.2ghz
+        --drm-i915-boost <HERTZ>      Set i915 boost frequency per --drm-i915, ex. 1200 or 1.2ghz
         --nvml <IDS>                  Target nvidia card ids or pci ids, default all, ex. 0,1,3-5
-        --nvml-gpu-min <HZ>           Set nvidia gpu min frequency per --nvml, ex. 1200 or 1.2ghz
-        --nvml-gpu-max <HZ>           Set nvidia gpu max frequency per --nvml, ex. 1200 or 1.2ghz
+        --nvml-gpu-min <HERTZ>        Set nvidia gpu min frequency per --nvml, ex. 1200 or 1.2ghz
+        --nvml-gpu-max <HERTZ>        Set nvidia gpu max frequency per --nvml, ex. 1200 or 1.2ghz
         --nvml-gpu-reset              Reset nvidia gpu frequency to default per --nvml
         --nvml-power-limit <WATTS>    Set nvidia card power limit per --nvml
         --pstate-epb <0-15>           Set intel-pstate energy/performance bias per --cpu
         --pstate-epp <STR>            Set intel-pstate energy/performance pref per --cpu
-    -P, --rapl-package <INT>          Target intel-rapl package, default 0
-    -Z, --rapl-zone <INT>             Target intel-rapl sub-zone, default none
-    -0, --rapl-c0-limit <WATTS>       Set intel-rapl c0 power limit per --rapl-{package,zone}
-    -1, --rapl-c1-limit <WATTS>       Set intel-rapl c1 power limit per --rapl-{package,zone}
-        --rapl-c0-window <SECS>       Set intel-rapl c0 time window per --rapl-{package,zone}
-        --rapl-c1-winodw <SECS>       Set intel-rapl c1 time window per --rapl-{package,zone}
+    -P, --rapl-package <INT>          Target intel-rapl package
+    -Z, --rapl-zone <INT>             Target intel-rapl sub-zone
+    -L, --rapl-long-limit <WATTS>     Set intel-rapl long_term power limit per --rapl-package/zone
+        --rapl-long-window <SECS>     Set intel-rapl long_term time window per --rapl-package/zone
+    -S, --rapl-short-limit <WATTS>    Set intel-rapl short_term power limit per --rapl-package/zone
+        --rapl-short-window <SECS>    Set intel-rapl short_term time window per --rapl-package/zone
     -h, --help                        Prints help information
 
 ARGS:
-    <chain>...
+    <CHAIN>...
 
+            BOOL   0, 1, true, false
              IDS   A comma-delimited sequence of integers and/or integer ranges.
-         TOGGLES   An sequence of 0 (off), 1 (on) or _ (skip) characters.
-              HZ*  mhz when unspecified: hz/h - khz/k - mhz/m - ghz/g - thz/t
-           WATTS*  mw when unspecified: uw/u - mw/m - w - kw/k
+           HERTZ*  mhz when unspecified: hz/h - khz/k - mhz/m - ghz/g - thz/t
             SECS   ms when unspecified: ns/n - us/u - ms/m - s
+           WATTS*  mw when unspecified: uw/u - mw/m - w - kw/k
 
         * Floating point values may be given for these units.
 
@@ -127,7 +126,6 @@ ARGS:
         --drm-i915-boost 1.2ghz    → KNOBS_DRM_I915_BOOST=1.2ghz
 
     The KNOBS_LOG env var may be set to trace, debug, info, warn, or error (default).
-
 ```
 
 ## Example usage
@@ -168,13 +166,12 @@ knobs --cpu 0-3 --pstate-epb 6 --pstate-epp balance_performance
 
 knobs -c 0-3 --pstate-epb 6 --pstate-epp balance_performance
 
-### set intel-rapl package 0 constraint 0 (long-term) → 28 watts
-### set intel-rapl package 0 constraint 1 (short-term) → 35 watts
-### (0 is the default value for --rapl-package, while --rapl-zone has no default.)
+### set intel-rapl package 0 constraint named 'long_term' → 28 watts
+### set intel-rapl package 0 constraint named 'short-term' → 35 watts
 
-knobs --rapl-c0-limit 28w --rapl-c1-limit 35w
+knobs --rapl-package 0 --rapl-long-limit 28w --rapl-short-limit 35w
 
-knobs -0 28w -1 35w
+knobs -P 0 -L 28w -S 35w
 
 # set nvidia gpu minimum frequency → 600 MHz
 # set nvidia gpu maximum frequency → 2.2 GHz
@@ -192,7 +189,7 @@ knobs --nvml 0,1 --nvml-gpu-min 600 --nvml-gpu-max 2.2ghz
 # set cpus 1-3 online
 # set cpus 4-7 offline
 
-knobs --cpu 1-3 --cpu-on true -- --cpu 4-7 --cpu-on false
+knobs --cpu 1-3 --cpu-online true -- --cpu 4-7 --cpu-online false
 
 knobs -c 1-3 -o true -- -c 4-7 -o false
 
@@ -207,84 +204,4 @@ knobs --nvml 0 --nvml-gpu-min 1800 --nvml-gpu-max 2.2ghz -- \
 ### chains can be arbitarily long
 
 knobs -c 0 -x 4.0ghz -- -c 1 -x 4.1ghz -- -c 2 -x 4.2ghz -- -c 3 -x 4.3ghz # and so on
-
-### enable debug logging with -q/--quiet to see what commands are doing
-
-# ex. 1
-
-KNOBS_LOG=debug knobs -q -x 4400
-Chain 0
-OK sysfs w /sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq 4400000
-OK sysfs w /sys/devices/system/cpu/cpufreq/policy1/scaling_max_freq 4400000
-OK sysfs w /sys/devices/system/cpu/cpufreq/policy2/scaling_max_freq 4400000
-OK sysfs w /sys/devices/system/cpu/cpufreq/policy3/scaling_max_freq 4400000
-
-# ex, 2
-
-KNOBS_LOG=debug knobs -q \
-    --rapl-c0-limit 10w --rapl-c1-limit 13w -- \
-    --drm-i915-min 300mhz --drm-i915-max 900mhz
-OK sysfs l /sys/class/drm/card0/device/driver ../../../bus/pci/drivers/i915
-Chain 0
-OK sysfs w /sys/devices/virtual/powercap/intel-rapl/intel-rapl:0/constraint_0_power_limit_uw 10000000
-OK sysfs w /sys/devices/virtual/powercap/intel-rapl/intel-rapl:0/constraint_1_power_limit_uw 13000000
-Chain 1
-OK sysfs w /sys/class/drm/card0/gt_max_freq_mhz 900
-OK sysfs w /sys/class/drm/card0/gt_min_freq_mhz 300
-
-# ex, 3
-
-KNOBS_LOG=debug knobs -q --nvml-gpu-min 300 --nvml-gpu-max 2.2ghz
-OK nvml r init NVML
-OK nvml r Nvml::ids 1
-Chain 0
-OK nvml r Nvml::device_for_id Device { device: 0x7f6084539e58, nvml: NVML }
-OK nvml w Clocks::set_gpu_locked_clocks 0 ()
-
-### each chain's instance is printed to the trace logging channel
-
-KNOBS_LOG=trace knobs -q -x 4400
-Chain 0
-Knobs {
-    cpu: Some(
-        [
-            0,
-            1,
-            2,
-            3,
-        ],
-    ),
-    cpu_on: None,
-    cpus_on: None,
-    cpufreq_gov: None,
-    cpufreq_min: None,
-    cpufreq_max: Some(
-        Frequency {
-            hertz: 4400000000.0,
-        },
-    ),
-    drm_i915: None,
-    drm_i915_min: None,
-    drm_i915_max: None,
-    drm_i915_boost: None,
-    nvml: None,
-    nvml_gpu_min: None,
-    nvml_gpu_max: None,
-    nvml_gpu_reset: None,
-    nvml_power_limit: None,
-    pstate_epb: None,
-    pstate_epp: None,
-    rapl_package: Some(
-        0,
-    ),
-    rapl_zone: None,
-    rapl_c0_limit: None,
-    rapl_c1_limit: None,
-    rapl_c0_window: None,
-    rapl_c1_window: None,
-}
-OK sysfs w /sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq 4400000
-OK sysfs w /sys/devices/system/cpu/cpufreq/policy1/scaling_max_freq 4400000
-OK sysfs w /sys/devices/system/cpu/cpufreq/policy2/scaling_max_freq 4400000
-OK sysfs w /sys/devices/system/cpu/cpufreq/policy3/scaling_max_freq 4400000
 ```

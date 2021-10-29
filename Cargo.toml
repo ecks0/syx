@@ -1,13 +1,13 @@
 [package]
 name = "knobs"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2021"
 
 [features]
 nvml = ["nvml-facade"]
 
 [dependencies]
-async-trait = "0.1.51"
+async-trait = "0.1"
 clap = "2.33"
 comfy-table = "4.1"
 env_logger = "0.9"

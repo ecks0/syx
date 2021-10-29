@@ -1,45 +1,45 @@
-use log::{Level, debug, info, log_enabled, trace};
+use log::debug;
 use zysfs::types::{self as sysfs, tokio::Read as _};
 use std::{convert::TryFrom, str::FromStr};
 use tokio::{io::AsyncWriteExt, sync::OnceCell};
 use crate::{Error, Result};
 
-const ARG_QUIET: &str            = "quiet";
-const ARG_SHOW_CPU: &str         = "show-cpu";
-const ARG_SHOW_DRM: &str         = "show-drm";
+const ARG_QUIET: &str             = "quiet";
+const ARG_SHOW_CPU: &str          = "show-cpu";
+const ARG_SHOW_DRM: &str          = "show-drm";
 #[cfg(feature = "nvml")]
-const ARG_SHOW_NVML: &str        = "show-nvml";
-const ARG_SHOW_PSTATE: &str      = "show-pstate";
-const ARG_SHOW_RAPL: &str        = "show-rapl";
-const ARG_CPU: &str              = "cpu";
-const ARG_CPU_ONLINE: &str       = "cpu-online";
-const ARG_CPUFREQ_GOV: &str      = "cpufreq-gov";
-const ARG_CPUFREQ_MIN: &str      = "cpufreq-min";
-const ARG_CPUFREQ_MAX: &str      = "cpufreq-max";
-const ARG_DRM_I915: &str         = "drm-i915";
-const ARG_DRM_I915_MIN: &str     = "drm-i915-min";
-const ARG_DRM_I915_MAX: &str     = "drm-i915-max";
-const ARG_DRM_I915_BOOST: &str   = "drm-i915-boost";
+const ARG_SHOW_NVML: &str         = "show-nvml";
+const ARG_SHOW_PSTATE: &str       = "show-pstate";
+const ARG_SHOW_RAPL: &str         = "show-rapl";
+const ARG_CPU: &str               = "cpu";
+const ARG_CPU_ONLINE: &str        = "cpu-online";
+const ARG_CPUFREQ_GOV: &str       = "cpufreq-gov";
+const ARG_CPUFREQ_MIN: &str       = "cpufreq-min";
+const ARG_CPUFREQ_MAX: &str       = "cpufreq-max";
+const ARG_DRM_I915: &str          = "drm-i915";
+const ARG_DRM_I915_MIN: &str      = "drm-i915-min";
+const ARG_DRM_I915_MAX: &str      = "drm-i915-max";
+const ARG_DRM_I915_BOOST: &str    = "drm-i915-boost";
 #[cfg(feature = "nvml")]
-const ARG_NVML: &str             = "nvml";
+const ARG_NVML: &str              = "nvml";
 #[cfg(feature = "nvml")]
-const ARG_NVML_GPU_MIN: &str     = "nvml-gpu-min";
+const ARG_NVML_GPU_MIN: &str      = "nvml-gpu-min";
 #[cfg(feature = "nvml")]
-const ARG_NVML_GPU_MAX: &str     = "nvml-gpu-max";
+const ARG_NVML_GPU_MAX: &str      = "nvml-gpu-max";
 #[cfg(feature = "nvml")]
-const ARG_NVML_GPU_RESET: &str   = "nvml-gpu-reset";
+const ARG_NVML_GPU_RESET: &str    = "nvml-gpu-reset";
 #[cfg(feature = "nvml")]
-const ARG_NVML_POWER_LIMIT: &str = "nvml-power-limit";
-const ARG_PSTATE_EPB: &str       = "pstate-epb";
-const ARG_PSTATE_EPP: &str       = "pstate-epp";
-const ARG_RAPL_PACKAGE: &str     = "rapl-package";
-const ARG_RAPL_ZONE: &str        = "rapl-zone";
-const ARG_RAPL_C0_LIMIT: &str    = "rapl-c0-limit";
-const ARG_RAPL_C1_LIMIT: &str    = "rapl-c1-limit";
-const ARG_RAPL_C0_WINDOW: &str   = "rapl-c0-window";
-const ARG_RAPL_C1_WINDOW: &str   = "rapl-c1-window";
+const ARG_NVML_POWER_LIMIT: &str  = "nvml-power-limit";
+const ARG_PSTATE_EPB: &str        = "pstate-epb";
+const ARG_PSTATE_EPP: &str        = "pstate-epp";
+const ARG_RAPL_PACKAGE: &str      = "rapl-package";
+const ARG_RAPL_ZONE: &str         = "rapl-zone";
+const ARG_RAPL_LONG_LIMIT: &str   = "rapl-long-limit";
+const ARG_RAPL_LONG_WINDOW: &str  = "rapl-long-window";
+const ARG_RAPL_SHORT_LIMIT: &str  = "rapl-short-limit";
+const ARG_RAPL_SHORT_WINDOW: &str = "rapl-short-window";
 
-const AFTER_HELP: &str = r#"            BOOL   0, 1, true, or false
+const AFTER_HELP: &str = r#"            BOOL   0, 1, true, false
              IDS   A comma-delimited sequence of integers and/or integer ranges.
            HERTZ*  mhz when unspecified: hz/h - khz/k - mhz/m - ghz/g - thz/t
             SECS   ms when unspecified: ns/n - us/u - ms/m - s
@@ -223,40 +223,40 @@ fn app(argv0: &str) -> clap::App {
             .long(ARG_RAPL_PACKAGE)
             .takes_value(true)
             .value_name("INT")
-            .help("Target intel-rapl package, default 0"))
+            .help("Target intel-rapl package"))
 
         .arg(Arg::with_name(ARG_RAPL_ZONE)
             .short("Z")
             .long(ARG_RAPL_ZONE)
             .takes_value(true)
             .value_name("INT")
-            .help("Target intel-rapl sub-zone, default none"))
+            .help("Target intel-rapl sub-zone"))
 
-        .arg(Arg::with_name(ARG_RAPL_C0_LIMIT)
-            .short("0")
-            .long(ARG_RAPL_C0_LIMIT)
+        .arg(Arg::with_name(ARG_RAPL_LONG_LIMIT)
+            .short("L")
+            .long(ARG_RAPL_LONG_LIMIT)
             .takes_value(true)
             .value_name("WATTS")
-            .help("Set intel-rapl c0 power limit per --rapl-{package,zone}"))
+            .help("Set intel-rapl long_term power limit per --rapl-package/zone"))
 
-        .arg(Arg::with_name(ARG_RAPL_C1_LIMIT)
-            .short("1")
-            .long(ARG_RAPL_C1_LIMIT)
+        .arg(Arg::with_name(ARG_RAPL_LONG_WINDOW)
+            .long(ARG_RAPL_LONG_WINDOW)
+            .takes_value(true)
+            .value_name("SECS")
+            .help("Set intel-rapl long_term time window per --rapl-package/zone"))
+
+        .arg(Arg::with_name(ARG_RAPL_SHORT_LIMIT)
+            .short("S")
+            .long(ARG_RAPL_SHORT_LIMIT)
             .takes_value(true)
             .value_name("WATTS")
-            .help("Set intel-rapl c1 power limit per --rapl-{package,zone}"))
+            .help("Set intel-rapl short_term power limit per --rapl-package/zone"))
 
-        .arg(Arg::with_name(ARG_RAPL_C0_WINDOW)
-            .long(ARG_RAPL_C0_WINDOW)
+        .arg(Arg::with_name(ARG_RAPL_SHORT_WINDOW)
+            .long(ARG_RAPL_SHORT_WINDOW)
             .takes_value(true)
             .value_name("SECS")
-            .help("Set intel-rapl c0 time window per --rapl-{package,zone}"))
-
-        .arg(Arg::with_name(ARG_RAPL_C1_WINDOW)
-            .long("rapl-c1-winodw")
-            .takes_value(true)
-            .value_name("SECS")
-            .help("Set intel-rapl c1 time window per --rapl-{package,zone}"))
+            .help("Set intel-rapl short_term time window per --rapl-package/zone"))
 
         .arg(Arg::with_name("CHAIN")
             .raw(true));
@@ -362,12 +362,12 @@ impl<'a> TryFrom<clap::ArgMatches<'a>> for crate::Knobs {
             nvml_power_limit: arg::<crate::PowerStr>(ARG_NVML_POWER_LIMIT, &m)?.map(|v| v.into()),
             pstate_epb: arg_int::<u64>(ARG_PSTATE_EPB, &m)?,
             pstate_epp: arg_str(ARG_PSTATE_EPP, &m),
-            rapl_package: arg_int::<u64>(ARG_RAPL_PACKAGE, &m)?.or(Some(0)),
+            rapl_package: arg_int::<u64>(ARG_RAPL_PACKAGE, &m)?,
             rapl_zone: arg_int::<u64>(ARG_RAPL_ZONE, &m)?,
-            rapl_c0_limit: arg::<crate::PowerStr>(ARG_RAPL_C0_LIMIT, &m)?.map(|v| v.into()),
-            rapl_c1_limit: arg::<crate::PowerStr>(ARG_RAPL_C1_LIMIT, &m)?.map(|v| v.into()),
-            rapl_c0_window: arg::<crate::DurationStr>(ARG_RAPL_C0_WINDOW, &m)?.map(|v| v.into()),
-            rapl_c1_window: arg::<crate::DurationStr>(ARG_RAPL_C1_WINDOW, &m)?.map(|v| v.into()),
+            rapl_long_limit: arg::<crate::PowerStr>(ARG_RAPL_LONG_LIMIT, &m)?.map(|v| v.into()),
+            rapl_long_window: arg::<crate::DurationStr>(ARG_RAPL_LONG_WINDOW, &m)?.map(|v| v.into()),
+            rapl_short_limit: arg::<crate::PowerStr>(ARG_RAPL_SHORT_LIMIT, &m)?.map(|v| v.into()),
+            rapl_short_window: arg::<crate::DurationStr>(ARG_RAPL_SHORT_WINDOW, &m)?.map(|v| v.into()),
         };
         Ok(s)
    }
@@ -396,13 +396,12 @@ impl<'a> TryFrom<clap::ArgMatches<'a>> for crate::Knobs {
 // Because chains result in a longer runtime, they give more time for samples to be
 // collected when calculating certain values (e.g. watts from energy_uj).
 //
-fn chain(a: clap::App, m: clap::ArgMatches) -> Result<Vec<crate::Knobs>> {
+fn chain(a: clap::App, m: clap::ArgMatches) -> Result<crate::Chain> {
     let mut chain: Vec<crate::Knobs> = vec![];
     let mut argv: Vec<String>;
     let mut m = m;
     loop {
-        let k: crate::Knobs = m.clone().try_into()?;
-        if !k.is_default() { chain.push(k); }
+        chain.push(m.clone().try_into()?);
         if !m.is_present("CHAIN") { break; }
         m = match m.values_of("CHAIN") {
             Some(c) => {
@@ -415,14 +414,14 @@ fn chain(a: clap::App, m: clap::ArgMatches) -> Result<Vec<crate::Knobs>> {
             None => break,
         }
     };
-    Ok(chain)
+    Ok(chain.into())
 }
 
 // Resolve resource ids. Some flags, e.g. --cpu, --nvml, accept a list of
 // resource ids, and will default to all resource ids when omitted. In the
 // latter case, this function will fill in the default resource ids as
 // required.
-async fn resolve(mut chain: Vec<crate::Knobs>) -> Result<Vec<crate::Knobs>> {
+async fn resolve(mut chain: crate::Chain) -> Result<crate::Chain> {
     static CPU_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
     static DRM_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
     static DRM_I915_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
@@ -463,7 +462,7 @@ async fn resolve(mut chain: Vec<crate::Knobs>) -> Result<Vec<crate::Knobs>> {
     }
 
     for k in chain.iter_mut() {
-        if k.has_cpu_or_related_values() && k.cpu.is_none() {
+        if k.has_cpu_related_values() && k.cpu.is_none() {
             k.cpu = cpu_ids_cached().await;
         }
         if k.has_drm_i915_values() && k.drm_i915.is_none() {
@@ -505,7 +504,7 @@ pub struct Cli {
     #[cfg(feature = "nvml")] pub show_nvml: Option<()>,
     pub show_pstate: Option<()>,
     pub show_rapl: Option<()>,
-    pub chain: Vec<crate::Knobs>,
+    pub chain: crate::Chain,
 }
 
 impl Cli {
@@ -553,11 +552,8 @@ impl Cli {
         use sysfs::tokio::Read as _;
         use crate::format::Format as _;
 
-        for (i, knobs) in self.chain.iter().enumerate() {
-            info!("Chain {}", i);
-            if log_enabled!(Level::Trace) { trace!("{:#?}", knobs); }
-            knobs.apply().await;
-        }
+        self.chain.apply_values().await;
+
         if self.quiet.is_none() {
             let show_all = !self.has_show_args();
             let mut s = vec![];
