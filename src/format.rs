@@ -450,9 +450,9 @@ impl RaplEnergyCounter {
             .ok()
             .map(|now_value| {
                 let delta_dur = Instant::now() - self.start_instant;
-                let delta_uj = (now_value - self.start_value) as f64;
-                let value = delta_uj * 10f64.powf(6.) / delta_dur.as_micros() as f64;
-                Power::from_microwatts(value)
+                let delta_uj = now_value - self.start_value;
+                let value = delta_uj as u128 * 10u128.pow(6) / delta_dur.as_micros();
+                Power::from_microwatts(value as f64)
             })
     }
 

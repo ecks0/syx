@@ -541,7 +541,7 @@ impl Cli {
         b
     }
 
-    const WAIT_FOR_RAPL_COUNTERS: Duration = Duration::from_millis(200);
+    const WAIT_FOR_RAPL_COUNTERS: Duration = Duration::from_millis(350);
 
     // Command-line interface app logic.
     pub async fn run(&self) -> Result<()> {
