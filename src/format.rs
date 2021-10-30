@@ -532,7 +532,7 @@ impl Format for sysfs::intel_rapl::IntelRapl {
                     .map(|v| format!("{} us", v))
                     .unwrap_or_else(dot),
                 power
-                    .map(|p| format!("{:.1}", p))
+                    .map(|p| if p.as_microwatts() == 0. { "0 W".to_string() } else { format!("{:.1}", p) })
                     .unwrap_or_else(dot),
             ]);
         }
