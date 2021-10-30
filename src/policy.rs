@@ -48,8 +48,8 @@ impl From<&crate::Knobs> for Option<sysfs::cpu::Cpu> {
 impl From<&crate::Knobs> for Option<sysfs::cpufreq::Cpufreq> {
     fn from(k: &crate::Knobs) -> Self {
         if !k.has_cpufreq_values() { return None; }
-        let scaling_min_freq = k.cpufreq_min.map(|f| f.as_kilohertz().ceil() as u64);
-        let scaling_max_freq = k.cpufreq_max.map(|f| f.as_kilohertz().ceil() as u64);
+        let scaling_min_freq = k.cpufreq_min.map(|f| f.as_kilohertz().round() as u64);
+        let scaling_max_freq = k.cpufreq_max.map(|f| f.as_kilohertz().round() as u64);
         let policies: Option<Vec<sysfs::cpufreq::Policy>> =
             k.cpu.clone().map(|ids| ids
                 .into_iter()
@@ -78,9 +78,9 @@ impl From<&crate::Knobs> for Option<sysfs::drm::Drm> {
 
             match k.has_drm_i915_values() {
                 true => {
-                    let min_freq_mhz = k.drm_i915_min.map(|f| f.as_megahertz().ceil() as u64);
-                    let max_freq_mhz = k.drm_i915_max.map(|f| f.as_megahertz().ceil() as u64);
-                    let boost_freq_mhz = k.drm_i915_boost.map(|f| f.as_megahertz().ceil() as u64);
+                    let min_freq_mhz = k.drm_i915_min.map(|f| f.as_megahertz().round() as u64);
+                    let max_freq_mhz = k.drm_i915_max.map(|f| f.as_megahertz().round() as u64);
+                    let boost_freq_mhz = k.drm_i915_boost.map(|f| f.as_megahertz().round() as u64);
                     k.drm_i915.clone().map(|ids| ids
                         .into_iter()
                         .map(|id|
@@ -168,9 +168,9 @@ impl From<&crate::Knobs> for Option<NvmlPolicies> {
             .and_then(|min|
                 k.nvml_gpu_max
                     .map(|max|
-                        (min.as_megahertz().ceil() as u32, max.as_megahertz().ceil() as u32)));
+                        (min.as_megahertz().round() as u32, max.as_megahertz().round() as u32)));
         let gpu_clock_reset = k.nvml_gpu_reset.and_then(|v| if v { Some(()) } else { None });
-        let power_limit = k.nvml_power_limit.map(|p| p.as_milliwatts().ceil() as u32);
+        let power_limit = k.nvml_power_limit.map(|p| p.as_milliwatts().round() as u32);
         let policies: Option<Vec<NvmlPolicy>> =
             k.nvml.clone().map(|ids| ids
                 .into_iter()
@@ -231,7 +231,7 @@ impl From<&crate::Knobs> for Option<sysfs::intel_rapl::IntelRapl> {
                 if limit.is_some() || window.is_some() {
                     let c = sysfs::intel_rapl::Constraint {
                         name: Some(name.to_string()),
-                        power_limit_uw: limit.map(|v| v.as_microwatts().ceil() as u64),
+                        power_limit_uw: limit.map(|v| v.as_microwatts().round() as u64),
                         time_window_us: window.map(|v| v.as_micros().try_into().unwrap()),
                         ..Default::default()
                     };

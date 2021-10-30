@@ -1,7 +1,7 @@
 use log::debug;
 use zysfs::types::{self as sysfs, tokio::Read as _};
-use std::{convert::TryFrom, str::FromStr};
-use tokio::sync::OnceCell;
+use std::{convert::TryFrom, str::FromStr, time::{Duration, Instant}};
+use tokio::{sync::OnceCell, time::sleep};
 use crate::{Error, Result};
 
 const ARG_QUIET: &str             = "quiet";
@@ -378,27 +378,6 @@ impl<'a> TryFrom<clap::ArgMatches<'a>> for crate::Knobs {
 }
 
 // Parse and return the knobs call chain.
-//
-// Knobs accepts an argument 'chain'. Each 'link' in the chain is a subset of knobs
-// arguments. Links are separated by the string `--`. Chains essentially let users
-// invoke knobs multiple times while invoking the binary only once.
-//
-// Any CLI argument which has an analogous field in the [`Knobs`] struct may participate
-// in a call chain. Arguments that do not have an analogous field in [`Knobs`], such as
-// `--show-*`, `--quiet`, etc. are parsed only once for the entire chain, and (at this
-// time) must appear in the first link.
-//
-// Chains are, in part, syntactic sugar for circumstances which necessarily require
-// multiple invocations. An easy example involves `--cpu-online`, which accepts a
-// boolean value. In a single invocation, a range of CPUs can be set online or offline
-// using `--cpu` and `--cpu-online` together, but setting some CPUs online and other
-// CPUs offline requires multiple invocations.
-//
-// More practically, chains reduce the amount of i/o that we must perform, because
-// the entire chain benefits from caching (e.g. `resolve()` in this module).
-//
-// Because chains result in a longer runtime, they give more time for samples to be
-// collected when calculating certain values (e.g. watts from energy_uj).
 fn chain(a: clap::App, m: clap::ArgMatches) -> Result<crate::Chain> {
     let mut chain: Vec<crate::Knobs> = vec![];
     let mut argv: Vec<String>;
@@ -420,34 +399,44 @@ fn chain(a: clap::App, m: clap::ArgMatches) -> Result<crate::Chain> {
     Ok(chain.into())
 }
 
-// Resolve resource ids. Some flags, e.g. --cpu, --nvml, accept a list of
-// resource ids, and will default to all resource ids when omitted. In the
-// latter case, this function will fill in the default resource ids as
-// required.
-async fn resolve(mut chain: crate::Chain) -> crate::Chain {
+#[derive(Clone, Debug)]
+pub(crate) struct RuntimeCounter;
 
-    static CPU_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
-    static DRM_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
-    static DRM_I915_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
-    #[cfg(feature = "nvml")]
-    static NVML_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
+impl RuntimeCounter {
+    pub async fn get() -> Duration {
+        static START: OnceCell<Instant> = OnceCell::const_new();
+        async fn make() -> Instant { Instant::now() }
+        let then = *START.get_or_init(make).await;
+        Instant::now() - then
+    }
 
-    pub async fn cpu_ids_cached() -> Option<Vec<u64>> {
+    pub async fn start() { Self::get().await; }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ResourceIdCache;
+
+// Cache ids to eliminate unnecessary sysfs io.
+impl ResourceIdCache {
+
+    pub async fn cpu() -> Option<Vec<u64>> {
+        static CPU_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
         async fn ids() -> Option<Vec<u64>> { sysfs::cpu::Policy::ids().await }
         CPU_IDS_CACHED.get_or_init(ids).await.clone()
     }
 
-    pub async fn drm_ids_cached() -> Option<Vec<u64>> {
+    pub async fn drm() -> Option<Vec<u64>> {
+        static DRM_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
         async fn ids() -> Option<Vec<u64>> { sysfs::drm::Card::ids().await }
         DRM_IDS_CACHED.get_or_init(ids).await.clone()
     }
 
-    pub async fn drm_ids_i915_cached() -> Option<Vec<u64>> {
+    pub async fn drm_i915() -> Option<Vec<u64>> {
+        use sysfs::drm::io::tokio::driver;
+        static DRM_I915_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
         async fn ids() -> Option<Vec<u64>> {
-            use zysfs::io::drm::tokio::driver;
-
             let mut ids = vec![];
-            if let Some(drm_ids) = drm_ids_cached().await {
+            if let Some(drm_ids) = ResourceIdCache::drm().await {
                 for id in drm_ids {
                     if let Ok("i915") = driver(id).await.as_deref() {
                         ids.push(id);
@@ -460,20 +449,28 @@ async fn resolve(mut chain: crate::Chain) -> crate::Chain {
     }
 
     #[cfg(feature = "nvml")]
-    pub async fn nvml_ids_cached() -> Option<Vec<u64>> {
+    pub async fn nvml() -> Option<Vec<u64>> {
+        static NVML_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
         async fn ids() -> Option<Vec<u64>> {
             nvml_facade::Nvml::ids()
                 .map(|ids| ids.into_iter().map(u64::from).collect())
         }
         NVML_IDS_CACHED.get_or_init(ids).await.clone()
     }
+}
+
+// Resolve resource ids. Some flags, e.g. --cpu, --nvml, accept a list of
+// resource ids, and will default to all resource ids when omitted. In the
+// latter case, this function will fill in the default resource ids as
+// required.
+async fn resolve(mut chain: crate::Chain) -> crate::Chain {
 
     for k in chain.iter_mut() {
         if k.has_cpu_related_values() && k.cpu.is_none() {
-            k.cpu = cpu_ids_cached().await;
+            k.cpu = ResourceIdCache::cpu().await;
         }
         if k.has_drm_i915_values() && k.drm_i915.is_none() {
-            k.drm_i915 = drm_ids_i915_cached().await
+            k.drm_i915 = ResourceIdCache::drm_i915().await
                 .map(|ids| ids
                     .into_iter()
                     .map(crate::CardId::Id)
@@ -481,7 +478,7 @@ async fn resolve(mut chain: crate::Chain) -> crate::Chain {
         }
         #[cfg(feature = "nvml")]
         if k.has_nvml_values() && k.nvml.is_none() {
-            k.nvml = nvml_ids_cached().await
+            k.nvml = ResourceIdCache::nvml().await
                 .map(|ids| ids
                     .into_iter()
                     .map(crate::CardId::Id)
@@ -517,6 +514,7 @@ pub struct Cli {
 
 impl Cli {
 
+    // Parse command-line arguments.
     pub async fn parse(argv: &[String]) -> Result<Self> {
         let a = app(argv0(argv));
         let m = a.clone().get_matches_from_safe(argv)?;
@@ -543,44 +541,60 @@ impl Cli {
         b
     }
 
+    const WAIT_FOR_RAPL_COUNTERS: Duration = Duration::from_millis(200);
+
+    // Command-line interface app logic.
     pub async fn run(&self) -> Result<()> {
         use sysfs::tokio::Read as _;
         use crate::format::Format as _;
 
+        let show_all = !self.has_show_args();
+        if self.quiet.is_none() && (show_all || self.show_rapl.is_some()) {
+            RuntimeCounter::start().await;
+            crate::format::RaplEnergyCounters::start().await;
+        }
+
         self.chain.apply_values().await;
 
-        if self.quiet.is_none() {
-            let show_all = !self.has_show_args();
-            let mut s = vec![];
-            if show_all || self.show_cpu.is_some() {
-                if let Some(cpu) = sysfs::cpu::Cpu::read(()).await {
-                    if let Some(cpufreq) = sysfs::cpufreq::Cpufreq::read(()).await {
-                        (cpu, cpufreq).format_values(&mut s).await?;
+        if self.quiet.is_some() { return Ok(()); }
+
+        let mut s = vec![];
+        if show_all || self.show_cpu.is_some() {
+            if let Some(cpu) = sysfs::cpu::Cpu::read(()).await {
+                if let Some(cpufreq) = sysfs::cpufreq::Cpufreq::read(()).await {
+                    (cpu, cpufreq).format_values(&mut s).await?;
+                }
+            }
+        }
+        if show_all || self.show_pstate.is_some() {
+            if let Some(intel_pstate) = sysfs::intel_pstate::IntelPstate::read(()).await {
+                intel_pstate.format_values(&mut s).await?;
+            }
+        }
+        if show_all || self.show_rapl.is_some() {
+            if let Some(intel_rapl) = sysfs::intel_rapl::IntelRapl::read(()).await {
+
+                if crate::format::RaplEnergyCounters::get().await.is_some() {
+                    let runtime = RuntimeCounter::get().await;
+                    if runtime < Self::WAIT_FOR_RAPL_COUNTERS {
+                        sleep(Self::WAIT_FOR_RAPL_COUNTERS - runtime).await;
                     }
                 }
+
+                intel_rapl.format_values(&mut s).await?;
             }
-            if show_all || self.show_pstate.is_some() {
-                if let Some(intel_pstate) = sysfs::intel_pstate::IntelPstate::read(()).await {
-                    intel_pstate.format_values(&mut s).await?;
-                }
-            }
-            if show_all || self.show_rapl.is_some() {
-                if let Some(intel_rapl) = sysfs::intel_rapl::IntelRapl::read(()).await {
-                    intel_rapl.format_values(&mut s).await?;
-                }
-            }
-            if show_all || self.show_drm.is_some() {
-                if let Some(drm) = sysfs::drm::Drm::read(()).await {
-                    drm.format_values(&mut s).await?;
-                }
-            }
-            #[cfg(feature = "nvml")]
-            if show_all || self.show_nvml.is_some() {
-                use nvml_facade::Nvml;
-                Nvml.format_values(&mut s).await?;
-            }
-            println!("{}", String::from_utf8_lossy(&s).trim_end());
         }
+        if show_all || self.show_drm.is_some() {
+            if let Some(drm) = sysfs::drm::Drm::read(()).await {
+                drm.format_values(&mut s).await?;
+            }
+        }
+        #[cfg(feature = "nvml")]
+        if show_all || self.show_nvml.is_some() {
+            use nvml_facade::Nvml;
+            Nvml.format_values(&mut s).await?;
+        }
+        println!("{}", String::from_utf8_lossy(&s).trim_end());
         Ok(())
     }
 }
@@ -590,6 +604,7 @@ pub struct App;
 
 impl App {
 
+    // Configure logging env vars and default configuration.
     pub fn setup_logging() {
         use std::io::Write;
 
@@ -604,6 +619,7 @@ impl App {
             .init();
     }
 
+    // Run the app.
     pub async fn run() -> Result<()> {
         Self::setup_logging();
         let args: Vec<String> = std::env::args().collect();

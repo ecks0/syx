@@ -1,10 +1,11 @@
 use async_trait::async_trait;
 use comfy_table as ct;
-use measurements::{Energy, Frequency, Power};
-#[cfg(feature = "nvml")] use nvml_facade as nvml;
-use tokio::io::{AsyncWrite, AsyncWriteExt};
+use measurements::{Frequency, Power};
+#[cfg(feature = "nvml")]
+use nvml_facade as nvml;
+use tokio::{io::{AsyncWrite, AsyncWriteExt}, sync::OnceCell};
 use zysfs::types as sysfs;
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display, time::Instant};
 use crate::{Error, Result};
 
 pub const DOT: &str = "\u{2022}";
@@ -59,15 +60,15 @@ fn format_uw(uw: u64) -> String {
     }
 }
 
-fn format_uj(uj: u64) -> String {
-    match uj {
-        0 => "0 J".to_string(),
-        _ => {
-            let j = uj as f64 * 10f64.powf(-6.);
-            format!("{:.3}", Energy::from_joules(j))
-        },
-    }
-}
+// fn format_uj(uj: u64) -> String {
+//     match uj {
+//         0 => "0 J".to_string(),
+//         _ => {
+//             let j = uj as f64 * 10f64.powf(-6.);
+//             format!("{:.3}", Energy::from_joules(j))
+//         },
+//     }
+// }
 
 fn format_hz(hz: u64) -> String {
     match hz {
@@ -210,7 +211,7 @@ impl Format for sysfs::drm::Drm {
 
 #[cfg(feature = "nvml")]
 #[async_trait]
-impl Format for nvml_facade::Nvml {
+impl Format for nvml::Nvml {
     type Err = Error;
 
     async fn format_values<W: AsyncWrite + Send + Unpin>(&self, w: &mut W) -> Result<()> {
@@ -398,11 +399,9 @@ impl Format for sysfs::intel_pstate::IntelPstate {
             Some(nl(tab.to_string()))
         }
 
-        use zysfs::io::intel_pstate::tokio::status;
-
         if let Some(p) = &self.policies {
             if !p.is_empty() {
-                if let Ok(status) = status().await {
+                if let Ok(status) = sysfs::intel_pstate::io::tokio::status().await {
                     w.write_all(system_status(&status).as_bytes()).await?;
                     if status == "active" {
                         if let Some(s) = epb_epp(p) { w.write_all(s.as_bytes()).await?; }
@@ -415,6 +414,78 @@ impl Format for sysfs::intel_pstate::IntelPstate {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct RaplEnergyCounter {
+    zone: sysfs::intel_rapl::ZoneId,
+    start_instant: Instant,
+    start_value: u64,
+}
+
+impl RaplEnergyCounter {
+
+    pub async fn all() -> Option<Vec<RaplEnergyCounter>> {
+        use sysfs::tokio::Read as _;
+        let mut res = vec![];
+        for zone in sysfs::intel_rapl::Policy::ids().await? {
+            if let Some(c) = RaplEnergyCounter::new(zone).await {
+                res.push(c);
+            }
+        }
+        if res.is_empty() { None } else { Some(res) }
+    }
+
+    pub async fn new(zone: sysfs::intel_rapl::ZoneId) -> Option<Self> {
+        use sysfs::intel_rapl::io::tokio::energy_uj;
+        let s = Self {
+            start_instant: Instant::now(),
+            start_value: energy_uj(zone.zone, zone.subzone).await.ok()?,
+            zone,
+        };
+        Some(s)
+    }
+
+    pub async fn value(&self) -> Option<Power> {
+        use sysfs::intel_rapl::io::tokio::energy_uj;
+        energy_uj(self.zone.zone, self.zone.subzone).await
+            .ok()
+            .map(|now_value| {
+                let delta_dur = Instant::now() - self.start_instant;
+                let delta_uj = (now_value - self.start_value) as f64;
+                let value = delta_uj * 10f64.powf(6.) / delta_dur.as_micros() as f64;
+                Power::from_microwatts(value)
+            })
+    }
+
+    pub fn zone(&self) -> sysfs::intel_rapl::ZoneId { self.zone }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct RaplEnergyCounters(HashMap<sysfs::intel_rapl::ZoneId, RaplEnergyCounter>);
+
+impl RaplEnergyCounters {
+
+    pub async fn get() -> Option<&'static RaplEnergyCounters> {
+        static RAPL_ENERGY_COUNTERS: OnceCell<Option<RaplEnergyCounters>> = OnceCell::const_new();
+        async fn counters() -> Option<RaplEnergyCounters> { RaplEnergyCounter::all().await.map(|c| c.into()) }
+        RAPL_ENERGY_COUNTERS.get_or_init(counters).await.as_ref()
+    }
+
+    pub async fn start() { Self::get().await; }
+
+    pub async fn value(&self, zone: sysfs::intel_rapl::ZoneId) -> Option<Power> {
+        if let Some(c) = self.0.get(&zone) { c.value().await } else { None }
+    }
+}
+
+impl From<Vec<RaplEnergyCounter>> for RaplEnergyCounters {
+    fn from(v: Vec<RaplEnergyCounter>) -> Self {
+            RaplEnergyCounters(v
+                .into_iter()
+                .map(|c| (c.zone(), c))
+                .collect())
+    }
+}
+
 #[async_trait]
 impl Format for sysfs::intel_rapl::IntelRapl {
     type Err = Error;
@@ -422,7 +493,8 @@ impl Format for sysfs::intel_rapl::IntelRapl {
     async fn format_values<W: AsyncWrite + Send + Unpin>(&self, w: &mut W) -> Result<()> {
         let policies = if let Some(p) = self.policies.as_ref() { p } else { return Ok(()); };
         if policies.is_empty() { return Ok(()); }
-        let mut tab = Table::new(&["Zone name", "Zone", "Long lim", "Short lim", "Long win", "Short win", "Energy"]);
+        let mut tab = Table::new(&["Zone name", "Zone", "Long lim", "Short lim", "Long win", "Short win", "Usage"]);
+        let energy_counters = RaplEnergyCounters::get().await;
         for policy in policies {
             let id = if let Some(id) = policy.id { id } else { continue; };
             let long = policy.constraints
@@ -435,6 +507,7 @@ impl Format for sysfs::intel_rapl::IntelRapl {
                 .and_then(|v| v
                     .iter()
                     .find(|p| p.name.as_ref().map(|s| s == "short_term").unwrap_or(false)));
+            let power = if let Some(counters) = energy_counters { counters.value(id).await } else { None };
             tab.row(&[
                 policy.name.clone().unwrap_or_else(dot),
                 format!(
@@ -458,8 +531,8 @@ impl Format for sysfs::intel_rapl::IntelRapl {
                     .and_then(|v| v.time_window_us)
                     .map(|v| format!("{} us", v))
                     .unwrap_or_else(dot),
-                policy.energy_uj
-                    .map(format_uj)
+                power
+                    .map(|p| format!("{:.3}", p))
                     .unwrap_or_else(dot),
             ]);
         }
