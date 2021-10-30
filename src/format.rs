@@ -532,7 +532,7 @@ impl Format for sysfs::intel_rapl::IntelRapl {
                     .map(|v| format!("{} us", v))
                     .unwrap_or_else(dot),
                 power
-                    .map(|p| format!("{:.3}", p))
+                    .map(|p| format!("{:.1}", p))
                     .unwrap_or_else(dot),
             ]);
         }
