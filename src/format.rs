@@ -441,7 +441,7 @@ impl FormatValues for sysfs::intel_rapl::IntelRapl {
     type Arg = Option<RaplSamplers>;
     type Err = Error;
 
-    async fn format_values<W>(&self, w: &mut W, energy_samplers: Option<RaplSamplers>) -> Result<()>
+    async fn format_values<W>(&self, w: &mut W, samplers: Option<RaplSamplers>) -> Result<()>
     where
         W: AsyncWrite + Send + Unpin
     {
@@ -460,7 +460,7 @@ impl FormatValues for sysfs::intel_rapl::IntelRapl {
                 .and_then(|v| v
                     .iter()
                     .find(|p| p.name.as_ref().map(|s| s == "short_term").unwrap_or(false)));
-            let watt_seconds = if let Some(s) = &energy_samplers { s.watt_seconds_max(zone).await } else { None };
+            let watt_seconds = if let Some(s) = &samplers { s.watt_seconds_max(zone).await } else { None };
             tab.row(&[
                 policy.name.clone().unwrap_or_else(Format::dot),
                 format!(

@@ -451,7 +451,7 @@ impl Cli {
             .unwrap_or(NAME)
     }
 
-    // Parse command-line arguments.
+    // Create new instance from command-line arguments.
     pub async fn from_args(argv: &[String]) -> Result<Self> {
         let a = Self::app(Self::argv0(argv));
         let m = a.get_matches_from_safe(argv)?;
@@ -479,17 +479,54 @@ impl Cli {
         b
     }
 
-    // Command-line interface app logic.
-    pub async fn run(&self) -> Result<()> {
+    async fn format_values(&self, s: &mut Vec<u8>, rapl_samplers: Option<RaplSamplers>) -> Result<()> {
         use crate::format::FormatValues as _;
-
-        CounterOnce::init().await;
 
         let show_all = !self.has_show_args();
 
+        if show_all || self.show_cpu.is_some() {
+            if let Some(cpu) = sysfs::cpu::Cpu::read(()).await {
+                if let Some(cpufreq) = sysfs::cpufreq::Cpufreq::read(()).await {
+                    (cpu, cpufreq).format_values(s, ()).await?;
+                }
+            }
+        }
+
+        if show_all || self.show_pstate.is_some() {
+            if let Some(intel_pstate) = sysfs::intel_pstate::IntelPstate::read(()).await {
+                intel_pstate.format_values(s, ()).await?;
+            }
+        }
+
+        if show_all || self.show_rapl.is_some() {
+            if let Some(intel_rapl) = sysfs::intel_rapl::IntelRapl::read(()).await {
+                intel_rapl.format_values(s, rapl_samplers.clone()).await?;
+            }
+        }
+
+        if show_all || self.show_drm.is_some() {
+            if let Some(drm) = sysfs::drm::Drm::read(()).await {
+                drm.format_values(s, ()).await?;
+            }
+        }
+
+        #[cfg(feature = "nvml")]
+        if show_all || self.show_nvml.is_some() {
+            nvml_facade::Nvml.format_values(s, ()).await?;
+        }
+
+        Ok(())
+    }
+
+    // Command-line interface app logic.
+    pub async fn run(&self) -> Result<()> {
+
+        let begin = CounterOnce::get().await;
+
         let rapl_samplers =
-            if self.quiet.is_none() && (show_all || self.show_rapl.is_some()) {
+            if self.quiet.is_none() && (!self.has_show_args() || self.show_rapl.is_some()) {
                 if let Some(mut s) = RaplSamplersOnce::get().await {
+                    s.clear().await;
                     s.start().await;
                     Some(s)
                 } else { None }
@@ -501,7 +538,7 @@ impl Cli {
 
         if let Some(samplers) = rapl_samplers.as_ref() {
             if samplers.working().await {
-                let runtime = CounterOnce::get().await;
+                let runtime = CounterOnce::get().await - begin;
                 if runtime < RaplSamplersOnce::MIN_RUNTIME {
                     sleep(RaplSamplersOnce::MIN_RUNTIME - runtime).await;
                 }
@@ -510,41 +547,14 @@ impl Cli {
 
         let mut s = Vec::with_capacity(3000);
 
-        if show_all || self.show_cpu.is_some() {
-            if let Some(cpu) = sysfs::cpu::Cpu::read(()).await {
-                if let Some(cpufreq) = sysfs::cpufreq::Cpufreq::read(()).await {
-                    (cpu, cpufreq).format_values(&mut s, ()).await?;
-                }
-            }
-        }
-
-        if show_all || self.show_pstate.is_some() {
-            if let Some(intel_pstate) = sysfs::intel_pstate::IntelPstate::read(()).await {
-                intel_pstate.format_values(&mut s, ()).await?;
-            }
-        }
-
-        if show_all || self.show_rapl.is_some() {
-            if let Some(intel_rapl) = sysfs::intel_rapl::IntelRapl::read(()).await {
-                intel_rapl.format_values(&mut s, rapl_samplers.clone()).await?;
-            }
-        }
+        let format_res = self.format_values(&mut s, rapl_samplers.clone()).await;
 
         if let Some(mut samplers) = rapl_samplers {
             samplers.stop().await;
-            samplers.clear().await; // XXX
+            samplers.clear().await;
         }
 
-        if show_all || self.show_drm.is_some() {
-            if let Some(drm) = sysfs::drm::Drm::read(()).await {
-                drm.format_values(&mut s, ()).await?;
-            }
-        }
-
-        #[cfg(feature = "nvml")]
-        if show_all || self.show_nvml.is_some() {
-            nvml_facade::Nvml.format_values(&mut s, ()).await?;
-        }
+        format_res?;
 
         println!("{}", String::from_utf8_lossy(&s).trim_end());
         Ok(())
@@ -555,6 +565,7 @@ impl Cli {
 pub struct App;
 
 impl App {
+
     // Configure logging env vars and default configuration.
     pub fn setup_logging() {
         use std::io::Write;
@@ -606,8 +617,6 @@ impl CounterOnce {
         let then = *START.get_or_init(make).await;
         Instant::now() - then
     }
-
-    pub async fn init() { Self::get().await; }
 }
 
 // Once of cpu ids.
