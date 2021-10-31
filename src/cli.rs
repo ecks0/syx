@@ -518,72 +518,53 @@ impl Cli {
         Ok(())
     }
 
+    const RAPL_RUNTIME: Duration = Duration::from_millis(400);
+    const RAPL_INTERVAL: Duration = Duration::from_millis(100);
+    const RAPL_COUNT: usize = 11;
+
     // Command-line interface app logic.
     pub async fn run(&self) -> Result<()> {
-
-        let begin = CounterOnce::get().await;
-
+        use sysfs::tokio::Feature;
+        let begin = CounterOnce::delta().await;
         let rapl_samplers =
-            if self.quiet.is_none() && (!self.has_show_args() || self.show_rapl.is_some()) {
-                if let Some(mut s) = RaplSamplersOnce::get().await {
-                    s.clear().await;
+            if self.quiet.is_none() &&
+                (!self.has_show_args() || self.show_rapl.is_some()) &&
+                sysfs::intel_rapl::IntelRapl::present().await
+            {
+                if let Some(s) = RaplSampler::all(Self::RAPL_INTERVAL, Self::RAPL_COUNT).await {
+                    let mut s = RaplSamplers::from(s);
                     s.start().await;
                     Some(s)
                 } else { None }
             } else { None };
-
         self.chain.apply_values().await;
-
         if self.quiet.is_some() { return Ok(()); }
-
         if let Some(samplers) = rapl_samplers.as_ref() {
             if samplers.working().await {
-                let runtime = CounterOnce::get().await - begin;
-                if runtime < RaplSamplersOnce::MIN_RUNTIME {
-                    sleep(RaplSamplersOnce::MIN_RUNTIME - runtime).await;
+                let runtime = CounterOnce::delta().await - begin;
+                if runtime < Self::RAPL_RUNTIME {
+                    sleep(Self::RAPL_RUNTIME - runtime).await;
                 }
             }
         }
-
         let mut s = Vec::with_capacity(3000);
-
         let format_res = self.format_values(&mut s, rapl_samplers.clone()).await;
-
-        if let Some(mut samplers) = rapl_samplers {
-            samplers.stop().await;
-            samplers.clear().await;
-        }
-
+        if let Some(mut samplers) = rapl_samplers { samplers.stop().await; }
         format_res?;
-
         println!("{}", String::from_utf8_lossy(&s).trim_end());
         Ok(())
     }
 }
 
+// Cli application.
 #[derive(Clone, Debug)]
 pub struct App;
 
 impl App {
 
-    // Configure logging env vars and default configuration.
-    pub fn setup_logging() {
-        use std::io::Write;
-
-        use env_logger::{Builder, Env};
-        let env = Env::default()
-            .filter_or("KNOBS_LOG", "error")
-            .write_style_or("KNOBS_LOG_STYLE", "never");
-        Builder::from_env(env)
-            .format(|buf, record| {
-                writeln!(buf, "{}", record.args())
-            })
-            .init();
-    }
-
-    // Run the app with args.
+    // Run app with args.
     pub async fn run_with_args(args: &[String]) -> Result<()> {
-        Self::setup_logging();
+        LoggingOnce::configure().await;
         match Cli::from_args(args).await {
             Ok(cli) => cli.run().await,
             Err(err) => {
@@ -599,10 +580,33 @@ impl App {
         }
     }
 
-    // Run the app.
+    // Run app.
     pub async fn run() -> Result<()> {
         let args: Vec<String> = std::env::args().collect();
         Self::run_with_args(&args).await
+    }
+}
+
+// Configure logging env vars and default configuration.
+#[derive(Clone, Debug)]
+struct LoggingOnce;
+
+impl LoggingOnce {
+    pub async fn configure() {
+        static LOGGING: OnceCell<()> = OnceCell::const_new();
+        async fn init() {
+            use std::io::Write;
+            use env_logger::{Builder, Env};
+            let env = Env::default()
+                .filter_or("KNOBS_LOG", "error")
+                .write_style_or("KNOBS_LOG_STYLE", "never");
+            Builder::from_env(env)
+                .format(|buf, record| {
+                    writeln!(buf, "{}", record.args())
+                })
+                .init()
+        }
+        LOGGING.get_or_init(init).await;
     }
 }
 
@@ -611,10 +615,14 @@ impl App {
 struct CounterOnce;
 
 impl CounterOnce {
-    pub async fn get() -> Duration {
+    pub async fn get() -> Instant {
         static START: OnceCell<Instant> = OnceCell::const_new();
         async fn make() -> Instant { Instant::now() }
-        let then = *START.get_or_init(make).await;
+        *START.get_or_init(make).await
+    }
+
+    pub async fn delta() -> Duration {
+        let then = Self::get().await;
         Instant::now() - then
     }
 }
@@ -680,29 +688,5 @@ impl NvmlIdsOnce {
                 .map(|ids| ids.into_iter().map(u64::from).collect())
         }
         NVML_IDS.get_or_init(ids).await.clone()
-    }
-}
-
-// Once of `RaplEnergySamplers`. Don't forget to start it.
-#[derive(Clone, Debug)]
-struct RaplSamplersOnce;
-
-impl RaplSamplersOnce {
-
-    // the min amount of time we would we would like to collect before being asked for a value
-    pub const MIN_RUNTIME: Duration = Duration::from_millis(400);
-
-    const INTERVAL: Duration = Duration::from_millis(100);
-    const COUNT: usize = 11;
-
-    pub async fn get() -> Option<RaplSamplers> {
-        static RAPL_ENERGY_SAMPLERS: OnceCell<Option<RaplSamplers>> = OnceCell::const_new();
-        async fn samplers() -> Option<RaplSamplers> {
-            RaplSampler::all(
-                RaplSamplersOnce::INTERVAL,
-                RaplSamplersOnce::COUNT
-            ).await.map(|c| c.into())
-        }
-        RAPL_ENERGY_SAMPLERS.get_or_init(samplers).await.clone()
     }
 }
