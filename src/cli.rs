@@ -1,25 +1,31 @@
 use zysfs::types::{self as sysfs, tokio::Read as _};
-use std::{convert::TryFrom, str::FromStr, time::Duration};
-use tokio::time::sleep;
-use crate::{Error, Result};
-use crate::data::{RuntimeCounter, RaplEnergySamplersInstance};
+use std::{convert::TryFrom, str::FromStr, time::{Duration, Instant}};
+use tokio::{sync::OnceCell, time::sleep};
+use crate::{Error, Result, data::{RaplSampler, RaplSamplers}};
+
+const NAME: &str                  = "knobs";
 
 const ARG_QUIET: &str             = "quiet";
+
 const ARG_SHOW_CPU: &str          = "show-cpu";
 const ARG_SHOW_DRM: &str          = "show-drm";
 #[cfg(feature = "nvml")]
 const ARG_SHOW_NVML: &str         = "show-nvml";
 const ARG_SHOW_PSTATE: &str       = "show-pstate";
 const ARG_SHOW_RAPL: &str         = "show-rapl";
+
 const ARG_CPU: &str               = "cpu";
 const ARG_CPU_ONLINE: &str        = "cpu-online";
+
 const ARG_CPUFREQ_GOV: &str       = "cpufreq-gov";
 const ARG_CPUFREQ_MIN: &str       = "cpufreq-min";
 const ARG_CPUFREQ_MAX: &str       = "cpufreq-max";
+
 const ARG_DRM_I915: &str          = "drm-i915";
 const ARG_DRM_I915_MIN: &str      = "drm-i915-min";
 const ARG_DRM_I915_MAX: &str      = "drm-i915-max";
 const ARG_DRM_I915_BOOST: &str    = "drm-i915-boost";
+
 #[cfg(feature = "nvml")]
 const ARG_NVML: &str              = "nvml";
 #[cfg(feature = "nvml")]
@@ -30,8 +36,10 @@ const ARG_NVML_GPU_MAX: &str      = "nvml-gpu-max";
 const ARG_NVML_GPU_RESET: &str    = "nvml-gpu-reset";
 #[cfg(feature = "nvml")]
 const ARG_NVML_POWER_LIMIT: &str  = "nvml-power-limit";
+
 const ARG_PSTATE_EPB: &str        = "pstate-epb";
 const ARG_PSTATE_EPP: &str        = "pstate-epp";
+
 const ARG_RAPL_PACKAGE: &str      = "rapl-package";
 const ARG_RAPL_ZONE: &str         = "rapl-zone";
 const ARG_RAPL_LONG_LIMIT: &str   = "rapl-long-limit";
@@ -57,222 +65,6 @@ const AFTER_HELP: &str = r#"            BOOL   0, 1, true, false
 
     The KNOBS_LOG env var may be set to trace, debug, info, warn, or error (default).
 "#;
-
-// Build and return a clap app.
-fn app(argv0: &str) -> clap::App {
-    use clap::{App, AppSettings, Arg, crate_version};
-
-    let a = App::new(argv0)
-
-        .setting(AppSettings::DeriveDisplayOrder)
-        .setting(AppSettings::DisableHelpSubcommand)
-        .setting(AppSettings::DisableVersion)
-        .setting(AppSettings::TrailingVarArg)
-        .setting(AppSettings::UnifiedHelpMessage)
-
-        .version(crate_version!())
-
-        .after_help(AFTER_HELP)
-
-        .arg(Arg::with_name(ARG_QUIET)
-            .short("q")
-            .long(ARG_QUIET)
-            .takes_value(false)
-            .help("Do not print values"))
-
-        .arg(Arg::with_name(ARG_SHOW_CPU)
-            .long(ARG_SHOW_CPU)
-            .takes_value(false)
-            .help("Print cpu and cpufreq values"))
-
-        .arg(Arg::with_name(ARG_SHOW_DRM)
-            .long(ARG_SHOW_DRM)
-            .takes_value(false)
-            .help("Print drm values"));
-
-    #[cfg(feature = "nvml")]
-    let a = a
-
-        .arg(Arg::with_name(ARG_SHOW_NVML)
-            .long(ARG_SHOW_NVML)
-            .takes_value(false)
-            .help("Print nvidia management values"));
-
-    let a = a
-
-        .arg(Arg::with_name(ARG_SHOW_PSTATE)
-            .long(ARG_SHOW_PSTATE)
-            .takes_value(false)
-            .help("Print intel-pstate values"))
-
-        .arg(Arg::with_name(ARG_SHOW_RAPL)
-            .long(ARG_SHOW_RAPL)
-            .takes_value(false)
-            .help("Print intel-rapl values"))
-
-        .arg(Arg::with_name(ARG_CPU)
-            .short("c")
-            .long(ARG_CPU)
-            .takes_value(true)
-            .value_name("IDS")
-            .help("Target cpu ids, default all, ex. 0,1,3-5"))
-
-        .arg(Arg::with_name(ARG_CPU_ONLINE)
-            .short("o")
-            .long(ARG_CPU_ONLINE)
-            .takes_value(true)
-            .value_name("BOOL")
-            .help("Set cpu online status per --cpu"))
-
-        .arg(Arg::with_name(ARG_CPUFREQ_GOV)
-            .short("g")
-            .long(ARG_CPUFREQ_GOV)
-            .takes_value(true)
-            .value_name("STR")
-            .help("Set cpufreq governor per --cpu"))
-
-        .arg(Arg::with_name(ARG_CPUFREQ_MIN)
-            .short("n")
-            .long(ARG_CPUFREQ_MIN)
-            .takes_value(true)
-            .value_name("HERTZ")
-            .help("Set cpufreq min freq per --cpu, ex. 1200 or 1.2ghz"))
-
-        .arg(Arg::with_name(ARG_CPUFREQ_MAX)
-            .short("x")
-            .long(ARG_CPUFREQ_MAX)
-            .takes_value(true)
-            .value_name("HERTZ")
-            .help("Set cpufreq max freq per --cpu, ex. 1200 or 1.2ghz"))
-
-        .arg(Arg::with_name(ARG_DRM_I915)
-            .long(ARG_DRM_I915)
-            .takes_value(true)
-            .value_name("IDS")
-            .help("Target i915 card ids or pci ids, default all, ex. 0,1,3-5"))
-
-        .arg(Arg::with_name(ARG_DRM_I915_MIN)
-            .long(ARG_DRM_I915_MIN)
-            .takes_value(true)
-            .value_name("HERTZ")
-            .help("Set i915 min frequency per --drm-i915, ex. 1200 or 1.2ghz"))
-
-        .arg(Arg::with_name(ARG_DRM_I915_MAX)
-            .long(ARG_DRM_I915_MAX)
-            .takes_value(true)
-            .value_name("HERTZ")
-            .help("Set i915 max frequency per --drm-i915, ex. 1200 or 1.2ghz"))
-
-        .arg(Arg::with_name(ARG_DRM_I915_BOOST)
-            .long(ARG_DRM_I915_BOOST)
-            .takes_value(true)
-            .value_name("HERTZ")
-            .help("Set i915 boost frequency per --drm-i915, ex. 1200 or 1.2ghz"));
-
-    #[cfg(feature = "nvml")]
-    let a = a
-
-        .arg(Arg::with_name(ARG_NVML)
-            .long(ARG_NVML)
-            .takes_value(true)
-            .value_name("IDS")
-            .help("Target nvidia card ids or pci ids, default all, ex. 0,1,3-5"))
-
-        .arg(Arg::with_name(ARG_NVML_GPU_MIN)
-            .long(ARG_NVML_GPU_MIN)
-            .takes_value(true)
-            .value_name("HERTZ")
-            .help("Set nvidia gpu min frequency per --nvml, ex. 1200 or 1.2ghz")
-            .requires(ARG_NVML_GPU_MAX))
-
-        .arg(Arg::with_name(ARG_NVML_GPU_MAX)
-            .long(ARG_NVML_GPU_MAX)
-            .takes_value(true)
-            .value_name("HERTZ")
-            .help("Set nvidia gpu max frequency per --nvml, ex. 1200 or 1.2ghz")
-            .requires(ARG_NVML_GPU_MIN))
-
-        .arg(Arg::with_name(ARG_NVML_GPU_RESET)
-            .long(ARG_NVML_GPU_RESET)
-            .takes_value(false)
-            .conflicts_with("nvml-gpu-freq")
-            .help("Reset nvidia gpu frequency to default per --nvml"))
-
-        .arg(Arg::with_name(ARG_NVML_POWER_LIMIT)
-            .long(ARG_NVML_POWER_LIMIT)
-            .takes_value(true)
-            .value_name("WATTS")
-            .help("Set nvidia card power limit per --nvml"));
-
-    let a = a
-
-        .arg(Arg::with_name(ARG_PSTATE_EPB)
-            .long(ARG_PSTATE_EPB)
-            .takes_value(true)
-            .value_name("0-15")
-            .help("Set intel-pstate energy/performance bias per --cpu"))
-
-        .arg(Arg::with_name(ARG_PSTATE_EPP)
-            .long(ARG_PSTATE_EPP)
-            .takes_value(true)
-            .value_name("STR")
-            .help("Set intel-pstate energy/performance pref per --cpu"))
-
-        .arg(Arg::with_name(ARG_RAPL_PACKAGE)
-            .short("P")
-            .long(ARG_RAPL_PACKAGE)
-            .takes_value(true)
-            .value_name("INT")
-            .help("Target intel-rapl package"))
-
-        .arg(Arg::with_name(ARG_RAPL_ZONE)
-            .short("Z")
-            .long(ARG_RAPL_ZONE)
-            .takes_value(true)
-            .value_name("INT")
-            .help("Target intel-rapl sub-zone"))
-
-        .arg(Arg::with_name(ARG_RAPL_LONG_LIMIT)
-            .short("L")
-            .long(ARG_RAPL_LONG_LIMIT)
-            .takes_value(true)
-            .value_name("WATTS")
-            .help("Set intel-rapl long_term power limit per --rapl-package/zone")
-            .requires(ARG_RAPL_PACKAGE))
-
-        .arg(Arg::with_name(ARG_RAPL_LONG_WINDOW)
-            .long(ARG_RAPL_LONG_WINDOW)
-            .takes_value(true)
-            .value_name("SECS")
-            .help("Set intel-rapl long_term time window per --rapl-package/zone")
-            .requires(ARG_RAPL_PACKAGE))
-
-        .arg(Arg::with_name(ARG_RAPL_SHORT_LIMIT)
-            .short("S")
-            .long(ARG_RAPL_SHORT_LIMIT)
-            .takes_value(true)
-            .value_name("WATTS")
-            .help("Set intel-rapl short_term power limit per --rapl-package/zone")
-            .requires(ARG_RAPL_PACKAGE))
-
-        .arg(Arg::with_name(ARG_RAPL_SHORT_WINDOW)
-            .long(ARG_RAPL_SHORT_WINDOW)
-            .takes_value(true)
-            .value_name("SECS")
-            .help("Set intel-rapl short_term time window per --rapl-package/zone")
-            .requires(ARG_RAPL_PACKAGE))
-
-        .arg(Arg::with_name("CHAIN")
-            .raw(true));
-
-    a
-}
-
-// Build a clap error.
-// fn clap_error(kind: clap::ErrorKind, message: String) -> clap::Error {
-//     let info = None;
-//     clap::Error { message, kind, info }
-// }
 
 // Convert a cli flag name to an environment variable name.
 fn env_name(cli_name: &str) -> String {
@@ -327,7 +119,7 @@ fn arg_int<T: FromStr<Err = std::num::ParseIntError>>(name: &str, m: &clap::ArgM
     {
         Some(v) => Ok(Some(
             T::from_str(&v)
-                .map_err(|_| Error::parse_flag(name, "expected integer value".into()))?
+                .map_err(|_| Error::parse_flag(name, "Expected integer value".into()))?
         )),
         None => Ok(None),
     }
@@ -378,7 +170,7 @@ impl<'a> TryFrom<clap::ArgMatches<'a>> for crate::Knobs {
 }
 
 #[derive(Clone, Debug)]
-struct Cli {
+pub struct Cli {
     pub quiet: Option<()>,
     pub show_cpu: Option<()>,
     pub show_drm: Option<()>,
@@ -391,8 +183,218 @@ struct Cli {
 
 impl Cli {
 
+    // Build and return a clap app.
+    fn app(argv0: &str) -> clap::App {
+        use clap::{App, AppSettings, Arg, crate_version};
+
+        let a = App::new(argv0)
+
+            .setting(AppSettings::DeriveDisplayOrder)
+            .setting(AppSettings::DisableHelpSubcommand)
+            .setting(AppSettings::DisableVersion)
+            .setting(AppSettings::TrailingVarArg)
+            .setting(AppSettings::UnifiedHelpMessage)
+
+            .version(crate_version!())
+
+            .after_help(AFTER_HELP)
+
+            .arg(Arg::with_name(ARG_QUIET)
+                .short("q")
+                .long(ARG_QUIET)
+                .takes_value(false)
+                .help("Do not print values"))
+
+            .arg(Arg::with_name(ARG_SHOW_CPU)
+                .long(ARG_SHOW_CPU)
+                .takes_value(false)
+                .help("Print cpu and cpufreq values"))
+
+            .arg(Arg::with_name(ARG_SHOW_DRM)
+                .long(ARG_SHOW_DRM)
+                .takes_value(false)
+                .help("Print drm values"));
+
+        #[cfg(feature = "nvml")]
+        let a = a
+
+            .arg(Arg::with_name(ARG_SHOW_NVML)
+                .long(ARG_SHOW_NVML)
+                .takes_value(false)
+                .help("Print nvidia management values"));
+
+        let a = a
+
+            .arg(Arg::with_name(ARG_SHOW_PSTATE)
+                .long(ARG_SHOW_PSTATE)
+                .takes_value(false)
+                .help("Print intel-pstate values"))
+
+            .arg(Arg::with_name(ARG_SHOW_RAPL)
+                .long(ARG_SHOW_RAPL)
+                .takes_value(false)
+                .help("Print intel-rapl values"))
+
+            .arg(Arg::with_name(ARG_CPU)
+                .short("c")
+                .long(ARG_CPU)
+                .takes_value(true)
+                .value_name("IDS")
+                .help("Target cpu ids, default all, ex. 0,1,3-5"))
+
+            .arg(Arg::with_name(ARG_CPU_ONLINE)
+                .short("o")
+                .long(ARG_CPU_ONLINE)
+                .takes_value(true)
+                .value_name("BOOL")
+                .help("Set cpu online status per --cpu"))
+
+            .arg(Arg::with_name(ARG_CPUFREQ_GOV)
+                .short("g")
+                .long(ARG_CPUFREQ_GOV)
+                .takes_value(true)
+                .value_name("STR")
+                .help("Set cpufreq governor per --cpu"))
+
+            .arg(Arg::with_name(ARG_CPUFREQ_MIN)
+                .short("n")
+                .long(ARG_CPUFREQ_MIN)
+                .takes_value(true)
+                .value_name("HERTZ")
+                .help("Set cpufreq min freq per --cpu, ex. 1200 or 1.2ghz"))
+
+            .arg(Arg::with_name(ARG_CPUFREQ_MAX)
+                .short("x")
+                .long(ARG_CPUFREQ_MAX)
+                .takes_value(true)
+                .value_name("HERTZ")
+                .help("Set cpufreq max freq per --cpu, ex. 1200 or 1.2ghz"))
+
+            .arg(Arg::with_name(ARG_DRM_I915)
+                .long(ARG_DRM_I915)
+                .takes_value(true)
+                .value_name("IDS")
+                .help("Target i915 card ids or pci ids, default all, ex. 0,1,3-5"))
+
+            .arg(Arg::with_name(ARG_DRM_I915_MIN)
+                .long(ARG_DRM_I915_MIN)
+                .takes_value(true)
+                .value_name("HERTZ")
+                .help("Set i915 min frequency per --drm-i915, ex. 1200 or 1.2ghz"))
+
+            .arg(Arg::with_name(ARG_DRM_I915_MAX)
+                .long(ARG_DRM_I915_MAX)
+                .takes_value(true)
+                .value_name("HERTZ")
+                .help("Set i915 max frequency per --drm-i915, ex. 1200 or 1.2ghz"))
+
+            .arg(Arg::with_name(ARG_DRM_I915_BOOST)
+                .long(ARG_DRM_I915_BOOST)
+                .takes_value(true)
+                .value_name("HERTZ")
+                .help("Set i915 boost frequency per --drm-i915, ex. 1200 or 1.2ghz"));
+
+        #[cfg(feature = "nvml")]
+        let a = a
+
+            .arg(Arg::with_name(ARG_NVML)
+                .long(ARG_NVML)
+                .takes_value(true)
+                .value_name("IDS")
+                .help("Target nvidia card ids or pci ids, default all, ex. 0,1,3-5"))
+
+            .arg(Arg::with_name(ARG_NVML_GPU_MIN)
+                .long(ARG_NVML_GPU_MIN)
+                .takes_value(true)
+                .value_name("HERTZ")
+                .help("Set nvidia gpu min frequency per --nvml, ex. 1200 or 1.2ghz")
+                .requires(ARG_NVML_GPU_MAX))
+
+            .arg(Arg::with_name(ARG_NVML_GPU_MAX)
+                .long(ARG_NVML_GPU_MAX)
+                .takes_value(true)
+                .value_name("HERTZ")
+                .help("Set nvidia gpu max frequency per --nvml, ex. 1200 or 1.2ghz")
+                .requires(ARG_NVML_GPU_MIN))
+
+            .arg(Arg::with_name(ARG_NVML_GPU_RESET)
+                .long(ARG_NVML_GPU_RESET)
+                .takes_value(false)
+                .conflicts_with("nvml-gpu-freq")
+                .help("Reset nvidia gpu frequency to default per --nvml"))
+
+            .arg(Arg::with_name(ARG_NVML_POWER_LIMIT)
+                .long(ARG_NVML_POWER_LIMIT)
+                .takes_value(true)
+                .value_name("WATTS")
+                .help("Set nvidia card power limit per --nvml"));
+
+        let a = a
+
+            .arg(Arg::with_name(ARG_PSTATE_EPB)
+                .long(ARG_PSTATE_EPB)
+                .takes_value(true)
+                .value_name("0-15")
+                .help("Set intel-pstate energy/performance bias per --cpu"))
+
+            .arg(Arg::with_name(ARG_PSTATE_EPP)
+                .long(ARG_PSTATE_EPP)
+                .takes_value(true)
+                .value_name("STR")
+                .help("Set intel-pstate energy/performance pref per --cpu"))
+
+            .arg(Arg::with_name(ARG_RAPL_PACKAGE)
+                .short("P")
+                .long(ARG_RAPL_PACKAGE)
+                .takes_value(true)
+                .value_name("INT")
+                .help("Target intel-rapl package"))
+
+            .arg(Arg::with_name(ARG_RAPL_ZONE)
+                .short("Z")
+                .long(ARG_RAPL_ZONE)
+                .takes_value(true)
+                .value_name("INT")
+                .help("Target intel-rapl sub-zone"))
+
+            .arg(Arg::with_name(ARG_RAPL_LONG_LIMIT)
+                .short("L")
+                .long(ARG_RAPL_LONG_LIMIT)
+                .takes_value(true)
+                .value_name("WATTS")
+                .help("Set intel-rapl long_term power limit per --rapl-package/zone")
+                .requires(ARG_RAPL_PACKAGE))
+
+            .arg(Arg::with_name(ARG_RAPL_LONG_WINDOW)
+                .long(ARG_RAPL_LONG_WINDOW)
+                .takes_value(true)
+                .value_name("SECS")
+                .help("Set intel-rapl long_term time window per --rapl-package/zone")
+                .requires(ARG_RAPL_PACKAGE))
+
+            .arg(Arg::with_name(ARG_RAPL_SHORT_LIMIT)
+                .short("S")
+                .long(ARG_RAPL_SHORT_LIMIT)
+                .takes_value(true)
+                .value_name("WATTS")
+                .help("Set intel-rapl short_term power limit per --rapl-package/zone")
+                .requires(ARG_RAPL_PACKAGE))
+
+            .arg(Arg::with_name(ARG_RAPL_SHORT_WINDOW)
+                .long(ARG_RAPL_SHORT_WINDOW)
+                .takes_value(true)
+                .value_name("SECS")
+                .help("Set intel-rapl short_term time window per --rapl-package/zone")
+                .requires(ARG_RAPL_PACKAGE))
+
+            .arg(Arg::with_name("CHAIN")
+                .raw(true));
+
+        a
+    }
+
     // Parse and return the knobs call chain.
-    fn chain(a: clap::App, m: clap::ArgMatches) -> Result<crate::Chain> {
+    fn chain(m: clap::ArgMatches) -> Result<crate::Chain> {
         let mut chain: Vec<crate::Knobs> = vec![];
         let mut argv: Vec<String>;
         let mut m = m;
@@ -403,9 +405,9 @@ impl Cli {
                 Some(c) => {
                     let chain_args: Vec<String> = c.map(String::from).collect();
                     if chain_args.is_empty() { break; }
-                    argv = vec!["knobs".to_string()];
+                    argv = vec![NAME.to_string()];
                     argv.extend(chain_args.into_iter());
-                    a.clone().get_matches_from_safe(&argv)?
+                    Self::app(NAME).get_matches_from_safe(&argv)?
                 },
                 None => break,
             }
@@ -418,13 +420,12 @@ impl Cli {
     // latter case, this function will fill in the default resource ids as
     // required.
     async fn resolve(mut chain: crate::Chain) -> crate::Chain {
-
         for k in chain.iter_mut() {
             if k.has_cpu_related_values() && k.cpu.is_none() {
-                k.cpu = crate::data::ResourceIdCache::cpu().await;
+                k.cpu = CpuIdsOnce::get().await;
             }
             if k.has_drm_i915_values() && k.drm_i915.is_none() {
-                k.drm_i915 = crate::data::ResourceIdCache::drm_i915().await
+                k.drm_i915 = DrmI915IdsOnce::get().await
                     .map(|ids| ids
                         .into_iter()
                         .map(crate::CardId::Id)
@@ -432,7 +433,7 @@ impl Cli {
             }
             #[cfg(feature = "nvml")]
             if k.has_nvml_values() && k.nvml.is_none() {
-                k.nvml = crate::data::ResourceIdCache::nvml().await
+                k.nvml = NvmlIdsOnce::get().await
                     .map(|ids| ids
                         .into_iter()
                         .map(crate::CardId::Id)
@@ -444,21 +445,16 @@ impl Cli {
 
     // Determine the binary name from argv[0].
     fn argv0(argv: &[String]) -> &str {
-        const DEFAULT: &str = "knobs";
         argv
             .first()
-            .map(|s| s.as_str())
-            .unwrap_or(DEFAULT)
-            .split('/')
-            .last()
-            .unwrap_or(DEFAULT)
+            .and_then(|s| s.as_str().split('/').last())
+            .unwrap_or(NAME)
     }
 
-
     // Parse command-line arguments.
-    pub async fn parse(argv: &[String]) -> Result<Self> {
-        let a = app(Self::argv0(argv));
-        let m = a.clone().get_matches_from_safe(argv)?;
+    pub async fn from_args(argv: &[String]) -> Result<Self> {
+        let a = Self::app(Self::argv0(argv));
+        let m = a.get_matches_from_safe(argv)?;
         let s = Self {
             quiet: flag(ARG_QUIET, &m),
             show_cpu: flag(ARG_SHOW_CPU, &m),
@@ -467,11 +463,12 @@ impl Cli {
             show_nvml: flag(ARG_SHOW_NVML, &m),
             show_pstate: flag(ARG_SHOW_PSTATE, &m),
             show_rapl: flag(ARG_SHOW_RAPL, &m),
-            chain: Self::resolve(Self::chain(a, m)?).await,
+            chain: Self::resolve(Self::chain(m)?).await,
         };
         Ok(s)
     }
 
+    // Return true if --show-* args are present.
     fn has_show_args(&self) -> bool {
         let b = self.show_cpu.is_some() ||
             self.show_drm.is_some() ||
@@ -482,20 +479,17 @@ impl Cli {
         b
     }
 
-    const WAIT_FOR_RAPL: Duration = Duration::from_millis(400);
-
     // Command-line interface app logic.
     pub async fn run(&self) -> Result<()> {
-        use crate::format::Format as _;
+        use crate::format::FormatValues as _;
 
-        RuntimeCounter::initialize().await;
+        CounterOnce::init().await;
 
         let show_all = !self.has_show_args();
 
         let rapl_samplers =
             if self.quiet.is_none() && (show_all || self.show_rapl.is_some()) {
-                RaplEnergySamplersInstance::initialize().await;
-                if let Some(mut s) = RaplEnergySamplersInstance::get().await {
+                if let Some(mut s) = RaplSamplersOnce::get().await {
                     s.start().await;
                     Some(s)
                 } else { None }
@@ -504,6 +498,15 @@ impl Cli {
         self.chain.apply_values().await;
 
         if self.quiet.is_some() { return Ok(()); }
+
+        if let Some(samplers) = rapl_samplers.as_ref() {
+            if samplers.working().await {
+                let runtime = CounterOnce::get().await;
+                if runtime < RaplSamplersOnce::MIN_RUNTIME {
+                    sleep(RaplSamplersOnce::MIN_RUNTIME - runtime).await;
+                }
+            }
+        }
 
         let mut s = Vec::with_capacity(3000);
 
@@ -523,21 +526,13 @@ impl Cli {
 
         if show_all || self.show_rapl.is_some() {
             if let Some(intel_rapl) = sysfs::intel_rapl::IntelRapl::read(()).await {
-
-                if let Some(mut samplers) = rapl_samplers {
-                    if samplers.working().await {
-                        let runtime = RuntimeCounter::get().await;
-                        if runtime < Self::WAIT_FOR_RAPL {
-                            sleep(Self::WAIT_FOR_RAPL - runtime).await;
-                        }
-                    }
-                    intel_rapl.format_values(&mut s, Some(samplers.clone())).await?;
-                    samplers.stop().await;
-                    samplers.clear().await;
-                } else {
-                    intel_rapl.format_values(&mut s, None).await?;
-                }
+                intel_rapl.format_values(&mut s, rapl_samplers.clone()).await?;
             }
+        }
+
+        if let Some(mut samplers) = rapl_samplers {
+            samplers.stop().await;
+            samplers.clear().await; // XXX
         }
 
         if show_all || self.show_drm.is_some() {
@@ -548,8 +543,7 @@ impl Cli {
 
         #[cfg(feature = "nvml")]
         if show_all || self.show_nvml.is_some() {
-            use nvml_facade::Nvml;
-            Nvml.format_values(&mut s, ()).await?;
+            nvml_facade::Nvml.format_values(&mut s, ()).await?;
         }
 
         println!("{}", String::from_utf8_lossy(&s).trim_end());
@@ -561,9 +555,8 @@ impl Cli {
 pub struct App;
 
 impl App {
-
     // Configure logging env vars and default configuration.
-    fn setup_logging() {
+    pub fn setup_logging() {
         use std::io::Write;
 
         use env_logger::{Builder, Env};
@@ -577,11 +570,10 @@ impl App {
             .init();
     }
 
-    // Run the app.
-    pub async fn run() -> Result<()> {
+    // Run the app with args.
+    pub async fn run_with_args(args: &[String]) -> Result<()> {
         Self::setup_logging();
-        let args: Vec<String> = std::env::args().collect();
-        match Cli::parse(&args).await {
+        match Cli::from_args(args).await {
             Ok(cli) => cli.run().await,
             Err(err) => {
                 if let Error::Clap(e) = &err {
@@ -594,5 +586,114 @@ impl App {
                 std::process::exit(1);
             },
         }
+    }
+
+    // Run the app.
+    pub async fn run() -> Result<()> {
+        let args: Vec<String> = std::env::args().collect();
+        Self::run_with_args(&args).await
+    }
+}
+
+// Once of the `Instant` it was initialized.
+#[derive(Clone, Debug)]
+struct CounterOnce;
+
+impl CounterOnce {
+    pub async fn get() -> Duration {
+        static START: OnceCell<Instant> = OnceCell::const_new();
+        async fn make() -> Instant { Instant::now() }
+        let then = *START.get_or_init(make).await;
+        Instant::now() - then
+    }
+
+    pub async fn init() { Self::get().await; }
+}
+
+// Once of cpu ids.
+#[derive(Clone, Debug)]
+struct CpuIdsOnce;
+
+impl CpuIdsOnce {
+    pub async fn get() -> Option<Vec<u64>> {
+        static CPU_IDS: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
+        async fn ids() -> Option<Vec<u64>> { sysfs::cpu::Policy::ids().await }
+        CPU_IDS.get_or_init(ids).await.clone()
+    }
+}
+
+// Once of drm card ids.
+#[derive(Clone, Debug)]
+struct DrmIdsOnce;
+
+impl DrmIdsOnce {
+    pub async fn get() -> Option<Vec<u64>> {
+        static DRM_IDS: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
+        async fn ids() -> Option<Vec<u64>> { sysfs::drm::Card::ids().await }
+        DRM_IDS.get_or_init(ids).await.clone()
+    }
+}
+
+// Once of i915 card ids.
+#[derive(Clone, Debug)]
+struct DrmI915IdsOnce;
+
+impl DrmI915IdsOnce {
+    pub async fn get() -> Option<Vec<u64>> {
+        use sysfs::drm::io::tokio::driver;
+        static DRM_I915_IDS: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
+        async fn ids() -> Option<Vec<u64>> {
+            let mut ids = vec![];
+            if let Some(drm_ids) = DrmIdsOnce::get().await {
+                for id in drm_ids {
+                    if let Ok("i915") = driver(id).await.as_deref() {
+                        ids.push(id);
+                    }
+                }
+            }
+            if ids.is_empty() { None } else { Some(ids) }
+        }
+        DRM_I915_IDS.get_or_init(ids).await.clone()
+    }
+}
+
+// Once of nvml card ids.
+#[cfg(feature = "nvml")]
+#[derive(Clone, Debug)]
+struct NvmlIdsOnce;
+
+#[cfg(feature = "nvml")]
+impl NvmlIdsOnce {
+    pub async fn get() -> Option<Vec<u64>> {
+        static NVML_IDS: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
+        async fn ids() -> Option<Vec<u64>> {
+            nvml_facade::Nvml::ids()
+                .map(|ids| ids.into_iter().map(u64::from).collect())
+        }
+        NVML_IDS.get_or_init(ids).await.clone()
+    }
+}
+
+// Once of `RaplEnergySamplers`. Don't forget to start it.
+#[derive(Clone, Debug)]
+struct RaplSamplersOnce;
+
+impl RaplSamplersOnce {
+
+    // the min amount of time we would we would like to collect before being asked for a value
+    pub const MIN_RUNTIME: Duration = Duration::from_millis(400);
+
+    const INTERVAL: Duration = Duration::from_millis(100);
+    const COUNT: usize = 11;
+
+    pub async fn get() -> Option<RaplSamplers> {
+        static RAPL_ENERGY_SAMPLERS: OnceCell<Option<RaplSamplers>> = OnceCell::const_new();
+        async fn samplers() -> Option<RaplSamplers> {
+            RaplSampler::all(
+                RaplSamplersOnce::INTERVAL,
+                RaplSamplersOnce::COUNT
+            ).await.map(|c| c.into())
+        }
+        RAPL_ENERGY_SAMPLERS.get_or_init(samplers).await.clone()
     }
 }

@@ -1,4 +1,3 @@
-use log::{Level, info, log_enabled, trace};
 use measurements::{Frequency, Power};
 use serde::{Deserialize, Deserializer, de::Error as _};
 use zysfs::types::{self as sysfs, tokio::Write as _};
@@ -10,7 +9,7 @@ pub mod data;
 pub mod format;
 pub mod policy;
 
-pub use format::Format;
+pub use format::FormatValues;
 
 pub use measurements;
 #[cfg(feature = "nvml")]
@@ -93,6 +92,7 @@ impl FromStr for Indices {
 
     fn from_str(s: &str) -> Result<Self> {
         let mut ids = vec![];
+        let s = s.trim_end_matches(',');
         for item in s.split(',') {
             let s: Vec<&str> = item.split('-').collect();
             match &s[..] {
@@ -588,35 +588,34 @@ impl Chain {
         ids
     }
 
-    const PAUSE_FOR_SYSFS: Duration = Duration::from_millis(200);
+    const CPU_ONOFFLINE_WAIT: Duration = Duration::from_millis(200);
 
-    async fn pause_for_sysfs() { sleep(Self::PAUSE_FOR_SYSFS).await }
+    async fn cpu_onoffline_wait() { sleep(Self::CPU_ONOFFLINE_WAIT).await }
 
     pub async fn apply_values(&self) {
-        if log_enabled!(Level::Trace) {
+        if log::log_enabled!(log::Level::Trace) {
             for (i, k) in self.iter().enumerate() {
-                trace!("Group {}", i);
-                trace!("{:#?}", k);
+                log::trace!("Group {}", i);
+                log::trace!("{:#?}", k);
             }
         }
-
         if self.has_cpufreq_values() || self.has_pstate_values() {
             let cpu_ids = policy::set_cpus_online(self.cpu()).await;
-            if !cpu_ids.is_empty() { Self::pause_for_sysfs().await; }
+            if !cpu_ids.is_empty() { Self::cpu_onoffline_wait().await; }
 
             for (i, k) in self.0.iter().enumerate() {
-                info!("Group {} Pass 0", i);
+                log::info!("Group {} Pass 0", i);
                 k.apply_cpufreq_values().await;
                 k.apply_pstate_values().await;
             }
 
             let cpu_ids = policy::set_cpus_offline(cpu_ids).await;
-            if !cpu_ids.is_empty() { Self::pause_for_sysfs().await; }
+            if !cpu_ids.is_empty() { Self::cpu_onoffline_wait().await; }
         }
         for (i, k) in self.0.iter().enumerate() {
-            info!("Group {} Pass 1", i);
+            log::info!("Group {} Pass 1", i);
             k.apply_cpu_values().await;
-            if k.has_cpu_values() { Self::pause_for_sysfs().await; }
+            if k.has_cpu_values() { Self::cpu_onoffline_wait().await; }
             k.apply_rapl_values().await;
             k.apply_drm_values().await;
             #[cfg(feature = "nvml")]

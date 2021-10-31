@@ -2,77 +2,12 @@ use zysfs::types as sysfs;
 use zysfs::types::tokio::Read as _;
 use zysfs::io::intel_rapl::tokio::energy_uj;
 use std::{collections::{HashMap, VecDeque}, sync::{Arc, atomic::{AtomicBool, Ordering}}, time::{Duration, Instant}};
-use tokio::{
-    sync::{Mutex, OnceCell},
-    time::sleep,
-};
+use tokio::{sync::Mutex, time::sleep};
 use measurements::Power;
 
-// Simple runtime counter. Initialized on the first get.
+// Samples rapl energy usage at a regular interval.
 #[derive(Clone, Debug)]
-pub(crate) struct RuntimeCounter;
-
-impl RuntimeCounter {
-
-    pub async fn get() -> Duration {
-        static START: OnceCell<Instant> = OnceCell::const_new();
-        async fn make() -> Instant { Instant::now() }
-        let then = *START.get_or_init(make).await;
-        Instant::now() - then
-    }
-
-    pub async fn initialize() { Self::get().await; }
-}
-
-// Cache resource ids to eliminate unnecessary sysfs io. Automatic lazy initialization.
-#[derive(Clone, Debug)]
-pub(crate) struct ResourceIdCache;
-
-impl ResourceIdCache {
-
-    pub async fn cpu() -> Option<Vec<u64>> {
-        static CPU_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
-        async fn ids() -> Option<Vec<u64>> { sysfs::cpu::Policy::ids().await }
-        CPU_IDS_CACHED.get_or_init(ids).await.clone()
-    }
-
-    pub async fn drm() -> Option<Vec<u64>> {
-        static DRM_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
-        async fn ids() -> Option<Vec<u64>> { sysfs::drm::Card::ids().await }
-        DRM_IDS_CACHED.get_or_init(ids).await.clone()
-    }
-
-    pub async fn drm_i915() -> Option<Vec<u64>> {
-        use sysfs::drm::io::tokio::driver;
-        static DRM_I915_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
-        async fn ids() -> Option<Vec<u64>> {
-            let mut ids = vec![];
-            if let Some(drm_ids) = ResourceIdCache::drm().await {
-                for id in drm_ids {
-                    if let Ok("i915") = driver(id).await.as_deref() {
-                        ids.push(id);
-                    }
-                }
-            }
-            if ids.is_empty() { None } else { Some(ids) }
-        }
-        DRM_I915_IDS_CACHED.get_or_init(ids).await.clone()
-    }
-
-    #[cfg(feature = "nvml")]
-    pub async fn nvml() -> Option<Vec<u64>> {
-        static NVML_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
-        async fn ids() -> Option<Vec<u64>> {
-            nvml_facade::Nvml::ids()
-                .map(|ids| ids.into_iter().map(u64::from).collect())
-        }
-        NVML_IDS_CACHED.get_or_init(ids).await.clone()
-    }
-}
-
-// Sample rapl energy usage at a regular interval.
-#[derive(Clone, Debug)]
-pub struct RaplEnergySampler {
+pub struct RaplSampler {
     zone: sysfs::intel_rapl::ZoneId,
     interval: Duration,
     count: usize,
@@ -80,15 +15,14 @@ pub struct RaplEnergySampler {
     working: Arc<AtomicBool>,
 }
 
-impl RaplEnergySampler {
+impl RaplSampler {
 
-    pub async fn all(interval: Duration, count: usize) -> Option<Vec<RaplEnergySampler>> {
+    pub async fn all(interval: Duration, count: usize) -> Option<Vec<RaplSampler>> {
         sysfs::intel_rapl::Policy::ids().await
             .map(|zones| zones
                 .into_iter()
                 .map(|zone| Self::new(zone, interval, count))
-                .collect::<Vec<RaplEnergySampler>>())
-            .and_then(|s| if s.is_empty() { None } else { Some(s) })
+                .collect())
     }
 
     pub fn new(zone: sysfs::intel_rapl::ZoneId, interval: Duration, count: usize) -> Self {
@@ -112,10 +46,10 @@ impl RaplEnergySampler {
         while self.working() {
             match self.poll().await {
                 Some(v) => {
-                    let mut guard = self.values.lock().await;
-                    guard.push_back(v);
-                    while guard.len() > self.count { guard.pop_front(); }
-                    drop(guard);
+                    let mut values = self.values.lock().await;
+                    values.push_back(v);
+                    while values.len() > self.count { values.pop_front(); }
+                    drop(values);
                 },
                 None => {
                     self.swap_working(false);
@@ -157,11 +91,11 @@ impl RaplEnergySampler {
 
 // Manage a collection of `RaplEnergySampler`s.
 #[derive(Clone, Debug)]
-pub struct RaplEnergySamplers {
-    samplers: HashMap<sysfs::intel_rapl::ZoneId, RaplEnergySampler>,
+pub struct RaplSamplers {
+    samplers: HashMap<sysfs::intel_rapl::ZoneId, RaplSampler>,
 }
 
-impl RaplEnergySamplers {
+impl RaplSamplers {
 
     pub async fn working(&self) -> bool { self.samplers.values().any(|s| s.working()) }
 
@@ -176,8 +110,8 @@ impl RaplEnergySamplers {
     }
 }
 
-impl From<Vec<RaplEnergySampler>> for RaplEnergySamplers {
-    fn from(v: Vec<RaplEnergySampler>) -> Self {
+impl From<Vec<RaplSampler>> for RaplSamplers {
+    fn from(v: Vec<RaplSampler>) -> Self {
         let samplers = v
             .into_iter()
             .map(|c| (c.zone(), c))
@@ -185,37 +119,5 @@ impl From<Vec<RaplEnergySampler>> for RaplEnergySamplers {
         Self {
             samplers,
         }
-    }
-}
-
-// Static instance of for `RaplEnergySamplers`. Must be initialized.
-#[derive(Clone, Debug)]
-pub struct RaplEnergySamplersInstance;
-
-static RAPL_ENERGY_SAMPLERS: OnceCell<Option<RaplEnergySamplers>> = OnceCell::const_new();
-
-impl RaplEnergySamplersInstance {
-
-    const INTERVAL: Duration = Duration::from_millis(100);
-    const COUNT: usize = 11;
-
-    async fn get_or_init() -> Option<RaplEnergySamplers> {
-        async fn samplers() -> Option<RaplEnergySamplers> {
-            RaplEnergySampler::all(
-                RaplEnergySamplersInstance::INTERVAL,
-                RaplEnergySamplersInstance::COUNT
-            ).await.map(|c| c.into())
-        }
-        RAPL_ENERGY_SAMPLERS.get_or_init(samplers).await.clone()
-    }
-
-    pub fn initialized() -> bool { RAPL_ENERGY_SAMPLERS.initialized() }
-
-    pub async fn initialize() {
-        if let Some(mut s) = Self::get_or_init().await { s.clear().await; }
-    }
-
-    pub async fn get() -> Option<RaplEnergySamplers> {
-        if Self::initialized() { Self::get_or_init().await } else { None }
     }
 }
