@@ -1,6 +1,6 @@
 # knobs
 
-A command-line utility and library for viewing and setting Linux power and performance values.
+A command-line utility for viewing and setting Linux power and performance values.
 
 Supported knobs:
 
