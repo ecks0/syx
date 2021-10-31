@@ -23,10 +23,10 @@ A contrived example showing all available tables:
 ```
  CPU  Online  Governor   Cur      Min      Max      CPU min  CPU max
  ---  ------  --------   ---      ---      ---      -------  -------
- 0    •       powersave  993 MHz  400 MHz  1.8 GHz  400 MHz  3.4 GHz
- 1    true    powersave  629 MHz  400 MHz  1.8 GHz  400 MHz  3.4 GHz
- 2    true    powersave  600 MHz  400 MHz  1.8 GHz  400 MHz  3.4 GHz
- 3    true    powersave  600 MHz  400 MHz  1.8 GHz  400 MHz  3.4 GHz
+ 0    •       powersave  546 MHz  400 MHz  4.8 GHz  400 MHz  4.8 GHz
+ 1    true    powersave  680 MHz  400 MHz  4.8 GHz  400 MHz  4.8 GHz
+ 2    true    powersave  723 MHz  400 MHz  5.0 GHz  400 MHz  5.0 GHz
+ 3    true    powersave  553 MHz  400 MHz  5.0 GHz  400 MHz  5.0 GHz
 
  CPU  Available governors
  ---  -------------------
@@ -42,13 +42,12 @@ A contrived example showing all available tables:
  ---  ------------------------
  all  default performance balance_performance balance_power power
 
- Zone name  Zone  C0 limit  C1 limit  C0 window    C1 window  Energy
- ---------  ----  --------  --------  ---------    ---------  ------
- package-0  0     4 W       6 W       27983872 us  2440 us    17.763 kJ
- core       0:0   0 W       •         976 us       •          1.760 kJ
- uncore     0:1   0 W       •         976 us       •          944.211 mJ
- dram       0:2   0 W       •         976 us       •          2.704 kJ
- psys       1     0 W       0 W       27983872 us  976 us     1.812 kJ
+ Zone name  Zone  Long lim  Short lim  Long win     Short win  Usage
+ ---------  ----  --------  ---------  --------     ---------  -----
+ package-0  0     28 W      35 W       27983872 us  2440 us    3.8 W/s
+ core       0:0   0 W       •          976 us       •          1.4 W/s
+ uncore     0:1   0 W       •          976 us       •          27.5 mW/s
+ psys       1     0 W       0 W        27983872 us  976 us     98.9 mW/s
 
  Card  Driver  Actual   Req'd    Min      Max      Boost    GPU min  GPU max
  ----  ------  ------   -----    ---      ---      -----    -------  -------
@@ -110,7 +109,7 @@ ARGS:
     <CHAIN>...
 
             BOOL   0, 1, true, false
-             IDS   A comma-delimited sequence of integers and/or integer ranges.
+             IDS   comma-delimited sequence of integers and/or integer ranges
            HERTZ*  mhz when unspecified: hz/h - khz/k - mhz/m - ghz/g - thz/t
             SECS   ms when unspecified: ns/n - us/u - ms/m - s
            WATTS*  mw when unspecified: uw/u - mw/m - w - kw/k
@@ -179,8 +178,8 @@ knobs --nvml 0,1 --nvml-gpu-min 600 --nvml-gpu-max 2.2ghz
 
 ### knobs calls can be chained
 
-#### set cpus 1-3 online
-#### set cpus 4-7 offline
+# set cpus 1-3 online
+# set cpus 4-7 offline
 
 knobs --cpu 1-3 --cpu-online true -- --cpu 4-7 --cpu-online false
 
