@@ -3,10 +3,10 @@ use comfy_table as ct;
 use measurements::{Frequency, Power};
 #[cfg(feature = "nvml")]
 use nvml_facade as nvml;
-use tokio::{io::{AsyncWrite, AsyncWriteExt}, sync::OnceCell};
+use tokio::io::{AsyncWrite, AsyncWriteExt};
 use zysfs::types as sysfs;
-use std::{collections::HashMap, fmt::Display, time::Instant};
-use crate::{Error, Result};
+use std::fmt::Display;
+use crate::{Error, Result, data::RaplEnergySamplers};
 
 pub const DOT: &str = "\u{2022}";
 
@@ -99,17 +99,23 @@ fn nl(mut s: String) -> String { s.push('\n'); s }
 
 #[async_trait]
 pub trait Format {
+    type Arg;
     type Err;
 
-    async fn format_values<W: AsyncWrite + Send + Unpin>(&self, w: &mut W) -> std::result::Result<(), Self::Err>;
+    async fn format_values<W>(&self, w: &mut W, arg: Self::Arg) -> std::result::Result<(), Self::Err>
+    where
+        W: AsyncWrite + Send + Unpin;
 }
 
 #[async_trait]
 impl Format for (sysfs::cpu::Cpu, sysfs::cpufreq::Cpufreq) {
+    type Arg = ();
     type Err = Error;
 
-    async fn format_values<W: AsyncWrite + Send + Unpin>(&self, w: &mut W) -> Result<()> {
-
+    async fn format_values<W>(&self, w: &mut W, _: ()) -> Result<()>
+    where
+        W: AsyncWrite + Send + Unpin
+    {
         fn khz(khz: u64) -> String { format_hz(khz * 10u64.pow(3)) }
 
         fn cpu_cpufreq(cpu: &sysfs::cpu::Cpu, cpufreq: &sysfs::cpufreq::Cpufreq ) -> Option<String> {
@@ -170,10 +176,13 @@ impl Format for (sysfs::cpu::Cpu, sysfs::cpufreq::Cpufreq) {
 
 #[async_trait]
 impl Format for sysfs::drm::Drm {
+    type Arg = ();
     type Err = Error;
 
-    async fn format_values<W: AsyncWrite + Send + Unpin>(&self, w: &mut W) -> Result<()> {
-
+    async fn format_values<W>(&self, w: &mut W, _: ()) -> Result<()>
+    where
+        W: AsyncWrite + Send + Unpin
+    {
         fn mhz(mhz: u64) -> String { format_hz(mhz * 10u64.pow(6)) }
 
         #[allow(clippy::ptr_arg)]
@@ -212,10 +221,13 @@ impl Format for sysfs::drm::Drm {
 #[cfg(feature = "nvml")]
 #[async_trait]
 impl Format for nvml::Nvml {
+    type Arg = ();
     type Err = Error;
 
-    async fn format_values<W: AsyncWrite + Send + Unpin>(&self, w: &mut W) -> Result<()> {
-
+    async fn format_values<W>(&self, w: &mut W, _: ()) -> Result<()>
+    where
+        W: AsyncWrite + Send + Unpin
+    {
         fn mhz(mhz: u32) -> String { format_hz(mhz as u64 * 10u64.pow(6)) }
 
         fn mw(mw: u32) -> String { format_uw(mw as u64 * 10u64.pow(3)) }
@@ -337,9 +349,13 @@ impl Format for nvml::Nvml {
 
 #[async_trait]
 impl Format for sysfs::intel_pstate::IntelPstate {
+    type Arg = ();
     type Err = Error;
 
-    async fn format_values<W: AsyncWrite + Send + Unpin>(&self, w: &mut W) -> Result<()> {
+    async fn format_values<W>(&self, w: &mut W, _: ()) -> Result<()>
+    where
+        W: AsyncWrite + Send + Unpin
+    {
 
         fn system_status(status: &str) -> String {
             format!(" intel_pstate: {}\n\n", status)
@@ -414,87 +430,18 @@ impl Format for sysfs::intel_pstate::IntelPstate {
     }
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct RaplEnergyCounter {
-    zone: sysfs::intel_rapl::ZoneId,
-    start_instant: Instant,
-    start_value: u64,
-}
-
-impl RaplEnergyCounter {
-
-    pub async fn all() -> Option<Vec<RaplEnergyCounter>> {
-        use sysfs::tokio::Read as _;
-        let mut res = vec![];
-        for zone in sysfs::intel_rapl::Policy::ids().await? {
-            if let Some(c) = RaplEnergyCounter::new(zone).await {
-                res.push(c);
-            }
-        }
-        if res.is_empty() { None } else { Some(res) }
-    }
-
-    pub async fn new(zone: sysfs::intel_rapl::ZoneId) -> Option<Self> {
-        use sysfs::intel_rapl::io::tokio::energy_uj;
-        let s = Self {
-            start_instant: Instant::now(),
-            start_value: energy_uj(zone.zone, zone.subzone).await.ok()?,
-            zone,
-        };
-        Some(s)
-    }
-
-    pub async fn value(&self) -> Option<Power> {
-        use sysfs::intel_rapl::io::tokio::energy_uj;
-        energy_uj(self.zone.zone, self.zone.subzone).await
-            .ok()
-            .map(|now_value| {
-                let delta_dur = Instant::now() - self.start_instant;
-                let delta_uj = now_value - self.start_value;
-                let value = delta_uj as f64 * 10f64.powf(6.) / delta_dur.as_micros() as f64;
-                Power::from_microwatts(value as f64)
-            })
-    }
-
-    pub fn zone(&self) -> sysfs::intel_rapl::ZoneId { self.zone }
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct RaplEnergyCounters(HashMap<sysfs::intel_rapl::ZoneId, RaplEnergyCounter>);
-
-impl RaplEnergyCounters {
-
-    pub async fn get() -> Option<&'static RaplEnergyCounters> {
-        static RAPL_ENERGY_COUNTERS: OnceCell<Option<RaplEnergyCounters>> = OnceCell::const_new();
-        async fn counters() -> Option<RaplEnergyCounters> { RaplEnergyCounter::all().await.map(|c| c.into()) }
-        RAPL_ENERGY_COUNTERS.get_or_init(counters).await.as_ref()
-    }
-
-    pub async fn start() { Self::get().await; }
-
-    pub async fn value(&self, zone: sysfs::intel_rapl::ZoneId) -> Option<Power> {
-        if let Some(c) = self.0.get(&zone) { c.value().await } else { None }
-    }
-}
-
-impl From<Vec<RaplEnergyCounter>> for RaplEnergyCounters {
-    fn from(v: Vec<RaplEnergyCounter>) -> Self {
-            RaplEnergyCounters(v
-                .into_iter()
-                .map(|c| (c.zone(), c))
-                .collect())
-    }
-}
-
 #[async_trait]
 impl Format for sysfs::intel_rapl::IntelRapl {
+    type Arg = Option<RaplEnergySamplers>;
     type Err = Error;
 
-    async fn format_values<W: AsyncWrite + Send + Unpin>(&self, w: &mut W) -> Result<()> {
+    async fn format_values<W>(&self, w: &mut W, energy_samplers: Option<RaplEnergySamplers>) -> Result<()>
+    where
+        W: AsyncWrite + Send + Unpin
+    {
         let policies = if let Some(p) = self.policies.as_ref() { p } else { return Ok(()); };
         if policies.is_empty() { return Ok(()); }
         let mut tab = Table::new(&["Zone name", "Zone", "Long lim", "Short lim", "Long win", "Short win", "Usage"]);
-        let energy_counters = RaplEnergyCounters::get().await;
         for policy in policies {
             let id = if let Some(id) = policy.id { id } else { continue; };
             let long = policy.constraints
@@ -507,7 +454,7 @@ impl Format for sysfs::intel_rapl::IntelRapl {
                 .and_then(|v| v
                     .iter()
                     .find(|p| p.name.as_ref().map(|s| s == "short_term").unwrap_or(false)));
-            let power = if let Some(counters) = energy_counters { counters.value(id).await } else { None };
+            let watt_seconds = if let Some(s) = &energy_samplers { s.watt_seconds_max(id).await } else { None };
             tab.row(&[
                 policy.name.clone().unwrap_or_else(dot),
                 format!(
@@ -531,8 +478,8 @@ impl Format for sysfs::intel_rapl::IntelRapl {
                     .and_then(|v| v.time_window_us)
                     .map(|v| format!("{} us", v))
                     .unwrap_or_else(dot),
-                power
-                    .map(|p| if p.as_microwatts() == 0. { "0 W".to_string() } else { format!("{:.1}", p) })
+                watt_seconds
+                    .map(|p| if p.as_microwatts() == 0. { "0 W/s".to_string() } else { format!("{:.1}/s", p) })
                     .unwrap_or_else(dot),
             ]);
         }

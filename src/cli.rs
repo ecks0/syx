@@ -1,8 +1,8 @@
-use log::debug;
 use zysfs::types::{self as sysfs, tokio::Read as _};
-use std::{convert::TryFrom, str::FromStr, time::{Duration, Instant}};
-use tokio::{sync::OnceCell, time::sleep};
+use std::{convert::TryFrom, str::FromStr, time::Duration};
+use tokio::time::sleep;
 use crate::{Error, Result};
+use crate::data::{RuntimeCounter, RaplEnergySamplersInstance};
 
 const ARG_QUIET: &str             = "quiet";
 const ARG_SHOW_CPU: &str          = "show-cpu";
@@ -40,7 +40,7 @@ const ARG_RAPL_SHORT_LIMIT: &str  = "rapl-short-limit";
 const ARG_RAPL_SHORT_WINDOW: &str = "rapl-short-window";
 
 const AFTER_HELP: &str = r#"            BOOL   0, 1, true, false
-             IDS   A comma-delimited sequence of integers and/or integer ranges.
+             IDS   comma-delimited sequence of integers and/or integer ranges
            HERTZ*  mhz when unspecified: hz/h - khz/k - mhz/m - ghz/g - thz/t
             SECS   ms when unspecified: ns/n - us/u - ms/m - s
            WATTS*  mw when unspecified: uw/u - mw/m - w - kw/k
@@ -283,7 +283,7 @@ fn env_name(cli_name: &str) -> String {
 fn env_value(cli_name: &str) -> Option<String> {
     match std::env::var(&env_name(cli_name)) {
         Ok(v) => {
-            debug!("--{}: using value from environment: {}", cli_name, v);
+            log::debug!("--{}: using value from environment: {}", cli_name, v);
             Some(v)
         },
         _ => None,
@@ -377,131 +377,8 @@ impl<'a> TryFrom<clap::ArgMatches<'a>> for crate::Knobs {
    }
 }
 
-// Parse and return the knobs call chain.
-fn chain(a: clap::App, m: clap::ArgMatches) -> Result<crate::Chain> {
-    let mut chain: Vec<crate::Knobs> = vec![];
-    let mut argv: Vec<String>;
-    let mut m = m;
-    loop {
-        chain.push(m.clone().try_into()?);
-        if !m.is_present("CHAIN") { break; }
-        m = match m.values_of("CHAIN") {
-            Some(c) => {
-                let chain_args: Vec<String> = c.map(String::from).collect();
-                if chain_args.is_empty() { break; }
-                argv = vec!["knobs".to_string()];
-                argv.extend(chain_args.into_iter());
-                a.clone().get_matches_from_safe(&argv)?
-            },
-            None => break,
-        }
-    };
-    Ok(chain.into())
-}
-
 #[derive(Clone, Debug)]
-pub(crate) struct RuntimeCounter;
-
-impl RuntimeCounter {
-    pub async fn get() -> Duration {
-        static START: OnceCell<Instant> = OnceCell::const_new();
-        async fn make() -> Instant { Instant::now() }
-        let then = *START.get_or_init(make).await;
-        Instant::now() - then
-    }
-
-    pub async fn start() { Self::get().await; }
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct ResourceIdCache;
-
-// Cache ids to eliminate unnecessary sysfs io.
-impl ResourceIdCache {
-
-    pub async fn cpu() -> Option<Vec<u64>> {
-        static CPU_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
-        async fn ids() -> Option<Vec<u64>> { sysfs::cpu::Policy::ids().await }
-        CPU_IDS_CACHED.get_or_init(ids).await.clone()
-    }
-
-    pub async fn drm() -> Option<Vec<u64>> {
-        static DRM_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
-        async fn ids() -> Option<Vec<u64>> { sysfs::drm::Card::ids().await }
-        DRM_IDS_CACHED.get_or_init(ids).await.clone()
-    }
-
-    pub async fn drm_i915() -> Option<Vec<u64>> {
-        use sysfs::drm::io::tokio::driver;
-        static DRM_I915_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
-        async fn ids() -> Option<Vec<u64>> {
-            let mut ids = vec![];
-            if let Some(drm_ids) = ResourceIdCache::drm().await {
-                for id in drm_ids {
-                    if let Ok("i915") = driver(id).await.as_deref() {
-                        ids.push(id);
-                    }
-                }
-            }
-            if ids.is_empty() { None } else { Some(ids) }
-        }
-        DRM_I915_IDS_CACHED.get_or_init(ids).await.clone()
-    }
-
-    #[cfg(feature = "nvml")]
-    pub async fn nvml() -> Option<Vec<u64>> {
-        static NVML_IDS_CACHED: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
-        async fn ids() -> Option<Vec<u64>> {
-            nvml_facade::Nvml::ids()
-                .map(|ids| ids.into_iter().map(u64::from).collect())
-        }
-        NVML_IDS_CACHED.get_or_init(ids).await.clone()
-    }
-}
-
-// Resolve resource ids. Some flags, e.g. --cpu, --nvml, accept a list of
-// resource ids, and will default to all resource ids when omitted. In the
-// latter case, this function will fill in the default resource ids as
-// required.
-async fn resolve(mut chain: crate::Chain) -> crate::Chain {
-
-    for k in chain.iter_mut() {
-        if k.has_cpu_related_values() && k.cpu.is_none() {
-            k.cpu = ResourceIdCache::cpu().await;
-        }
-        if k.has_drm_i915_values() && k.drm_i915.is_none() {
-            k.drm_i915 = ResourceIdCache::drm_i915().await
-                .map(|ids| ids
-                    .into_iter()
-                    .map(crate::CardId::Id)
-                    .collect());
-        }
-        #[cfg(feature = "nvml")]
-        if k.has_nvml_values() && k.nvml.is_none() {
-            k.nvml = ResourceIdCache::nvml().await
-                .map(|ids| ids
-                    .into_iter()
-                    .map(crate::CardId::Id)
-                    .collect());
-        }
-    }
-    chain
-}
-
-// Determine the binary name from argv[0].
-fn argv0(argv: &[String]) -> &str {
-    const DEFAULT: &str = "knobs";
-    argv
-        .first()
-        .map(|s| s.as_str())
-        .unwrap_or(DEFAULT)
-        .split('/')
-        .last()
-        .unwrap_or(DEFAULT)
-}
-
-#[derive(Clone, Debug)]
-pub struct Cli {
+struct Cli {
     pub quiet: Option<()>,
     pub show_cpu: Option<()>,
     pub show_drm: Option<()>,
@@ -514,9 +391,73 @@ pub struct Cli {
 
 impl Cli {
 
+    // Parse and return the knobs call chain.
+    fn chain(a: clap::App, m: clap::ArgMatches) -> Result<crate::Chain> {
+        let mut chain: Vec<crate::Knobs> = vec![];
+        let mut argv: Vec<String>;
+        let mut m = m;
+        loop {
+            chain.push(m.clone().try_into()?);
+            if !m.is_present("CHAIN") { break; }
+            m = match m.values_of("CHAIN") {
+                Some(c) => {
+                    let chain_args: Vec<String> = c.map(String::from).collect();
+                    if chain_args.is_empty() { break; }
+                    argv = vec!["knobs".to_string()];
+                    argv.extend(chain_args.into_iter());
+                    a.clone().get_matches_from_safe(&argv)?
+                },
+                None => break,
+            }
+        };
+        Ok(chain.into())
+    }
+
+    // Resolve resource ids. Some flags, e.g. --cpu, --nvml, accept a list of
+    // resource ids, and will default to all resource ids when omitted. In the
+    // latter case, this function will fill in the default resource ids as
+    // required.
+    async fn resolve(mut chain: crate::Chain) -> crate::Chain {
+
+        for k in chain.iter_mut() {
+            if k.has_cpu_related_values() && k.cpu.is_none() {
+                k.cpu = crate::data::ResourceIdCache::cpu().await;
+            }
+            if k.has_drm_i915_values() && k.drm_i915.is_none() {
+                k.drm_i915 = crate::data::ResourceIdCache::drm_i915().await
+                    .map(|ids| ids
+                        .into_iter()
+                        .map(crate::CardId::Id)
+                        .collect());
+            }
+            #[cfg(feature = "nvml")]
+            if k.has_nvml_values() && k.nvml.is_none() {
+                k.nvml = crate::data::ResourceIdCache::nvml().await
+                    .map(|ids| ids
+                        .into_iter()
+                        .map(crate::CardId::Id)
+                        .collect());
+            }
+        }
+        chain
+    }
+
+    // Determine the binary name from argv[0].
+    fn argv0(argv: &[String]) -> &str {
+        const DEFAULT: &str = "knobs";
+        argv
+            .first()
+            .map(|s| s.as_str())
+            .unwrap_or(DEFAULT)
+            .split('/')
+            .last()
+            .unwrap_or(DEFAULT)
+    }
+
+
     // Parse command-line arguments.
     pub async fn parse(argv: &[String]) -> Result<Self> {
-        let a = app(argv0(argv));
+        let a = app(Self::argv0(argv));
         let m = a.clone().get_matches_from_safe(argv)?;
         let s = Self {
             quiet: flag(ARG_QUIET, &m),
@@ -526,7 +467,7 @@ impl Cli {
             show_nvml: flag(ARG_SHOW_NVML, &m),
             show_pstate: flag(ARG_SHOW_PSTATE, &m),
             show_rapl: flag(ARG_SHOW_RAPL, &m),
-            chain: resolve(chain(a, m)?).await,
+            chain: Self::resolve(Self::chain(a, m)?).await,
         };
         Ok(s)
     }
@@ -541,59 +482,76 @@ impl Cli {
         b
     }
 
-    const WAIT_FOR_RAPL_COUNTERS: Duration = Duration::from_millis(300);
+    const WAIT_FOR_RAPL: Duration = Duration::from_millis(400);
 
     // Command-line interface app logic.
     pub async fn run(&self) -> Result<()> {
-        use sysfs::tokio::Read as _;
         use crate::format::Format as _;
 
+        RuntimeCounter::initialize().await;
+
         let show_all = !self.has_show_args();
-        if self.quiet.is_none() && (show_all || self.show_rapl.is_some()) {
-            RuntimeCounter::start().await;
-            crate::format::RaplEnergyCounters::start().await;
-        }
+
+        let rapl_samplers =
+            if self.quiet.is_none() && (show_all || self.show_rapl.is_some()) {
+                RaplEnergySamplersInstance::initialize().await;
+                if let Some(mut s) = RaplEnergySamplersInstance::get().await {
+                    s.start().await;
+                    Some(s)
+                } else { None }
+            } else { None };
 
         self.chain.apply_values().await;
 
         if self.quiet.is_some() { return Ok(()); }
 
-        let mut s = vec![];
+        let mut s = Vec::with_capacity(3000);
+
         if show_all || self.show_cpu.is_some() {
             if let Some(cpu) = sysfs::cpu::Cpu::read(()).await {
                 if let Some(cpufreq) = sysfs::cpufreq::Cpufreq::read(()).await {
-                    (cpu, cpufreq).format_values(&mut s).await?;
+                    (cpu, cpufreq).format_values(&mut s, ()).await?;
                 }
             }
         }
+
         if show_all || self.show_pstate.is_some() {
             if let Some(intel_pstate) = sysfs::intel_pstate::IntelPstate::read(()).await {
-                intel_pstate.format_values(&mut s).await?;
+                intel_pstate.format_values(&mut s, ()).await?;
             }
         }
+
         if show_all || self.show_rapl.is_some() {
             if let Some(intel_rapl) = sysfs::intel_rapl::IntelRapl::read(()).await {
 
-                if crate::format::RaplEnergyCounters::get().await.is_some() {
-                    let runtime = RuntimeCounter::get().await;
-                    if runtime < Self::WAIT_FOR_RAPL_COUNTERS {
-                        sleep(Self::WAIT_FOR_RAPL_COUNTERS - runtime).await;
+                if let Some(mut samplers) = rapl_samplers {
+                    if samplers.working().await {
+                        let runtime = RuntimeCounter::get().await;
+                        if runtime < Self::WAIT_FOR_RAPL {
+                            sleep(Self::WAIT_FOR_RAPL - runtime).await;
+                        }
                     }
+                    intel_rapl.format_values(&mut s, Some(samplers.clone())).await?;
+                    samplers.stop().await;
+                    samplers.clear().await;
+                } else {
+                    intel_rapl.format_values(&mut s, None).await?;
                 }
-
-                intel_rapl.format_values(&mut s).await?;
             }
         }
+
         if show_all || self.show_drm.is_some() {
             if let Some(drm) = sysfs::drm::Drm::read(()).await {
-                drm.format_values(&mut s).await?;
+                drm.format_values(&mut s, ()).await?;
             }
         }
+
         #[cfg(feature = "nvml")]
         if show_all || self.show_nvml.is_some() {
             use nvml_facade::Nvml;
-            Nvml.format_values(&mut s).await?;
+            Nvml.format_values(&mut s, ()).await?;
         }
+
         println!("{}", String::from_utf8_lossy(&s).trim_end());
         Ok(())
     }
@@ -605,7 +563,7 @@ pub struct App;
 impl App {
 
     // Configure logging env vars and default configuration.
-    pub fn setup_logging() {
+    fn setup_logging() {
         use std::io::Write;
 
         use env_logger::{Builder, Env};

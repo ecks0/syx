@@ -6,6 +6,7 @@ use tokio::time::sleep;
 use std::{collections::HashSet, str::FromStr, time::Duration};
 
 pub mod cli;
+pub mod data;
 pub mod format;
 pub mod policy;
 
