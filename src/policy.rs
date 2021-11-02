@@ -28,16 +28,37 @@ pub async fn set_cpus_offline(cpu_ids: Vec<u64>) -> Vec<u64> {
 impl From<&crate::Knobs> for Option<sysfs::cpu::Cpu> {
     fn from(k: &crate::Knobs) -> Self {
         if !k.has_cpu_values() { return None; }
-        let policies: Option<Vec<sysfs::cpu::Policy>> =
-            k.cpu.clone().map(|ids| ids
-                .into_iter()
-                .map(|id|
-                    sysfs::cpu::Policy {
+        let mut policies: Vec<sysfs::cpu::Policy> =
+            k.cpu.clone()
+                .map(|ids| ids
+                    .into_iter()
+                    .map(|id|
+                        sysfs::cpu::Policy {
+                            id: Some(id),
+                            cpu_online: k.cpu_on,
+                        })
+                    .collect())
+                .unwrap_or_else(Vec::new);
+        if let Some(cpu_on_each) = k.cpu_on_each.clone() {
+            for (id, v) in cpu_on_each {
+                if let Some(mut p) = policies
+                    .iter_mut()
+                    .find(|p| p.id == Some(id))
+                {
+                    p.cpu_online = Some(v);
+                } else {
+                    let p = sysfs::cpu::Policy {
                         id: Some(id),
-                        cpu_online: k.cpu_online,
-                    })
-                .collect());
-        if policies.as_ref().map(|p| p.is_empty()).unwrap_or(true) { return None; }
+                        cpu_online: Some(v),
+                    };
+                    policies.push(p);
+                }
+            }
+        }
+        let policies = if policies.is_empty() { return None; } else {
+            policies.sort_unstable_by(|a, b| a.id.cmp(&b.id));
+            Some(policies)
+        };
         let s = sysfs::cpu::Cpu {
             policies,
         };
@@ -51,17 +72,18 @@ impl From<&crate::Knobs> for Option<sysfs::cpufreq::Cpufreq> {
         let scaling_min_freq = k.cpufreq_min.map(|f| f.as_kilohertz().round() as u64);
         let scaling_max_freq = k.cpufreq_max.map(|f| f.as_kilohertz().round() as u64);
         let policies: Option<Vec<sysfs::cpufreq::Policy>> =
-            k.cpu.clone().map(|ids| ids
-                .into_iter()
-                .map(|id|
-                    sysfs::cpufreq::Policy {
-                        id: Some(id),
-                        scaling_governor: k.cpufreq_gov.clone(),
-                        scaling_min_freq,
-                        scaling_max_freq,
-                        ..Default::default()
-                    })
-                .collect());
+            k.cpu.clone()
+                .map(|ids| ids
+                    .into_iter()
+                    .map(|id|
+                        sysfs::cpufreq::Policy {
+                            id: Some(id),
+                            scaling_governor: k.cpufreq_gov.clone(),
+                            scaling_min_freq,
+                            scaling_max_freq,
+                            ..Default::default()
+                        })
+                    .collect());
         if policies.as_ref().map(|p| p.is_empty()).unwrap_or(true) { return None; }
         let s = sysfs::cpufreq::Cpufreq {
             policies,

@@ -1,2 +1,1 @@
-#[tokio::main]
-async fn main() -> knobs::Result<()> { knobs::cli::App::run().await }
+#[tokio::main] async fn main() { knobs::cli::App::run().await; }

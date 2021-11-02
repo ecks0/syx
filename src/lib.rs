@@ -7,6 +7,7 @@ use std::{collections::HashSet, str::FromStr, time::Duration};
 pub mod cli;
 pub mod data;
 pub mod format;
+pub mod parse;
 pub mod policy;
 
 pub use format::FormatValues;
@@ -24,14 +25,17 @@ pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
-    #[error("{0}")]
-    ParseValue(String),
-
     #[error("--{flag}: {message}")]
     ParseFlag {
         flag: String,
         message: String,
     },
+
+    #[error("{0}")]
+    ParseValue(String),
+
+    #[error(transparent)]
+    Profile(#[from] cli::ProfileError),
 }
 
 impl Error {
@@ -45,256 +49,65 @@ impl Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Debug)]
-struct ParseUtil;
+// `Knobs` deserialization helpers
+mod de {
+    use super::{CardId, Deserialize, Deserializer, Duration, Frequency, Power, parse};
 
-impl ParseUtil {
-    fn start_of_unit(s: &str) -> Option<usize> {
-        for (i, c) in s.chars().enumerate() {
-            match c {
-                '0'..='9' | '.' => continue,
-                _ => return Some(i),
-            }
-        }
-        None
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct BoolStr(bool);
-
-impl FromStr for BoolStr {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "0" | "false" => Ok(Self(false)),
-            "1" | "true" => Ok(Self(true)),
-            _ => Err(Error::ParseValue("Expected 0, 1, false, or true".into())),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for BoolStr {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    pub fn bool<'de, D>(deserializer: D) -> std::result::Result<Option<bool>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let s: String = Deserialize::deserialize(deserializer)?;
-        Self::from_str(&s).map_err(D::Error::custom)
+        let v: parse::BoolStr = Deserialize::deserialize(deserializer)?;
+        Ok(Some(v.into()))
     }
-}
 
-impl From<BoolStr> for bool {
-    fn from(b: BoolStr) -> Self { b.0 }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct Indices(Vec<u64>);
-
-impl FromStr for Indices {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let mut ids = vec![];
-        let s = s.trim_end_matches(',');
-        for item in s.split(',') {
-            let s: Vec<&str> = item.split('-').collect();
-            match &s[..] {
-                [id] => ids.push(id.parse::<u64>()
-                    .map_err(|_| Error::ParseValue("Index is not an integer".into()))?),
-                [start, end] =>
-                    std::ops::Range {
-                        start: start.parse::<u64>()
-                            .map_err(|_| Error::ParseValue("Start of range is not an integer".into()))?,
-                        end: 1 + end.parse::<u64>()
-                            .map_err(|_| Error::ParseValue("End of range is not an integer".into()))?,
-                    }
-                    .for_each(|i| ids.push(i)),
-                _ => return Err(Error::ParseValue("Expected comma-delimited list of integers and/or integer ranges".into())),
-            }
-        }
-        ids.sort_unstable();
-        ids.dedup();
-        Ok(Self(ids))
-    }
-}
-
-impl<'de> Deserialize<'de> for Indices {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    pub fn card_ids<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<CardId>>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let s: String = Deserialize::deserialize(deserializer)?;
-        Self::from_str(&s).map_err(D::Error::custom)
+        let v: parse::CardIds = Deserialize::deserialize(deserializer)?;
+        Ok(Some(v.into()))
     }
-}
 
-impl From<Indices> for Vec<u64> {
-    fn from(i: Indices) -> Self { i.0 }
-}
-
-// #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-// pub struct Toggles(Vec<(u64, bool)>);
-//
-// impl FromStr for Toggles {
-//     type Err = Error;
-//
-//     fn from_str(s: &str) -> Result<Self> {
-//         let mut toggles = vec![];
-//         for (i, c) in s.chars().enumerate() {
-//             toggles.push(
-//                 (
-//                     i as u64,
-//                     match c {
-//                         '_' | '-' => continue,
-//                         '0' => false,
-//                         '1' => true,
-//                         _ => return Err(Error::ParseValue("Expected sequence of 0, 1, or -".into())),
-//                     },
-//                 )
-//             );
-//         }
-//         Ok(Self(toggles))
-//     }
-// }
-//
-// impl<'de> Deserialize<'de> for Toggles {
-//     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-//     where
-//         D: Deserializer<'de>,
-//     {
-//         let s: String = Deserialize::deserialize(deserializer)?;
-//         Self::from_str(&s).map_err(D::Error::custom)
-//     }
-// }
-//
-// impl From<Toggles> for Vec<(u64, bool)> {
-//     fn from(t: Toggles) -> Self { t.0 }
-// }
-
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct FrequencyStr(Frequency);
-
-impl FromStr for FrequencyStr {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let f = match ParseUtil::start_of_unit(s) {
-            Some(pos) => match s[..pos].parse::<f64>() {
-                Ok(v) => match s[pos..].to_lowercase().as_str() {
-                    "h" | "hz" => Frequency::from_hertz(v),
-                    "k" | "khz" => Frequency::from_kilohertz(v),
-                    "m" | "mhz" => Frequency::from_megahertz(v),
-                    "g" | "ghz" => Frequency::from_gigahertz(v),
-                    "t" | "thz" => Frequency::from_terahertz(v),
-                    _ => return Err(Error::ParseValue("Unrecognized frequency unit".into())),
-                },
-                Err(_) => return Err(Error::ParseValue("Expected frequency value with optional unit".into())),
-            },
-            None => match s.parse::<f64>() {
-                Ok(v) => Frequency::from_megahertz(v),
-                Err(_) => return Err(Error::ParseValue("Expected frequency value with optional unit".into())),
-            }
-        };
-        Ok(Self(f))
-    }
-}
-
-impl<'de> Deserialize<'de> for FrequencyStr {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    pub fn frequency<'de, D>(deserializer: D) -> std::result::Result<Option<Frequency>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let s: String = Deserialize::deserialize(deserializer)?;
-        Self::from_str(&s).map_err(D::Error::custom)
+        let v: parse::FrequencyStr = Deserialize::deserialize(deserializer)?;
+        Ok(Some(v.into()))
     }
-}
 
-impl From<FrequencyStr> for Frequency {
-    fn from(f: FrequencyStr) -> Self { f.0 }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct PowerStr(Power);
-
-impl FromStr for PowerStr {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        if let Some(pos) = ParseUtil::start_of_unit(s) {
-            match s[..pos].parse::<f64>() {
-                Ok(v) => match &s[pos..] {
-                    "u" | "uw" => Ok(Self(Power::from_microwatts(v))),
-                    "m" | "mw" => Ok(Self(Power::from_milliwatts(v))),
-                    "w" => Ok(Self(Power::from_watts(v))),
-                    "k" | "kw" => Ok(Self(Power::from_kilowatts(v))),
-                    _ => Err(Error::ParseValue("Unrecognized power unit".into())),
-                },
-                Err(_) => Err(Error::ParseValue("Expected power value".into())),
-            }
-        } else {
-            match s.parse::<f64>() {
-                Ok(v) => Ok(Self(Power::from_watts(v))),
-                Err(_) => Err(Error::ParseValue("Expected power value".into())),
-            }
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for PowerStr {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    pub fn indices<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<u64>>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let s: String = Deserialize::deserialize(deserializer)?;
-        Self::from_str(&s).map_err(D::Error::custom)
+        let v: parse::Indices = Deserialize::deserialize(deserializer)?;
+        Ok(Some(v.into()))
     }
-}
 
-impl From<PowerStr> for Power {
-    fn from(p: PowerStr) -> Self { p.0 }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct DurationStr(Duration);
-
-impl FromStr for DurationStr {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        if let Some(pos) = ParseUtil::start_of_unit(s) {
-            match s[..pos].parse::<u64>() {
-                Ok(v) => match &s[pos..] {
-                    "n" | "ns" => Ok(Self(Duration::from_nanos(v))),
-                    "u" | "us" => Ok(Self(Duration::from_micros(v))),
-                    "m" | "ms" => Ok(Self(Duration::from_millis(v))),
-                    "s" => Ok(Self(Duration::from_secs(v))),
-                    _ => Err(Error::ParseValue("Unrecognized duration unit".into())),
-                },
-                Err(_) => Err(Error::ParseValue("Expected duration value, ex. 2000, 2000ms, 2s".into())),
-            }
-        } else {
-            match s.parse::<u64>() {
-                Ok(v) => Ok(Self(Duration::from_millis(v))),
-                Err(_) => Err(Error::ParseValue("Expected duration value, ex. 3000, 3000ms, 3s".into())),
-            }
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for DurationStr {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    pub fn toggles<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<(u64, bool)>>, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let s: String = Deserialize::deserialize(deserializer)?;
-        Self::from_str(&s).map_err(D::Error::custom)
+        let v: parse::Toggles = Deserialize::deserialize(deserializer)?;
+        Ok(Some(v.into()))
     }
-}
 
-impl From<DurationStr> for Duration {
-    fn from(d: DurationStr) -> Self { d.0 }
+    pub fn power<'de, D>(deserializer: D) -> std::result::Result<Option<Power>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let v: parse::PowerStr = Deserialize::deserialize(deserializer)?;
+        Ok(Some(v.into()))
+    }
+
+    pub fn duration<'de, D>(deserializer: D) -> std::result::Result<Option<Duration>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let v: parse::DurationStr = Deserialize::deserialize(deserializer)?;
+        Ok(Some(v.into()))
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
@@ -322,111 +135,8 @@ impl<'de> Deserialize<'de> for CardId {
     where
         D: Deserializer<'de>,
     {
-        let s: &str = Deserialize::deserialize(deserializer)?;
-        Self::from_str(s).map_err(D::Error::custom)
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct CardIds(Vec<CardId>);
-
-impl FromStr for CardIds {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let mut indices = vec![];
-        let mut pci_ids = vec![];
-        for ss in s.split(',') {
-            if ss.contains(':') {
-                pci_ids.push(ss.to_string());
-            } else {
-                indices.push(ss.to_string());
-            }
-        }
-        let mut ids = vec![];
-        for id in Vec::from(Indices::from_str(&indices.join(","))?) {
-            ids.push(CardId::Id(id));
-        }
-        for id in pci_ids {
-            ids.push(CardId::PciId(id));
-        }
-        Ok(Self(ids))
-    }
-}
-
-impl<'de> Deserialize<'de> for CardIds {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
         let s: String = Deserialize::deserialize(deserializer)?;
         Self::from_str(&s).map_err(D::Error::custom)
-    }
-}
-
-impl From<CardIds> for Vec<CardId> {
-    fn from(c: CardIds) -> Self { c.0 }
-}
-
-// Deserialization helpers.
-#[derive(Debug)]
-struct De;
-
-impl De {
-    fn indices<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<u64>>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let v: Indices = Deserialize::deserialize(deserializer)?;
-        Ok(Some(v.into()))
-    }
-
-    fn bool<'de, D>(deserializer: D) -> std::result::Result<Option<bool>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let v: BoolStr = Deserialize::deserialize(deserializer)?;
-        Ok(Some(v.into()))
-    }
-
-    // fn toggles<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<(u64, bool)>>, D::Error>
-    // where
-    //     D: Deserializer<'de>,
-    // {
-    //     let v: Toggles = Deserialize::deserialize(deserializer)?;
-    //     Ok(Some(v.into()))
-    // }
-
-    fn frequency<'de, D>(deserializer: D) -> std::result::Result<Option<Frequency>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let v: FrequencyStr = Deserialize::deserialize(deserializer)?;
-        Ok(Some(v.into()))
-    }
-
-    fn card_ids<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<CardId>>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let v: CardIds = Deserialize::deserialize(deserializer)?;
-        Ok(Some(v.into()))
-    }
-
-    fn power<'de, D>(deserializer: D) -> std::result::Result<Option<Power>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let v: PowerStr = Deserialize::deserialize(deserializer)?;
-        Ok(Some(v.into()))
-    }
-
-    fn duration<'de, D>(deserializer: D) -> std::result::Result<Option<Duration>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let v: DurationStr = Deserialize::deserialize(deserializer)?;
-        Ok(Some(v.into()))
     }
 }
 
@@ -434,62 +144,66 @@ impl De {
 pub struct Knobs {
 
     #[serde(default)]
-    #[serde(deserialize_with = "De::indices")]
+    #[serde(deserialize_with = "de::indices")]
     pub cpu: Option<Vec<u64>>,
 
     #[serde(default)]
-    #[serde(deserialize_with = "De::bool")]
-    pub cpu_online: Option<bool>,
+    #[serde(deserialize_with = "de::bool")]
+    pub cpu_on: Option<bool>,
+
+    #[serde(default)]
+    #[serde(deserialize_with = "de::toggles")]
+    pub cpu_on_each: Option<Vec<(u64, bool)>>,
 
     pub cpufreq_gov: Option<String>,
 
     #[serde(default)]
-    #[serde(deserialize_with = "De::frequency")]
+    #[serde(deserialize_with = "de::frequency")]
     pub cpufreq_min: Option<Frequency>,
 
     #[serde(default)]
-    #[serde(deserialize_with = "De::frequency")]
+    #[serde(deserialize_with = "de::frequency")]
     pub cpufreq_max: Option<Frequency>,
 
     #[serde(default)]
-    #[serde(deserialize_with = "De::card_ids")]
+    #[serde(deserialize_with = "de::card_ids")]
     pub drm_i915: Option<Vec<CardId>>,
 
     #[serde(default)]
-    #[serde(deserialize_with = "De::frequency")]
+    #[serde(deserialize_with = "de::frequency")]
     pub drm_i915_min: Option<Frequency>,
 
     #[serde(default)]
-    #[serde(deserialize_with = "De::frequency")]
+    #[serde(deserialize_with = "de::frequency")]
     pub drm_i915_max: Option<Frequency>,
 
     #[serde(default)]
-    #[serde(deserialize_with = "De::frequency")]
+    #[serde(deserialize_with = "de::frequency")]
     pub drm_i915_boost: Option<Frequency>,
 
     #[cfg(feature = "nvml")]
     #[serde(default)]
-    #[serde(deserialize_with = "De::card_ids")]
+    #[serde(deserialize_with = "de::card_ids")]
     pub nvml: Option<Vec<CardId>>,
 
     #[cfg(feature = "nvml")]
     #[serde(default)]
-    #[serde(deserialize_with = "De::frequency")]
+    #[serde(deserialize_with = "de::frequency")]
     pub nvml_gpu_min: Option<Frequency>,
 
     #[cfg(feature = "nvml")]
     #[serde(default)]
-    #[serde(deserialize_with = "De::frequency")]
+    #[serde(deserialize_with = "de::frequency")]
     pub nvml_gpu_max: Option<Frequency>,
 
     #[cfg(feature = "nvml")]
     #[serde(default)]
-    #[serde(deserialize_with = "De::bool")]
+    #[serde(deserialize_with = "de::bool")]
     pub nvml_gpu_reset: Option<bool>,
 
     #[cfg(feature = "nvml")]
     #[serde(default)]
-    #[serde(deserialize_with = "De::power")]
+    #[serde(deserialize_with = "de::power")]
     pub nvml_power_limit: Option<Power>,
 
     pub pstate_epb: Option<u64>,
@@ -501,25 +215,26 @@ pub struct Knobs {
     pub rapl_zone: Option<u64>,
 
     #[serde(default)]
-    #[serde(deserialize_with = "De::power")]
+    #[serde(deserialize_with = "de::power")]
     pub rapl_long_limit: Option<Power>,
 
     #[serde(default)]
-    #[serde(deserialize_with = "De::duration")]
+    #[serde(deserialize_with = "de::duration")]
     pub rapl_long_window: Option<Duration>,
 
     #[serde(default)]
-    #[serde(deserialize_with = "De::power")]
+    #[serde(deserialize_with = "de::power")]
     pub rapl_short_limit: Option<Power>,
 
     #[serde(default)]
-    #[serde(deserialize_with = "De::duration")]
+    #[serde(deserialize_with = "de::duration")]
     pub rapl_short_window: Option<Duration>,
 }
 
 impl Knobs {
     pub fn has_cpu_values(&self) -> bool {
-        self.cpu_online.is_some()
+        self.cpu_on.is_some() ||
+        self.cpu_on_each.is_some()
     }
 
     pub fn has_cpu_related_values(&self) -> bool {
@@ -622,7 +337,7 @@ impl Chain {
 
     pub fn has_rapl_values(&self) -> bool { self.knobses.iter().any(|k| k.has_rapl_values()) }
 
-    const CPU_ONOFFLINE_WAIT: Duration = Duration::from_millis(200);
+    const CPU_ONOFFLINE_WAIT: Duration = Duration::from_millis(250);
 
     async fn cpu_onoff_wait() { sleep(Self::CPU_ONOFFLINE_WAIT).await }
 
@@ -658,7 +373,7 @@ impl Chain {
             }
         }
         if self.has_cpufreq_values() || self.has_pstate_values() {
-            let cpu_ids = self.cpus_online_all().await;
+            let onlined = self.cpus_online_all().await;
 
             for (i, k) in self.knobses.iter().enumerate() {
                 log::info!("Group {} Pass 0", i);
@@ -666,7 +381,7 @@ impl Chain {
                 k.apply_pstate_values().await;
             }
 
-            self.cpus_online_reset(cpu_ids).await;
+            self.cpus_online_reset(onlined).await;
         }
         for (i, k) in self.knobses.iter().enumerate() {
             log::info!("Group {} Pass 1", i);
