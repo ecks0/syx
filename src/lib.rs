@@ -45,14 +45,19 @@ impl Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-fn start_of_unit(s: &str) -> Option<usize> {
-    for (i, c) in s.chars().enumerate() {
-        match c {
-            '0'..='9' | '.' => continue,
-            _ => return Some(i),
+#[derive(Debug)]
+struct ParseUtil;
+
+impl ParseUtil {
+    fn start_of_unit(s: &str) -> Option<usize> {
+        for (i, c) in s.chars().enumerate() {
+            match c {
+                '0'..='9' | '.' => continue,
+                _ => return Some(i),
+            }
         }
+        None
     }
-    None
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
@@ -75,8 +80,8 @@ impl<'de> Deserialize<'de> for BoolStr {
     where
         D: Deserializer<'de>,
     {
-        let s: &str = Deserialize::deserialize(deserializer)?;
-        Self::from_str(s).map_err(D::Error::custom)
+        let s: String = Deserialize::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(D::Error::custom)
     }
 }
 
@@ -120,8 +125,8 @@ impl<'de> Deserialize<'de> for Indices {
     where
         D: Deserializer<'de>,
     {
-        let s: &str = Deserialize::deserialize(deserializer)?;
-        Self::from_str(s).map_err(D::Error::custom)
+        let s: String = Deserialize::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(D::Error::custom)
     }
 }
 
@@ -159,8 +164,8 @@ impl From<Indices> for Vec<u64> {
 //     where
 //         D: Deserializer<'de>,
 //     {
-//         let s: &str = Deserialize::deserialize(deserializer)?;
-//         Self::from_str(s).map_err(D::Error::custom)
+//         let s: String = Deserialize::deserialize(deserializer)?;
+//         Self::from_str(&s).map_err(D::Error::custom)
 //     }
 // }
 //
@@ -175,7 +180,7 @@ impl FromStr for FrequencyStr {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        let f = match start_of_unit(s) {
+        let f = match ParseUtil::start_of_unit(s) {
             Some(pos) => match s[..pos].parse::<f64>() {
                 Ok(v) => match s[pos..].to_lowercase().as_str() {
                     "h" | "hz" => Frequency::from_hertz(v),
@@ -201,8 +206,8 @@ impl<'de> Deserialize<'de> for FrequencyStr {
     where
         D: Deserializer<'de>,
     {
-        let s: &str = Deserialize::deserialize(deserializer)?;
-        Self::from_str(s).map_err(D::Error::custom)
+        let s: String = Deserialize::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(D::Error::custom)
     }
 }
 
@@ -217,7 +222,7 @@ impl FromStr for PowerStr {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        if let Some(pos) = start_of_unit(s) {
+        if let Some(pos) = ParseUtil::start_of_unit(s) {
             match s[..pos].parse::<f64>() {
                 Ok(v) => match &s[pos..] {
                     "u" | "uw" => Ok(Self(Power::from_microwatts(v))),
@@ -242,8 +247,8 @@ impl<'de> Deserialize<'de> for PowerStr {
     where
         D: Deserializer<'de>,
     {
-        let s: &str = Deserialize::deserialize(deserializer)?;
-        Self::from_str(s).map_err(D::Error::custom)
+        let s: String = Deserialize::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(D::Error::custom)
     }
 }
 
@@ -258,7 +263,7 @@ impl FromStr for DurationStr {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        if let Some(pos) = start_of_unit(s) {
+        if let Some(pos) = ParseUtil::start_of_unit(s) {
             match s[..pos].parse::<u64>() {
                 Ok(v) => match &s[pos..] {
                     "n" | "ns" => Ok(Self(Duration::from_nanos(v))),
@@ -283,8 +288,8 @@ impl<'de> Deserialize<'de> for DurationStr {
     where
         D: Deserializer<'de>,
     {
-        let s: &str = Deserialize::deserialize(deserializer)?;
-        Self::from_str(s).map_err(D::Error::custom)
+        let s: String = Deserialize::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(D::Error::custom)
     }
 }
 
@@ -354,8 +359,8 @@ impl<'de> Deserialize<'de> for CardIds {
     where
         D: Deserializer<'de>,
     {
-        let s: &str = Deserialize::deserialize(deserializer)?;
-        Self::from_str(s).map_err(D::Error::custom)
+        let s: String = Deserialize::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(D::Error::custom)
     }
 }
 
@@ -363,109 +368,128 @@ impl From<CardIds> for Vec<CardId> {
     fn from(c: CardIds) -> Self { c.0 }
 }
 
-fn de_indices<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<u64>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let i: Indices = Deserialize::deserialize(deserializer)?;
-    Ok(Some(i.into()))
-}
+// Deserialization helpers.
+#[derive(Debug)]
+struct De;
 
-fn de_bool<'de, D>(deserializer: D) -> std::result::Result<Option<bool>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let b: BoolStr = Deserialize::deserialize(deserializer)?;
-    Ok(Some(b.into()))
-}
+impl De {
+    fn indices<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<u64>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let v: Indices = Deserialize::deserialize(deserializer)?;
+        Ok(Some(v.into()))
+    }
 
-// fn de_toggles<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<(u64, bool)>>, D::Error>
-// where
-//     D: Deserializer<'de>,
-// {
-//     let t: Toggles = Deserialize::deserialize(deserializer)?;
-//     Ok(Some(Vec::from(t)))
-// }
+    fn bool<'de, D>(deserializer: D) -> std::result::Result<Option<bool>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let v: BoolStr = Deserialize::deserialize(deserializer)?;
+        Ok(Some(v.into()))
+    }
 
-fn de_frequency<'de, D>(deserializer: D) -> std::result::Result<Option<Frequency>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let f: FrequencyStr = Deserialize::deserialize(deserializer)?;
-    Ok(Some(f.into()))
-}
+    // fn toggles<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<(u64, bool)>>, D::Error>
+    // where
+    //     D: Deserializer<'de>,
+    // {
+    //     let v: Toggles = Deserialize::deserialize(deserializer)?;
+    //     Ok(Some(v.into()))
+    // }
 
-fn de_card_ids<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<CardId>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let c: CardIds = Deserialize::deserialize(deserializer)?;
-    Ok(Some(c.into()))
-}
+    fn frequency<'de, D>(deserializer: D) -> std::result::Result<Option<Frequency>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let v: FrequencyStr = Deserialize::deserialize(deserializer)?;
+        Ok(Some(v.into()))
+    }
 
-fn de_power<'de, D>(deserializer: D) -> std::result::Result<Option<Power>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let p: PowerStr = Deserialize::deserialize(deserializer)?;
-    Ok(Some(p.into()))
-}
+    fn card_ids<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<CardId>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let v: CardIds = Deserialize::deserialize(deserializer)?;
+        Ok(Some(v.into()))
+    }
 
-fn de_duration<'de, D>(deserializer: D) -> std::result::Result<Option<Duration>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let d: DurationStr = Deserialize::deserialize(deserializer)?;
-    Ok(Some(d.into()))
+    fn power<'de, D>(deserializer: D) -> std::result::Result<Option<Power>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let v: PowerStr = Deserialize::deserialize(deserializer)?;
+        Ok(Some(v.into()))
+    }
+
+    fn duration<'de, D>(deserializer: D) -> std::result::Result<Option<Duration>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let v: DurationStr = Deserialize::deserialize(deserializer)?;
+        Ok(Some(v.into()))
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, PartialOrd)]
 pub struct Knobs {
 
-    #[serde(deserialize_with = "de_indices")]
+    #[serde(default)]
+    #[serde(deserialize_with = "De::indices")]
     pub cpu: Option<Vec<u64>>,
 
-    #[serde(deserialize_with = "de_bool")]
+    #[serde(default)]
+    #[serde(deserialize_with = "De::bool")]
     pub cpu_online: Option<bool>,
 
     pub cpufreq_gov: Option<String>,
 
-    #[serde(deserialize_with = "de_frequency")]
+    #[serde(default)]
+    #[serde(deserialize_with = "De::frequency")]
     pub cpufreq_min: Option<Frequency>,
 
-    #[serde(deserialize_with = "de_frequency")]
+    #[serde(default)]
+    #[serde(deserialize_with = "De::frequency")]
     pub cpufreq_max: Option<Frequency>,
 
-    #[serde(deserialize_with = "de_card_ids")]
+    #[serde(default)]
+    #[serde(deserialize_with = "De::card_ids")]
     pub drm_i915: Option<Vec<CardId>>,
 
-    #[serde(deserialize_with = "de_frequency")]
+    #[serde(default)]
+    #[serde(deserialize_with = "De::frequency")]
     pub drm_i915_min: Option<Frequency>,
 
-    #[serde(deserialize_with = "de_frequency")]
+    #[serde(default)]
+    #[serde(deserialize_with = "De::frequency")]
     pub drm_i915_max: Option<Frequency>,
 
-    #[serde(deserialize_with = "de_frequency")]
+    #[serde(default)]
+    #[serde(deserialize_with = "De::frequency")]
     pub drm_i915_boost: Option<Frequency>,
 
     #[cfg(feature = "nvml")]
-    #[serde(deserialize_with = "de_card_ids")]
+    #[serde(default)]
+    #[serde(deserialize_with = "De::card_ids")]
     pub nvml: Option<Vec<CardId>>,
 
     #[cfg(feature = "nvml")]
-    #[serde(deserialize_with = "de_frequency")]
+    #[serde(default)]
+    #[serde(deserialize_with = "De::frequency")]
     pub nvml_gpu_min: Option<Frequency>,
 
     #[cfg(feature = "nvml")]
-    #[serde(deserialize_with = "de_frequency")]
+    #[serde(default)]
+    #[serde(deserialize_with = "De::frequency")]
     pub nvml_gpu_max: Option<Frequency>,
 
     #[cfg(feature = "nvml")]
-    #[serde(deserialize_with = "de_bool")]
+    #[serde(default)]
+    #[serde(deserialize_with = "De::bool")]
     pub nvml_gpu_reset: Option<bool>,
 
     #[cfg(feature = "nvml")]
-    #[serde(deserialize_with = "de_power")]
+    #[serde(default)]
+    #[serde(deserialize_with = "De::power")]
     pub nvml_power_limit: Option<Power>,
 
     pub pstate_epb: Option<u64>,
@@ -476,16 +500,20 @@ pub struct Knobs {
 
     pub rapl_zone: Option<u64>,
 
-    #[serde(deserialize_with = "de_power")]
+    #[serde(default)]
+    #[serde(deserialize_with = "De::power")]
     pub rapl_long_limit: Option<Power>,
 
-    #[serde(deserialize_with = "de_duration")]
+    #[serde(default)]
+    #[serde(deserialize_with = "De::duration")]
     pub rapl_long_window: Option<Duration>,
 
-    #[serde(deserialize_with = "de_power")]
+    #[serde(default)]
+    #[serde(deserialize_with = "De::power")]
     pub rapl_short_limit: Option<Power>,
 
-    #[serde(deserialize_with = "de_duration")]
+    #[serde(default)]
+    #[serde(deserialize_with = "De::duration")]
     pub rapl_short_window: Option<Duration>,
 }
 
@@ -566,18 +594,40 @@ impl Knobs {
         let intel_rapl: Option<sysfs::intel_rapl::IntelRapl> = self.into();
         if let Some(intel_rapl) = intel_rapl { intel_rapl.write().await; }
     }
+
+    pub async fn apply_values(&self) { Chain::from(self.clone()).apply_values().await; }
 }
 
 #[derive(Clone, Debug)]
-pub struct Chain(Vec<Knobs>);
+pub struct Chain {
+    knobses: Vec<Knobs>,
+}
 
 impl Chain {
-    fn has_cpufreq_values(&self) -> bool { self.0.iter().any(|k| k.has_cpufreq_values()) }
 
-    fn has_pstate_values(&self) -> bool { self.0.iter().any(|k| k.has_pstate_values()) }
+    pub fn has_cpu_values(&self) -> bool { self.knobses.iter().any(|k| k.has_cpu_values()) }
 
-    fn cpu(&self) -> Vec<u64> {
-        let mut ids: Vec<u64> = self.0
+    pub fn has_cpu_related_values(&self) -> bool { self.knobses.iter().any(|k| k.has_cpu_related_values()) }
+
+    pub fn has_cpufreq_values(&self) -> bool { self.knobses.iter().any(|k| k.has_cpufreq_values()) }
+
+    pub fn has_drm_i915_values(&self) -> bool { self.knobses.iter().any(|k| k.has_drm_i915_values()) }
+
+    pub fn has_drm_values(&self) -> bool { self.knobses.iter().any(|k| k.has_drm_values()) }
+
+    #[cfg(feature = "nvml")]
+    pub fn has_nvml_values(&self) -> bool { self.knobses.iter().any(|k| k.has_nvml_values()) }
+
+    pub fn has_pstate_values(&self) -> bool { self.knobses.iter().any(|k| k.has_pstate_values()) }
+
+    pub fn has_rapl_values(&self) -> bool { self.knobses.iter().any(|k| k.has_rapl_values()) }
+
+    const CPU_ONOFFLINE_WAIT: Duration = Duration::from_millis(200);
+
+    async fn cpu_onoff_wait() { sleep(Self::CPU_ONOFFLINE_WAIT).await }
+
+    fn cpu_ids_for_chain(&self) -> Vec<u64> {
+        let mut ids: Vec<u64> = self.knobses
             .iter()
             .fold(
                 HashSet::new(),
@@ -588,9 +638,17 @@ impl Chain {
         ids
     }
 
-    const CPU_ONOFFLINE_WAIT: Duration = Duration::from_millis(200);
+    async fn cpus_online_all(&self) -> Vec<u64> {
+        let cpu_ids = self.cpu_ids_for_chain();
+        let cpu_ids = policy::set_cpus_online(cpu_ids).await;
+        if !cpu_ids.is_empty() { Self::cpu_onoff_wait().await; }
+        cpu_ids
+    }
 
-    async fn cpu_onoffline_wait() { sleep(Self::CPU_ONOFFLINE_WAIT).await }
+    async fn cpus_online_reset(&self, cpu_ids: Vec<u64>) {
+        let cpu_ids = policy::set_cpus_offline(cpu_ids).await;
+        if !cpu_ids.is_empty() { Self::cpu_onoff_wait().await; }
+    }
 
     pub async fn apply_values(&self) {
         if log::log_enabled!(log::Level::Trace) {
@@ -600,22 +658,20 @@ impl Chain {
             }
         }
         if self.has_cpufreq_values() || self.has_pstate_values() {
-            let cpu_ids = policy::set_cpus_online(self.cpu()).await;
-            if !cpu_ids.is_empty() { Self::cpu_onoffline_wait().await; }
+            let cpu_ids = self.cpus_online_all().await;
 
-            for (i, k) in self.0.iter().enumerate() {
+            for (i, k) in self.knobses.iter().enumerate() {
                 log::info!("Group {} Pass 0", i);
                 k.apply_cpufreq_values().await;
                 k.apply_pstate_values().await;
             }
 
-            let cpu_ids = policy::set_cpus_offline(cpu_ids).await;
-            if !cpu_ids.is_empty() { Self::cpu_onoffline_wait().await; }
+            self.cpus_online_reset(cpu_ids).await;
         }
-        for (i, k) in self.0.iter().enumerate() {
+        for (i, k) in self.knobses.iter().enumerate() {
             log::info!("Group {} Pass 1", i);
             k.apply_cpu_values().await;
-            if k.has_cpu_values() { Self::cpu_onoffline_wait().await; }
+            if k.has_cpu_values() { Self::cpu_onoff_wait().await; }
             k.apply_rapl_values().await;
             k.apply_drm_values().await;
             #[cfg(feature = "nvml")]
@@ -623,22 +679,36 @@ impl Chain {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item=&Knobs> { self.0.iter() }
+    pub fn iter(&self) -> impl Iterator<Item=&Knobs> { self.knobses.iter() }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item=&mut Knobs> { self.0.iter_mut() }
+    pub fn iter_mut(&mut self) -> impl Iterator<Item=&mut Knobs> { self.knobses.iter_mut() }
 }
 
 impl From<Vec<Knobs>> for Chain {
-    fn from(v: Vec<Knobs>) -> Self { Self(v) }
+    fn from(knobses: Vec<Knobs>) -> Self { Self { knobses } }
+}
+
+impl From<Knobs> for Chain {
+    fn from(knobs: Knobs) -> Self { Self::from(vec![knobs]) }
 }
 
 impl From<Chain> for Vec<Knobs> {
-    fn from(c: Chain) -> Self { c.0 }
+    fn from(c: Chain) -> Self { c.knobses }
 }
 
 impl IntoIterator for Chain {
     type Item = crate::Knobs;
     type IntoIter = std::vec::IntoIter<Knobs>;
 
-    fn into_iter(self) -> Self::IntoIter { self.0.into_iter() }
+    fn into_iter(self) -> Self::IntoIter { self.knobses.into_iter() }
+}
+
+impl<'de> Deserialize<'de> for Chain {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: Vec<Knobs> = Deserialize::deserialize(deserializer)?;
+        Ok(s.into())
+    }
 }

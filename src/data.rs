@@ -1,9 +1,11 @@
-use zysfs::types as sysfs;
-use zysfs::types::tokio::Read as _;
-use zysfs::io::intel_rapl::tokio::energy_uj;
-use std::{collections::{HashMap, VecDeque}, sync::{Arc, atomic::{AtomicBool, Ordering}}, time::{Duration, Instant}};
-use tokio::{sync::Mutex, time::sleep};
 use measurements::Power;
+use zysfs::types::{self as sysfs, tokio::Read as _};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::{Arc, atomic::{AtomicBool, Ordering}},
+    time::{Duration, Instant},
+};
+use tokio::{sync::Mutex, time::sleep};
 
 // Samples rapl energy usage at a regular interval.
 #[derive(Clone, Debug)]
@@ -39,7 +41,9 @@ impl RaplSampler {
 
     fn swap_working(&mut self, v: bool) -> bool { self.working.swap(v, Ordering::Acquire) }
 
-    async fn poll(&self) -> Option<u64> { energy_uj(self.zone.zone, self.zone.subzone).await.ok() }
+    async fn poll(&self) -> Option<u64> {
+        sysfs::intel_rapl::io::tokio::energy_uj(self.zone.zone, self.zone.subzone).await.ok()
+    }
 
     async fn work(&mut self) {
         let mut begin = Instant::now();
@@ -74,7 +78,7 @@ impl RaplSampler {
 
     pub fn zone(&self) -> sysfs::intel_rapl::ZoneId { self.zone }
 
-    pub async fn values(&self) -> Vec<u64> { self.values.lock().await.clone().into() }
+    pub async fn values(&self) -> Vec<u64> {  { self.values.lock().await.clone() }.into() }
 
     pub async fn watt_seconds_max(&self) -> Option<Power> {
         let samples = self.values().await;
@@ -84,12 +88,12 @@ impl RaplSampler {
             .max()
             .map(|uw|
                 Power::from_microwatts(
-                    uw as f64 * 10f64.powf(6.) / self.interval.as_micros() as f64
+                    (uw as f64 * 10f64.powf(6.) / self.interval.as_micros() as f64).round()
                 ))
     }
 }
 
-// Manage a collection of `RaplEnergySampler`s.
+// Manage a collection of `RaplSampler`s.
 #[derive(Clone, Debug)]
 pub struct RaplSamplers {
     samplers: HashMap<sysfs::intel_rapl::ZoneId, RaplSampler>,
