@@ -17,12 +17,16 @@ A command-line utility for controlling Linux power and performance values.
 | ------- | ----------------------------------------- |
 | `nvml`  | Enable nvidia management library support. |
 
-_Note: `nvml` support requires the nvidia management library at **runtime**, which is usually installed with the
-proprietary driver. Knobs with `nvml` enabled will work just fine when no nvidia library/driver/hardware are present._
+_Note: `nvml` support requires the nvidia management library at **runtime**, which is
+usually installed with the proprietary driver. Knobs with `nvml` enabled will work just
+fine when no nvidia library/driver/hardware are present._
 
 ## Profiles
 
-Profiles may be declared in a yaml file. This example...
+Profiles may be declared in a yaml file. A profile is a list of value groups. A value group is
+a map of names to values. Names and values are analogous to command-line argument names and values.
+
+This example...
 
 ```yaml
 min:
@@ -41,13 +45,10 @@ max:
     rapl_short_limit: 15w
 ```
 
-...declares profiles named `min` and `max`. Each profile is a list of value groups. Each value group is a map
-of names to values. Names and values are analogous to command-line argument names and values.
-
-A profile's value groups are applied sequentially. In this example, each profile has a single value group.
+...declares profiles named `min` and `max`, each containing one value group. Each value group contains
+cpufreq and rapl values.
 
 To apply the above profiles, run:
-
 ```
 knobs min
 
@@ -65,7 +66,7 @@ The following command-line arguments may be used in a profile:
 - `--pstate-*`
 - `--rapl-*`
 
-Default profile file paths:
+The default profile file paths are, in order of preference:
 
 - `$XDG_CONFIG_HOME/knobs/profile/$HOSTNAME.yaml`
 - `/etc/knobs/profile/$HOSTNAME.yaml`
