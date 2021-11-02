@@ -18,8 +18,7 @@ A command-line utility for controlling Linux power and performance values.
 | `nvml`  | Enable nvidia management library support. |
 
 _Note: `nvml` support requires the nvidia management library at **runtime**, which is usually installed with the
-proprietary driver. Knobs with `nvml` enabled will work just fine when no nvidia library/driver/hardware are present
-on the system._
+proprietary driver. Knobs with `nvml` enabled will work just fine when no nvidia library/driver/hardware are present._
 
 ## Profiles
 
@@ -43,7 +42,9 @@ max:
 ```
 
 ...declares profiles named `min` and `max`. Each profile is a list of value groups. Each value group is a map
-of names to values. A profile's value groups are applied sequentially. In this example, each profile has a single value group.
+of names to values. Names and values are analogous to command-line argument names and values.
+
+A profile's value groups are applied sequentially. In this example, each profile has a single value group.
 
 To apply the above profiles, run:
 
@@ -72,8 +73,6 @@ Default profile file paths:
 - `/etc/knobs/profile/default.yaml`
 
 A profile path may be specified explicitly by setting the `KNOBS_PROFILE_PATH` env var.
-
-
 
 ## Command-line interface
 
