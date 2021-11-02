@@ -1,6 +1,10 @@
 use std::{collections::HashMap, path::{Path, PathBuf}};
-use crate::Chain;
-use crate::cli::{NAME, env, path};
+use crate::NAME;
+use crate::env::hostname;
+use crate::path::{profile_user, profile_sys};
+use crate::types::Chain;
+
+const DEFAULT_FILE_NAME: &str = "default";
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -22,7 +26,7 @@ pub enum Error {
         message: String,
     },
 
-    #[error("No profile file exists: {search_paths:#?}")]
+    #[error("No profile file exists in {search_paths:#?}")]
     NoFile {
         search_paths: Vec<String>,
     },
@@ -55,20 +59,24 @@ impl Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 // Return a list of possible paths for the profile file.
-fn search_paths() -> Vec<PathBuf> {
+pub fn paths() -> Vec<PathBuf> {
     let mut res = vec![];
-    for base_name in [env::hostname().as_deref(), Some(NAME)].into_iter().flatten() {
-        let file_name = format!("{}.yaml", base_name);
-        if let Some(p) = path::profile_user(&file_name) { res.push(p); }
-        let p = path::profile_sys(&file_name);
-        res.push(p);
+    if let Ok(v) = std::env::var(&format!("{}_PROFILE_PATH", NAME.to_uppercase())) {
+        res.push(PathBuf::from(v));
+    } else {
+        for base_name in [hostname().as_deref(), Some(DEFAULT_FILE_NAME)].into_iter().flatten() {
+            let file_name = format!("{}.yaml", base_name);
+            if let Some(p) = profile_user(&file_name) { res.push(p); }
+            let p = profile_sys(&file_name);
+            res.push(p);
+        }
     }
     res
 }
 
 // Return the path to the profile file.
-fn path() -> Option<PathBuf> {
-    search_paths()
+pub fn path() -> Option<PathBuf> {
+    paths()
         .into_iter()
         .find(|p| p.is_file())
 }
@@ -76,8 +84,9 @@ fn path() -> Option<PathBuf> {
 // Load the given profile name from the profile file.
 pub async fn read(name: &str) -> Result<Chain> {
     let path = if let Some(p) = path() { p } else {
-        return Err(Error::no_file(search_paths()));
+        return Err(Error::no_file(paths()));
     };
+    log::debug!("Reading profiles from {}", path.display());
     match tokio::fs::read_to_string(&path).await {
         Ok(s) =>
             match serde_yaml::from_str::<HashMap<String, Chain>>(&s) {

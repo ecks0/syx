@@ -1,4 +1,5 @@
 use zysfs::types::{self as sysfs, tokio::Read as _};
+use std::time::{Duration, Instant};
 use tokio::sync::OnceCell;
 
 pub async fn cpu_ids() -> Option<Vec<u64>> {
@@ -38,4 +39,20 @@ pub async fn nvml_ids() -> Option<Vec<u64>> {
             .map(|ids| ids.into_iter().map(u64::from).collect())
     }
     NVML_IDS.get_or_init(nvml_ids).await.clone()
+}
+
+#[derive(Debug)]
+pub struct Counter;
+
+impl Counter {
+    pub async fn get() -> Instant {
+        static COUNTER: OnceCell<Instant> = OnceCell::const_new();
+        async fn start() -> Instant { Instant::now() }
+        *COUNTER.get_or_init(start).await
+    }
+
+    pub async fn delta() -> Duration {
+        let then = Self::get().await;
+        Instant::now() - then
+    }
 }

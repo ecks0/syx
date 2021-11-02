@@ -1,5 +1,6 @@
 use zysfs::io::cpu::tokio::{cpu_online, set_cpu_online};
 use zysfs::types as sysfs;
+use crate::types;
 
 pub async fn set_cpus_online(cpu_ids: Vec<u64>) -> Vec<u64> {
     let mut onlined = vec![];
@@ -25,8 +26,8 @@ pub async fn set_cpus_offline(cpu_ids: Vec<u64>) -> Vec<u64> {
     offlined
 }
 
-impl From<&crate::Knobs> for Option<sysfs::cpu::Cpu> {
-    fn from(k: &crate::Knobs) -> Self {
+impl From<&types::Knobs> for Option<sysfs::cpu::Cpu> {
+    fn from(k: &types::Knobs) -> Self {
         if !k.has_cpu_values() { return None; }
         let mut policies: Vec<sysfs::cpu::Policy> =
             k.cpu.clone()
@@ -66,8 +67,8 @@ impl From<&crate::Knobs> for Option<sysfs::cpu::Cpu> {
     }
 }
 
-impl From<&crate::Knobs> for Option<sysfs::cpufreq::Cpufreq> {
-    fn from(k: &crate::Knobs) -> Self {
+impl From<&types::Knobs> for Option<sysfs::cpufreq::Cpufreq> {
+    fn from(k: &types::Knobs) -> Self {
         if !k.has_cpufreq_values() { return None; }
         let scaling_min_freq = k.cpufreq_min.map(|f| f.as_kilohertz().round() as u64);
         let scaling_max_freq = k.cpufreq_max.map(|f| f.as_kilohertz().round() as u64);
@@ -93,8 +94,8 @@ impl From<&crate::Knobs> for Option<sysfs::cpufreq::Cpufreq> {
     }
 }
 
-impl From<&crate::Knobs> for Option<sysfs::drm::Drm> {
-    fn from(k: &crate::Knobs) -> Self {
+impl From<&types::Knobs> for Option<sysfs::drm::Drm> {
+    fn from(k: &types::Knobs) -> Self {
         if !k.has_drm_values() { return None; }
         let cards = vec![
 
@@ -108,8 +109,8 @@ impl From<&crate::Knobs> for Option<sysfs::drm::Drm> {
                         .map(|id|
                             sysfs::drm::Card {
                                 id: match id {
-                                    crate::CardId::Id(id) => Some(id),
-                                    crate::CardId::PciId(_) => panic!("Indexing drm-i915 cards by PCI ID is not yet implemented"),
+                                    types::CardId::Id(id) => Some(id),
+                                    types::CardId::PciId(_) => panic!("Indexing drm-i915 cards by PCI ID is not yet implemented"),
                                 },
                                 driver_policy: Some(
                                     sysfs::drm::DriverPolicy::I915(
@@ -183,8 +184,8 @@ impl NvmlPolicies {
 }
 
 #[cfg(feature = "nvml")]
-impl From<&crate::Knobs> for Option<NvmlPolicies> {
-    fn from(k: &crate::Knobs) -> Self {
+impl From<&types::Knobs> for Option<NvmlPolicies> {
+    fn from(k: &types::Knobs) -> Self {
         if !k.has_nvml_values() { return None; }
         let gpu_clock = k.nvml_gpu_min
             .and_then(|min|
@@ -199,8 +200,8 @@ impl From<&crate::Knobs> for Option<NvmlPolicies> {
                 .map(|id|
                     NvmlPolicy {
                         id: match id {
-                            crate::CardId::Id(id) => Some(id.try_into().unwrap()),
-                            crate::CardId::PciId(id) => nvml_facade::Nvml::device_for_pci_id(&id).and_then(|d| d.card().id()),
+                            types::CardId::Id(id) => Some(id.try_into().unwrap()),
+                            types::CardId::PciId(id) => nvml_facade::Nvml::device_for_pci_id(&id).and_then(|d| d.card().id()),
                         },
                         gpu_clock,
                         gpu_clock_reset,
@@ -215,8 +216,8 @@ impl From<&crate::Knobs> for Option<NvmlPolicies> {
     }
 }
 
-impl From<&crate::Knobs> for Option<sysfs::intel_pstate::IntelPstate> {
-    fn from(k: &crate::Knobs) -> Self {
+impl From<&types::Knobs> for Option<sysfs::intel_pstate::IntelPstate> {
+    fn from(k: &types::Knobs) -> Self {
         if !k.has_pstate_values() { return None; }
         let policies: Option<Vec<sysfs::intel_pstate::Policy>> =
             k.cpu.clone().map(|ids| ids
@@ -238,8 +239,8 @@ impl From<&crate::Knobs> for Option<sysfs::intel_pstate::IntelPstate> {
     }
 }
 
-impl From<&crate::Knobs> for Option<sysfs::intel_rapl::IntelRapl> {
-    fn from(k: &crate::Knobs) -> Self {
+impl From<&types::Knobs> for Option<sysfs::intel_rapl::IntelRapl> {
+    fn from(k: &types::Knobs) -> Self {
         if !k.has_rapl_values() { return None; }
 
         let id = sysfs::intel_rapl::ZoneId { zone: k.rapl_package?, subzone: k.rapl_zone };

@@ -1,8 +1,8 @@
 use crate::cli::*;
+use clap::{App, AppSettings, Arg, crate_version};
 
 // Build and return a clap app.
-pub fn build<'a, 'b>() -> clap::App<'a, 'b> {
-    use clap::{App, AppSettings, Arg, crate_version};
+pub(super) fn build<'a, 'b>() -> clap::App<'a, 'b> {
 
     let a = App::new(NAME)
 
@@ -186,14 +186,14 @@ pub fn build<'a, 'b>() -> clap::App<'a, 'b> {
             .long(ARG_RAPL_LONG_LIMIT)
             .takes_value(true)
             .value_name("WATTS")
-            .help("Set intel-rapl long_term power limit per --rapl-package/zone")
+            .help("Set intel-rapl long term power limit per --rapl-package/zone")
             .requires(ARG_RAPL_PACKAGE))
 
         .arg(Arg::with_name(ARG_RAPL_LONG_WINDOW)
             .long(ARG_RAPL_LONG_WINDOW)
             .takes_value(true)
             .value_name("SECS")
-            .help("Set intel-rapl long_term time window per --rapl-package/zone")
+            .help("Set intel-rapl long term time window per --rapl-package/zone")
             .requires(ARG_RAPL_PACKAGE))
 
         .arg(Arg::with_name(ARG_RAPL_SHORT_LIMIT)
@@ -201,14 +201,14 @@ pub fn build<'a, 'b>() -> clap::App<'a, 'b> {
             .long(ARG_RAPL_SHORT_LIMIT)
             .takes_value(true)
             .value_name("WATTS")
-            .help("Set intel-rapl short_term power limit per --rapl-package/zone")
+            .help("Set intel-rapl short term power limit per --rapl-package/zone")
             .requires(ARG_RAPL_PACKAGE))
 
         .arg(Arg::with_name(ARG_RAPL_SHORT_WINDOW)
             .long(ARG_RAPL_SHORT_WINDOW)
             .takes_value(true)
             .value_name("SECS")
-            .help("Set intel-rapl short_term time window per --rapl-package/zone")
+            .help("Set intel-rapl short term time window per --rapl-package/zone")
             .requires(ARG_RAPL_PACKAGE))
 
         .arg(Arg::with_name(ARG_PROFILE))

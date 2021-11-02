@@ -1,8 +1,7 @@
 use tokio::sync::OnceCell;
 
-static LOGGING: OnceCell<()> = OnceCell::const_new();
-
 pub async fn configure() {
+    static LOGGING: OnceCell<()> = OnceCell::const_new();
     async fn init() {
         use std::io::Write;
         use env_logger::{Builder, Env};

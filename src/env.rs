@@ -1,8 +1,8 @@
-const ENV_PREFIX: &str = "KNOBS";
+use crate::NAME;
 
 // Return the environment variable name for the given cli argument name.
 fn var_name(cli_name: &str) -> String {
-    format!("{}_{}", ENV_PREFIX, cli_name.to_uppercase().replace("-", "_"))
+    format!("{}_{}", NAME.to_uppercase(), cli_name.to_uppercase().replace("-", "_"))
 }
 
 // Return the environment variable value for the given cli argument name.

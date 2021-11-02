@@ -1,11 +1,12 @@
 use zysfs::types::{self as sysfs, tokio::Feature as _};
 use std::time::Duration;
 use tokio::time::sleep;
-use crate::cli::{counter, Cli};
+use crate::lazy;
+use crate::cli::Cli;
 use crate::data::{RaplSampler, RaplSamplers};
 
 #[derive(Clone, Debug)]
-pub struct Samplers {
+pub(super) struct Samplers {
     samplers: Option<RaplSamplers>,
 }
 
@@ -23,6 +24,7 @@ impl Samplers {
                 sysfs::intel_rapl::IntelRapl::present().await
             {
                 if let Some(s) = RaplSampler::all(Self::INTERVAL).await {
+                    log::debug!("Starting rapl samplers");
                     let mut s = RaplSamplers::from(s);
                     s.start().await;
                     Some(s)
@@ -32,15 +34,13 @@ impl Samplers {
     }
 
     pub async fn stop(&mut self) {
-        if let Some(s) = self.samplers.as_mut() {
-            s.stop().await;
-        }
+        if let Some(s) = self.samplers.as_mut() { s.stop().await; }
     }
 
     pub async fn wait(&self, begin: Duration) {
         if let Some(s) = self.samplers.as_ref() {
             if s.working().await {
-                let runtime = counter::delta().await - begin;
+                let runtime = lazy::Counter::delta().await - begin;
                 if runtime < Self::RUNTIME {
                     sleep(Self::RUNTIME - runtime).await;
                 }
@@ -48,5 +48,5 @@ impl Samplers {
         }
     }
 
-    pub fn into_option(self) -> Option<RaplSamplers> { self.samplers }
+    pub fn into_samplers(self) -> Option<RaplSamplers> { self.samplers }
 }

@@ -74,8 +74,6 @@ impl RaplSampler {
 
     pub async fn stop(&mut self) { self.swap_working(false); }
 
-    pub async fn clear(&mut self) { self.values.lock().await.clear(); }
-
     pub fn zone(&self) -> sysfs::intel_rapl::ZoneId { self.zone }
 
     pub async fn values(&self) -> Vec<u64> {  { self.values.lock().await.clone() }.into() }
@@ -117,8 +115,6 @@ impl RaplSamplers {
     pub async fn start(&mut self) { for s in self.samplers.values_mut() { s.start().await; } }
 
     pub async fn stop(&mut self) { for s in self.samplers.values_mut() { s.stop().await; } }
-
-    pub async fn clear(&mut self) { for s in self.samplers.values_mut() { s.clear().await; } }
 
     pub async fn watt_seconds(&self, zone: sysfs::intel_rapl::ZoneId) -> Option<Power> {
         self.samplers.get(&zone)?.watt_seconds().await
