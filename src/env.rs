@@ -1,21 +1,8 @@
 use crate::NAME;
 
-// Return the environment variable name for the given cli argument name.
-fn var_name(cli_name: &str) -> String {
-    format!("{}_{}", NAME.to_uppercase(), cli_name.to_uppercase().replace("-", "_"))
-}
+pub fn var_name(n: &str) -> String { format!("{}_{}", NAME, n) }
 
-// Return the environment variable value for the given cli argument name.
-pub fn var(cli_name: &str) -> Option<String> {
-
-    match std::env::var(&var_name(cli_name)) {
-        Ok(v) => {
-            log::debug!("--{}: using value from environment: {}", cli_name, v);
-            Some(v)
-        },
-        _ => None,
-    }
-}
+pub fn var(n: &str) -> Option<String> { std::env::var(&var_name(n)).ok() }
 
 // Return the system's hostname.
 pub fn hostname() -> Option<String> {

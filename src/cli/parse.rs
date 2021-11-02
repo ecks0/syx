@@ -4,6 +4,18 @@ use crate::parse::{BoolStr, CardIds, DurationStr, FrequencyStr, Indices, PowerSt
 use crate::types::{Chain, Knobs};
 use std::str::FromStr;
 
+// Return the environment variable name for the given cli argument name.
+fn var_name(arg: &str) -> String { arg.to_uppercase().replace("-", "_") }
+
+// Return the environment variable value for the given cli argument name.
+fn var(arg: &str) -> Option<String> {
+    let v = env::var(&var_name(arg));
+    if let Some(v) = v.as_ref() {
+        log::debug!("--{}: using value from environment: {}", arg, v);
+    }
+    v
+}
+
 // Argument parsing helper.
 #[derive(Clone, Debug)]
 pub(super) struct Parser<'a>(clap::ArgMatches<'a>);
@@ -25,7 +37,7 @@ impl<'a> Parser<'a> {
         match self.0.is_present(name) {
             true => Some(()),
             false =>
-                match env::var(name)
+                match var(name)
                     .map(|v| !v.is_empty() && v != "0" && v.to_lowercase() != "false")
                     .unwrap_or(false)
                 {
@@ -39,7 +51,7 @@ impl<'a> Parser<'a> {
     pub fn int<T: FromStr<Err = std::num::ParseIntError>>(&self, name: &str) -> Result<Option<T>> {
         match self.0.value_of(name)
             .map(|v| v.to_string())
-            .or_else(|| env::var(name))
+            .or_else(|| var(name))
         {
             Some(v) => Ok(Some(
                 T::from_str(&v)
@@ -53,7 +65,7 @@ impl<'a> Parser<'a> {
     pub fn str(&self, name: &str) -> Option<String> {
         self.0.value_of(name)
             .map(|v| v.to_string())
-            .or_else(|| env::var(name))
+            .or_else(|| var(name))
     }
 
     // Parse an argument using `FromStr` from the argv or from env vars.
@@ -63,7 +75,7 @@ impl<'a> Parser<'a> {
     {
         match self.0.value_of(name)
             .map(String::from)
-            .or_else(|| env::var(name))
+            .or_else(|| var(name))
         {
             Some(v) => Ok(Some(
                 S::from_str(&v)

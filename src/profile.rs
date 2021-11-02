@@ -1,6 +1,5 @@
 use std::{collections::HashMap, path::{Path, PathBuf}};
-use crate::NAME;
-use crate::env::hostname;
+use crate::env;
 use crate::path::{profile_user, profile_sys};
 use crate::types::Chain;
 
@@ -61,10 +60,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 // Return a list of possible paths for the profile file.
 pub fn paths() -> Vec<PathBuf> {
     let mut res = vec![];
-    if let Ok(v) = std::env::var(&format!("{}_PROFILE_PATH", NAME.to_uppercase())) {
+    if let Some(v) = env::var("PROFILE_PATH") {
         res.push(PathBuf::from(v));
     } else {
-        for base_name in [hostname().as_deref(), Some(DEFAULT_FILE_NAME)].into_iter().flatten() {
+        for base_name in [env::hostname().as_deref(), Some(DEFAULT_FILE_NAME)].into_iter().flatten() {
             let file_name = format!("{}.yaml", base_name);
             if let Some(p) = profile_user(&file_name) { res.push(p); }
             let p = profile_sys(&file_name);

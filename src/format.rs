@@ -34,16 +34,6 @@ fn uw(uw: u64) -> String {
     }
 }
 
-// fn uj(uj: u64) -> String {
-//     match uj {
-//         0 => "0 J".to_string(),
-//         _ => {
-//             let j = uj as f64 * 10f64.powf(-6.);
-//             format!("{:.3}", Energy::from_joules(j))
-//         },
-//     }
-// }
-
 fn hz(hz: u64) -> String {
     match hz {
         0 => "0 Hz".to_string(),

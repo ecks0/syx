@@ -1,4 +1,5 @@
 use tokio::sync::OnceCell;
+use crate::env::var_name;
 
 pub async fn configure() {
     static LOGGING: OnceCell<()> = OnceCell::const_new();
@@ -6,8 +7,8 @@ pub async fn configure() {
         use std::io::Write;
         use env_logger::{Builder, Env};
         let env = Env::default()
-            .filter_or("KNOBS_LOG", "error")
-            .write_style_or("KNOBS_LOG_STYLE", "never");
+            .filter_or(var_name("LOG"), "error")
+            .write_style_or(var_name("LOG_STYLE"), "never");
         Builder::from_env(env)
             .format(|buf, record| {
                 writeln!(buf, "{}", record.args())
