@@ -15,10 +15,7 @@ A command-line utility for controlling Linux power and performance values.
 
 | Feature | Description                               |
 | ------- | ----------------------------------------- |
-| `cli`   | Enable the command-line interface.        |
 | `nvml`  | Enable nvidia management library support. |
-| `serde` | Enable serde support.                     |
-| `full`  | Enable all features.                      |
 
 _Note: `nvml` support requires the nvidia management library at **runtime**, which is usually installed with the
 proprietary driver. Knobs with `nvml` enabled will work just fine when no nvidia library/driver/hardware are present
