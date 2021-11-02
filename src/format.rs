@@ -460,7 +460,7 @@ impl FormatValues for sysfs::intel_rapl::IntelRapl {
                 .and_then(|v| v
                     .iter()
                     .find(|p| p.name.as_ref().map(|s| s == "short_term").unwrap_or(false)));
-            let watt_seconds = if let Some(s) = &samplers { s.watt_seconds_max(zone).await } else { None };
+            let watt_seconds = if let Some(s) = &samplers { s.watt_seconds(zone).await } else { None };
             tab.row(&[
                 policy.name.clone().unwrap_or_else(Format::dot),
                 format!(

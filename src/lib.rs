@@ -337,9 +337,13 @@ impl Chain {
 
     pub fn has_rapl_values(&self) -> bool { self.knobses.iter().any(|k| k.has_rapl_values()) }
 
-    const CPU_ONOFFLINE_WAIT: Duration = Duration::from_millis(250);
+    const CPU_ONOFFLINE_WAIT: Duration = Duration::from_millis(300);
 
     async fn cpu_onoff_wait() { sleep(Self::CPU_ONOFFLINE_WAIT).await }
+
+    const CPU_RELATED_WAIT: Duration = Duration::from_millis(100);
+
+    async fn cpu_related_wait() { sleep(Self::CPU_RELATED_WAIT).await }
 
     fn cpu_ids_for_chain(&self) -> Vec<u64> {
         let mut ids: Vec<u64> = self.knobses
@@ -379,6 +383,7 @@ impl Chain {
                 log::info!("Group {} Pass 0", i);
                 k.apply_cpufreq_values().await;
                 k.apply_pstate_values().await;
+                Self::cpu_related_wait().await;
             }
 
             self.cpus_online_reset(onlined).await;

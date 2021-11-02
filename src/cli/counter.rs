@@ -1,10 +1,8 @@
 use tokio::sync::OnceCell;
 use std::time::{Duration, Instant};
 
-// Runtime counter.
-static COUNTER: OnceCell<Instant> = OnceCell::const_new();
-
 pub async fn get() -> Instant {
+    static COUNTER: OnceCell<Instant> = OnceCell::const_new();
     async fn start() -> Instant { Instant::now() }
     *COUNTER.get_or_init(start).await
 }

@@ -12,26 +12,26 @@ use tokio::{sync::Mutex, time::sleep};
 pub struct RaplSampler {
     zone: sysfs::intel_rapl::ZoneId,
     interval: Duration,
-    count: usize,
     values: Arc<Mutex<VecDeque<u64>>>,
     working: Arc<AtomicBool>,
 }
 
 impl RaplSampler {
 
-    pub async fn all(interval: Duration, count: usize) -> Option<Vec<RaplSampler>> {
+    const COUNT: usize = 11;
+
+    pub async fn all(interval: Duration) -> Option<Vec<RaplSampler>> {
         sysfs::intel_rapl::Policy::ids().await
             .map(|zones| zones
                 .into_iter()
-                .map(|zone| Self::new(zone, interval, count))
+                .map(|zone| Self::new(zone, interval))
                 .collect())
     }
 
-    pub fn new(zone: sysfs::intel_rapl::ZoneId, interval: Duration, count: usize) -> Self {
+    pub fn new(zone: sysfs::intel_rapl::ZoneId, interval: Duration) -> Self {
         Self {
             zone,
             interval,
-            count,
             values: Default::default(),
             working: Default::default(),
         }
@@ -52,7 +52,7 @@ impl RaplSampler {
                 Some(v) => {
                     let mut values = self.values.lock().await;
                     values.push_back(v);
-                    while values.len() > self.count { values.pop_front(); }
+                    while values.len() > Self::COUNT { values.pop_front(); }
                     drop(values);
                 },
                 None => {
@@ -80,16 +80,27 @@ impl RaplSampler {
 
     pub async fn values(&self) -> Vec<u64> {  { self.values.lock().await.clone() }.into() }
 
-    pub async fn watt_seconds_max(&self) -> Option<Power> {
+    pub async fn watt_seconds(&self) -> Option<Power> {
         let samples = self.values().await;
-        if samples.len() < 2 { return None; }
-        (1..samples.len())
-            .map(|i| samples[i] - samples[i - 1])
-            .max()
-            .map(|uw|
-                Power::from_microwatts(
-                    (uw as f64 * 10f64.powf(6.) / self.interval.as_micros() as f64).round()
-                ))
+        let uw = match samples.len() {
+            v if v < 2 => return None,
+            v if v < Self::COUNT/2 =>
+                (1..samples.len())
+                    .map(|i| samples[i] - samples[i - 1])
+                    .max(),
+            _ => {
+                let mut deltas: Vec<u64> =
+                    (1..samples.len())
+                        .map(|i| samples[i] - samples[i - 1])
+                        .collect();
+                deltas.sort_unstable();
+                Some(deltas[deltas.len()/2])
+            },
+        };
+        uw.map(|uw|
+            Power::from_microwatts(
+                (uw as f64 * 10f64.powf(6.) / self.interval.as_micros() as f64).round()
+            ))
     }
 }
 
@@ -109,8 +120,8 @@ impl RaplSamplers {
 
     pub async fn clear(&mut self) { for s in self.samplers.values_mut() { s.clear().await; } }
 
-    pub async fn watt_seconds_max(&self, zone: sysfs::intel_rapl::ZoneId) -> Option<Power> {
-        self.samplers.get(&zone)?.watt_seconds_max().await
+    pub async fn watt_seconds(&self, zone: sysfs::intel_rapl::ZoneId) -> Option<Power> {
+        self.samplers.get(&zone)?.watt_seconds().await
     }
 }
 

@@ -16,16 +16,13 @@ impl Samplers {
     // Sleep time between samples, per sampler/zone.
     const INTERVAL: Duration = Duration::from_millis(100);
 
-    /// Maximum number of samples, per sampler/zone.
-    const COUNT: usize = 11;
-
     pub async fn new(cli: &Cli) -> Self {
         let samplers =
             if cli.quiet.is_none() &&
                 (!cli.has_show_args() || cli.show_rapl.is_some()) &&
                 sysfs::intel_rapl::IntelRapl::present().await
             {
-                if let Some(s) = RaplSampler::all(Self::INTERVAL, Self::COUNT).await {
+                if let Some(s) = RaplSampler::all(Self::INTERVAL).await {
                     let mut s = RaplSamplers::from(s);
                     s.start().await;
                     Some(s)

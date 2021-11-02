@@ -12,10 +12,10 @@ mod sampler;
 pub use profile::Error as ProfileError;
 
 use zysfs::types::{self as sysfs, tokio::Read as SysfsRead};
-use std::{convert::TryFrom, time::Duration};
+use std::{convert::TryFrom};
 use crate::{Chain, Error, Knobs, Result};
 use crate::parse::{BoolStr, CardIds, DurationStr, FrequencyStr, Indices, PowerStr, Toggles};
-use tokio::{io::{AsyncWriteExt, stdout}, time::sleep};
+use tokio::io::{AsyncWriteExt, stdout};
 
 const NAME: &str                  = "knobs";
 
@@ -211,17 +211,12 @@ impl Cli {
         Ok(())
     }
 
-    const CPU_RELATED_WAIT: Duration = Duration::from_millis(150);
-
     // Command-line interface app logic.
     pub async fn run(&self) -> Result<()> {
         let mut samplers = sampler::Samplers::new(self).await;
         let begin = counter::delta().await;
         for chain in &self.chains { chain.apply_values().await; }
         if self.quiet.is_some() { return Ok(()); } // samplers will not start if quiet
-        if self.chains.iter().any(|c| c.has_cpu_related_values()) {
-            sleep(Self::CPU_RELATED_WAIT).await;
-        }
         samplers.wait(begin).await;
         let pr = self.print_values(samplers.clone()).await;
         samplers.stop().await;
