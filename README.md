@@ -45,8 +45,8 @@ max:
     rapl_short_limit: 15w
 ```
 
-...declares profiles named `min` and `max`, each containing one value group. Each value group contains
-cpufreq and rapl values.
+...declares profiles named `min` and `max`, each containing one value group, with each value group
+containing cpufreq and rapl values.
 
 To apply the above profiles, run:
 ```
