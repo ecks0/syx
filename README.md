@@ -44,8 +44,8 @@ max:
 ```
 
 ...declares profiles named `min` and `max`, each containing one value group, with each value group
-containing cpufreq and rapl values. Multiple value groups may be specified per profile, which is
-useful for applying different settings to different resource ids.
+containing cpufreq and rapl values. Multiple value groups may be given per profile, and will
+be applied sequentially.
 
 ### Applying profiles
 
@@ -68,13 +68,12 @@ knobs _
 ```
 Knobs will exit with error if no profile has been previously applied.
 
-### Profile names and values
+### Profile keys and values
 
-Profile names and values are analogous to command-line argument names and values, but lowercased,
-with `_` in place of `-`.
+Profile keys and values are analogous to long command-line argument names and values, but with
+no dashes, and `_` in place of `-`.
 
 The following command-line arguments may be used in a profile:
-
 - `--cpu-*`
 - `--cpufreq-*`
 - `--drm-*`
