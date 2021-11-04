@@ -1,14 +1,14 @@
-pub(crate) mod cli;
-pub(crate) mod counter;
-pub(crate) mod data;
-pub(crate) mod de;
-pub(crate) mod env;
-pub(crate) mod format;
-pub(crate) mod logging;
-pub(crate) mod parse;
-pub(crate) mod path;
-pub(crate) mod policy;
-pub(crate) mod profile;
+mod cli;
+mod counter;
+mod data;
+mod de;
+mod env;
+mod format;
+mod logging;
+mod parse;
+mod path;
+mod policy;
+mod profile;
 
 pub use clap::{
     Error as ClapError,
@@ -66,13 +66,13 @@ use std::{collections::HashSet, time::Duration};
 use tokio::time::sleep;
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub(crate) enum CardId {
+enum CardId {
     Id(u64),
     PciId(String),
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, PartialOrd)]
-pub(crate) struct Knobs {
+struct Knobs {
 
     #[serde(default)]
     #[serde(deserialize_with = "de::indices")]
@@ -275,7 +275,7 @@ impl Knobs {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct Chain {
+struct Chain {
     knobses: Vec<Knobs>,
 }
 
