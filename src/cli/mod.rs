@@ -209,10 +209,13 @@ impl App {
         logging::configure().await;
         match Cli::new(args).await {
             Ok(cli) =>
-                if let Err(e) = cli.run().await {
-                    log::error!("Error: {}", e);
-                    std::process::exit(2);
-                }
+                match cli.run().await {
+                    Ok(()) => std::process::exit(0),
+                    Err(e) => {
+                        log::error!("Error: {}", e);
+                        std::process::exit(2);
+                    },
+                },
             Err(e) => {
                 if let Error::Clap(e) = &e {
                     if let clap::ErrorKind::HelpDisplayed = e.kind {
