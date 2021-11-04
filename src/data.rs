@@ -1,4 +1,5 @@
 use measurements::Power;
+use zysfs::io::intel_rapl::tokio::energy_uj;
 use zysfs::types::{self as sysfs, tokio::Read as _};
 use std::{
     collections::{HashMap, VecDeque},
@@ -7,7 +8,22 @@ use std::{
 };
 use tokio::{sync::Mutex, time::sleep};
 
-// Samples rapl energy usage at a regular interval.
+fn mean(n: Vec<u64>) -> f64 {
+    let sum: u64 = n.iter().sum();
+    sum as f64 / n.len() as f64
+}
+
+// fn median(mut n: Vec<u64>) -> u64 {
+//     n.sort_unstable();
+//     let mid = n.len() / 2;
+//     if n.len() % 2 == 0 {
+//         mean(n[mid - 1..mid].into()).round() as u64
+//     } else {
+//         n[mid]
+//     }
+// }
+
+// Sample rapl energy usage at a regular interval.
 #[derive(Clone, Debug)]
 pub struct RaplSampler {
     zone: sysfs::intel_rapl::ZoneId,
@@ -41,9 +57,7 @@ impl RaplSampler {
 
     fn swap_working(&mut self, v: bool) -> bool { self.working.swap(v, Ordering::Acquire) }
 
-    async fn poll(&self) -> Option<u64> {
-        sysfs::intel_rapl::io::tokio::energy_uj(self.zone.zone, self.zone.subzone).await.ok()
-    }
+    async fn poll(&self) -> Option<u64> { energy_uj(self.zone.zone, self.zone.subzone).await.ok() }
 
     async fn work(&mut self) {
         let mut begin = Instant::now();
@@ -68,8 +82,8 @@ impl RaplSampler {
 
     pub async fn start(&mut self) {
         if self.swap_working(true) { return; }
-        let mut this = self.clone();
-        tokio::task::spawn(async move { this.work().await; });
+        let mut worker = self.clone();
+        tokio::task::spawn(async move { worker.work().await; });
     }
 
     pub async fn stop(&mut self) { self.swap_working(false); }
@@ -80,22 +94,14 @@ impl RaplSampler {
 
     pub async fn watt_seconds(&self) -> Option<Power> {
         let samples = self.values().await;
-        let uw = match samples.len() {
-            v if v < 2 => return None,
-            v if v < Self::COUNT/2 =>
-                (1..samples.len())
-                    .map(|i| samples[i] - samples[i - 1])
-                    .max(),
-            _ => {
-                let mut deltas: Vec<u64> =
-                    (1..samples.len())
-                        .map(|i| samples[i] - samples[i - 1])
-                        .collect();
-                deltas.sort_unstable();
-                Some(deltas[deltas.len()/2])
-            },
-        };
-        uw.map(|uw|
+        if samples.len() < 2 { return None; }
+        let deltas = (1..samples.len()).map(|i| samples[i] - samples[i - 1]);
+        if samples.len() < Self::COUNT/2 - 1 {
+            deltas.max()
+        } else {
+            Some(mean(deltas.collect()).round() as u64)
+        }
+        .map(|uw|
             Power::from_microwatts(
                 (uw as f64 * 10f64.powf(6.) / self.interval.as_micros() as f64).round()
             ))

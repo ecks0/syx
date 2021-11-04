@@ -3,9 +3,10 @@ mod parse;
 mod sampler;
 
 use zysfs::types::{self as sysfs, tokio::Read as SysfsRead};
-use tokio::io::{AsyncWriteExt, stdout};
-use crate::{NAME, Error, Result, lazy, logging, profile};
-use crate::types::Chain;
+use tokio::io::{AsyncWriteExt as _, stdout};
+use crate::{NAME, Error, Result, counter, logging};
+use crate::profile::Profile;
+use crate::Chain;
 
 const ARG_QUIET: &str             = "quiet";
 
@@ -84,22 +85,32 @@ struct Cli {
     show_nvml: Option<()>,
     show_pstate: Option<()>,
     show_rapl: Option<()>,
+    profile: Option<Profile>,
     chains: Vec<Chain>,
 }
 
 impl Cli {
     // Create a new instance for the given argv.
     async fn new(argv: &[String]) -> Result<Self> {
-        log::debug!("Profile paths: {:#?}", profile::paths());
+        log::debug!("Profile config paths: {:#?}", Profile::config_paths().await);
         let p = parse::Parser::new(argv)?;
         let mut chains = vec![];
-        if let Some(name) = p.str(ARG_PROFILE) {
-            let c = profile::read(&name).await?;
-            if c.has_values() { chains.push(c); }
+        let profile =
+            if let Some(name) = p.str(ARG_PROFILE) {
+                if let Some(profile) = Profile::new(name).await? {
+                    let mut c = profile.read().await?;
+                    if c.has_values() {
+                        c.resolve().await;
+                        chains.push(c);
+                    }
+                    Some(profile)
+                } else { None }
+            } else { None };
+        let mut c = Chain::try_from(&p)?;
+        if c.has_values() {
+            c.resolve().await;
+            chains.push(c);
         }
-        let c = Chain::try_from(p.clone())?;
-        if c.has_values() { chains.push(c); }
-        for c in chains.iter_mut() { c.resolve().await; }
         let s = Self {
             quiet: p.flag(ARG_QUIET),
             show_cpu: p.flag(ARG_SHOW_CPU),
@@ -108,6 +119,7 @@ impl Cli {
             show_nvml: p.flag(ARG_SHOW_NVML),
             show_pstate: p.flag(ARG_SHOW_PSTATE),
             show_rapl: p.flag(ARG_SHOW_RAPL),
+            profile,
             chains,
         };
         Ok(s)
@@ -125,7 +137,7 @@ impl Cli {
     }
 
     // Print values tables.
-    async fn print_values(&self, samplers: sampler::Samplers) -> Result<()> {
+    async fn print_values(&self, samplers: &sampler::Samplers) -> Result<()> {
         use crate::format::FormatValues as _;
         let mut buf = Vec::with_capacity(3000);
         let show_all = !self.has_show_args();
@@ -143,7 +155,7 @@ impl Cli {
         }
         if show_all || self.show_rapl.is_some() {
             if let Some(intel_rapl) = sysfs::intel_rapl::IntelRapl::read(()).await {
-                intel_rapl.format_values(&mut buf, samplers.into_samplers()).await?;
+                intel_rapl.format_values(&mut buf, samplers.clone().into_samplers()).await?;
             }
         }
         if show_all || self.show_drm.is_some() {
@@ -165,13 +177,17 @@ impl Cli {
     // Command-line interface app logic.
     async fn run(&self) -> Result<()> {
         let mut samplers = sampler::Samplers::new(self).await;
-        let begin = lazy::Counter::delta().await;
+        let begin = counter::delta().await;
         for chain in &self.chains { chain.apply().await; }
+        if let Some(p) = self.profile.as_ref() {
+            let r = p.set_most_recent().await;
+            if r.is_err() { samplers.stop().await; r? }
+        }
         if self.quiet.is_some() { return Ok(()); } // samplers will not start if quiet
         samplers.wait(begin).await;
-        let pr = self.print_values(samplers.clone()).await;
+        let r = self.print_values(&samplers).await;
         samplers.stop().await;
-        pr?;
+        r?;
         Ok(())
     }
 }

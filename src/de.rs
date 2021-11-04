@@ -1,7 +1,7 @@
 use measurements::{Frequency, Power};
 use serde::{Deserialize, Deserializer, de::Error as _};
 use std::{str::FromStr, time::Duration};
-use crate::types::{CardId, Chain, Knobs};
+use crate::{CardId, Chain, Knobs};
 use crate::parse::{BoolStr, CardIds, DurationStr, FrequencyStr, Indices, PowerStr, Toggles};
 
 impl<'de> Deserialize<'de> for BoolStr {

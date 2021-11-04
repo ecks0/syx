@@ -1,6 +1,6 @@
 # knobs
 
-A command-line utility for controlling Linux power and performance values.
+A command-line utility for controlling Linux performance settings.
 
 | Topic        | Supported values                                     |
 | ------------ | ---------------------------------------------------- |
@@ -17,16 +17,14 @@ A command-line utility for controlling Linux power and performance values.
 | ------- | ----------------------------------------- |
 | `nvml`  | Enable nvidia management library support. |
 
-_Note: `nvml` support requires the nvidia management library at **runtime**, which is
-usually installed with the proprietary driver. Knobs with `nvml` enabled will work just
-fine when no nvidia library/driver/hardware are present._
+_Note: `nvml` requires the nvidia management library at runtime, usually installed with
+the proprietary driver. If the nvml library is missing, nvml arguments will be no-ops._
 
 ## Profiles
 
-Profiles may be declared in a yaml file. A profile is a list of value groups. A value group is
-a map of names to values. Names and values are analogous to command-line argument names and values.
+### Profile config file example
 
-This example...
+This example profile config...
 
 ```yaml
 min:
@@ -46,7 +44,10 @@ max:
 ```
 
 ...declares profiles named `min` and `max`, each containing one value group, with each value group
-containing cpufreq and rapl values.
+containing cpufreq and rapl values. Multiple value groups may be specified per profile, which is
+useful for applying different settings to different resource ids.
+
+### Applying profiles
 
 To apply the above profiles, run:
 ```
@@ -57,6 +58,21 @@ knobs min
 knobs max
 ```
 
+The underscore `_` is an alias for the name of the most recently applied profile.
+```
+# apply max
+knobs max
+
+# apply max again
+knobs _
+```
+Knobs will exit with error if no profile has been previously applied.
+
+### Profile names and values
+
+Profile names and values are analogous to command-line argument names and values, but lowercased,
+with `_` in place of `-`.
+
 The following command-line arguments may be used in a profile:
 
 - `--cpu-*`
@@ -66,21 +82,29 @@ The following command-line arguments may be used in a profile:
 - `--pstate-*`
 - `--rapl-*`
 
-The default profile file paths are, in order of preference:
 
-- `$XDG_CONFIG_HOME/knobs/profile/$HOSTNAME.yaml`
-- `/etc/knobs/profile/$HOSTNAME.yaml`
-- `$XDG_CONFIG_HOME/knobs/profile/default.yaml`
-- `/etc/knobs/profile/default.yaml`
+### Profile config file paths
 
-A profile path may be specified explicitly by setting the `KNOBS_PROFILE_PATH` env var.
+The default profile config search list is:
+
+```sh
+$XDG_CONFIG_HOME/knobs/profile/$HOSTNAME.yaml
+
+/etc/knobs/profile/$HOSTNAME.yaml
+
+$XDG_CONFIG_HOME/knobs/profile/default.yaml
+
+/etc/knobs/profile/default.yaml
+```
+
+A path may be specified explicitly by setting the env var `KNOBS_PROFILE_CONFIG`.
 
 ## Command-line interface
 
 ### Help
 
 ```
-knobs 0.3.1
+knobs 0.3.2
 
 USAGE:
     knobs [OPTIONS] [PROFILE] [-- <CHAIN>...]
@@ -130,7 +154,7 @@ ARGS:
 
         * Floating point values may be given for these units.
 
-    Values for supported hardware are shown unless the --show-* or --quiet flags are used.
+    All supported values are shown by default unless the --show-* or --quiet flags are used.
 
     All flags may be expressed as env vars. For example:
 

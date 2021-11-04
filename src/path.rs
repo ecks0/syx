@@ -1,53 +1,82 @@
 use std::path::PathBuf;
 use super::NAME;
 
-// Sub-directory containing profile files.
-const PROFILE: &str = "profile";
+pub(crate) mod config {
+    use super::*;
 
-// Name of state file.
-// const STATE: &'static str = "state.yaml";
+    const DIR_DEFAULT: &str = "/etc";
 
-// e.g. ~/.config/knobs
-fn config_user() -> Option<PathBuf> {
-    dirs::config_dir()
-        .map(|mut p| {
-            p.push(NAME);
-            p
-        })
+    const DIR: Option<&'static str> = option_env!("KNOBS_SYS_CONFIG_DIR");
+
+    // e.g. ~/.config/knobs
+    pub fn home() -> Option<PathBuf> {
+        dirs::config_dir()
+            .map(|mut p| {
+                p.push(NAME);
+                p
+            })
+    }
+
+    // e.g. /etc/knobs
+    pub fn sys() -> PathBuf {
+        let dir = DIR.unwrap_or(DIR_DEFAULT);
+        let mut p = PathBuf::new();
+        p.push(dir);
+        p.push(NAME);
+        p
+    }
+
+    pub fn home_with(file_name: &str) -> Option<PathBuf> {
+        home()
+            .map(|mut p| {
+                p.push(file_name);
+                p
+            })
+    }
+
+    pub fn sys_with(file_name: &str) -> PathBuf {
+        let mut p = sys();
+        p.push(file_name);
+        p
+    }
 }
 
-// /etc/knobs
-fn config_sys() -> PathBuf {
-    let mut p = PathBuf::new();
-    p.push("/etc");
-    p.push(NAME);
-    p
-}
+pub(crate) mod state {
+    use super::*;
 
-// e.g. ~/.config/knobs/profile/<file_name>
-pub fn profile_user(file_name: &str) -> Option<PathBuf> {
-    config_user()
-        .map(|mut p| {
-            p.push(PROFILE);
-            p.push(file_name);
-            p
-        })
-}
+    const DIR_DEFAULT: &str = "/var/lib";
 
-// /etc/knobs/profile/<file_name>
-pub fn profile_sys(file_name: &str) -> PathBuf {
-    let mut p = config_sys();
-    p.push(PROFILE);
-    p.push(file_name);
-    p
-}
+    const DIR: Option<&'static str> = option_env!("KNOBS_SYS_STATE_DIR");
 
-// e.g. ~/.local/state/knobs/state.yaml
-// pub fn state() -> Option<PathBuf> {
-//     dirs::state_dir()
-//         .map(|mut p| {
-//             p.push(NAME);
-//             p.push(STATE);
-//             p
-//         })
-// }
+    // e.g. ~/.local/state/knobs
+    pub fn home() -> Option<PathBuf> {
+        dirs::state_dir()
+            .map(|mut p| {
+                p.push(NAME);
+                p
+            })
+    }
+
+    // e.g. /var/lib/knobs
+    pub fn sys() -> PathBuf {
+        let dir = DIR.unwrap_or(DIR_DEFAULT);
+        let mut p = PathBuf::new();
+        p.push(dir);
+        p.push(NAME);
+        p
+    }
+
+    pub fn home_with(file_name: &str) -> Option<PathBuf> {
+        home()
+            .map(|mut p| {
+                p.push(file_name);
+                p
+            })
+    }
+
+    pub fn sys_with(file_name: &str) -> PathBuf {
+        let mut p = sys();
+        p.push(file_name);
+        p
+    }
+}

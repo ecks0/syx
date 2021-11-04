@@ -2,7 +2,7 @@ use crate::NAME;
 
 pub fn var_name(n: &str) -> String { format!("{}_{}", NAME, n) }
 
-pub fn var(n: &str) -> Option<String> { std::env::var(&var_name(n)).ok() }
+pub fn var(n: &str) -> Option<String> { std::env::var(&var_name(n)).ok() } // FIXME handle result
 
 // Return the system's hostname.
 pub fn hostname() -> Option<String> {

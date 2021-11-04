@@ -1,7 +1,6 @@
-use crate::{NAME, Error, Result, env};
+use crate::{NAME, Chain, Error, Knobs, Result, env};
 use crate::cli::*;
 use crate::parse::{BoolStr, CardIds, DurationStr, FrequencyStr, Indices, PowerStr, Toggles};
-use crate::types::{Chain, Knobs};
 use std::str::FromStr;
 
 // Return the environment variable name for the given cli argument name.
@@ -97,10 +96,10 @@ impl<'a> Parser<'a> {
 }
 
 // Build a `Knobs` from a `Parser`.
-impl<'a> TryFrom<Parser<'a>> for Knobs {
+impl TryFrom<&Parser<'_>> for Knobs {
     type Error = Error;
 
-    fn try_from(p: parse::Parser<'a>) -> Result<Self> {
+    fn try_from(p: &Parser<'_>) -> Result<Self> {
         let s = Self {
             cpu: p.from_str_as::<Indices, _>(ARG_CPU)?,
             cpu_on: p.from_str_as::<BoolStr, _>(ARG_CPU_ON)?,
@@ -136,14 +135,14 @@ impl<'a> TryFrom<Parser<'a>> for Knobs {
 }
 
 // Build a `Chain` from a `Parser`.
-impl<'a> TryFrom<Parser<'a>> for Chain {
+impl TryFrom<&Parser<'_>> for Chain {
     type Error = Error;
 
-    fn try_from(p: Parser<'a>) -> Result<Self> {
+    fn try_from(p: &Parser<'_>) -> Result<Self> {
         let mut chain: Vec<Knobs> = vec![];
-        let mut p = p;
+        let mut p = p.clone();
         loop {
-            let k = Knobs::try_from(p.clone())?;
+            let k = Knobs::try_from(&p)?;
             if k.has_values() { chain.push(k); }
             if !p.arg_present(ARG_CHAIN) { break; }
             match p.arg_values(ARG_CHAIN) {

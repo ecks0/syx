@@ -1,7 +1,7 @@
 use zysfs::types::{self as sysfs, tokio::Feature as _};
 use std::time::Duration;
 use tokio::time::sleep;
-use crate::lazy;
+use crate::counter;
 use crate::cli::Cli;
 use crate::data::{RaplSampler, RaplSamplers};
 
@@ -40,7 +40,7 @@ impl Samplers {
     pub async fn wait(&self, begin: Duration) {
         if let Some(s) = self.samplers.as_ref() {
             if s.working().await {
-                let runtime = lazy::Counter::delta().await - begin;
+                let runtime = counter::delta().await - begin;
                 if runtime < Self::RUNTIME {
                     sleep(Self::RUNTIME - runtime).await;
                 }

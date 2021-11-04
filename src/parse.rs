@@ -1,7 +1,7 @@
 use measurements::{Frequency, Power};
 use std::{str::FromStr, time::Duration};
-use crate::{Error, Result, types};
-use crate::types::CardId;
+use crate::{Error, Result};
+use crate::CardId;
 
 fn start_of_unit(s: &str) -> Option<usize> {
     for (i, c) in s.chars().enumerate() {
@@ -32,7 +32,7 @@ impl From<BoolStr> for bool {
     fn from(b: BoolStr) -> Self { b.0 }
 }
 
-impl FromStr for types::CardId {
+impl FromStr for CardId {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
@@ -47,7 +47,7 @@ impl FromStr for types::CardId {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct CardIds(Vec<types::CardId>);
+pub struct CardIds(Vec<CardId>);
 
 impl FromStr for CardIds {
     type Err = Error;
