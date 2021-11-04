@@ -44,8 +44,7 @@ max:
 ```
 
 ...declares profiles named `min` and `max`, each containing one value group, with each value group
-containing cpufreq and rapl values. Multiple value groups may be given per profile, and will
-be applied sequentially.
+containing cpufreq and rapl values. Multiple value groups may be given per profile.
 
 ### Applying profiles
 
@@ -80,7 +79,6 @@ The following command-line arguments may be used in a profile:
 - `--nvml-*`
 - `--pstate-*`
 - `--rapl-*`
-
 
 ### Profile config file paths
 
