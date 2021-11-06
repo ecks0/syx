@@ -40,7 +40,7 @@ impl Error {
     }
 
     fn parse_value<S: Display>(message: S) -> Self {
-        let message = s.to_string();
+        let message = message.to_string();
         Self::ParseValue(message)
     }
 }

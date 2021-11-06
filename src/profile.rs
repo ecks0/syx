@@ -123,7 +123,7 @@ impl Profile {
         let path = if let Some(p) = path::config_path().await {
             p
         } else {
-            return Err(Error::no_config(path::config_paths().await));
+            return Err(Error::no_config(Self::paths().await));
         };
         log::debug!("Reading profiles from {}", path.display());
         match tokio::fs::read_to_string(&path).await {
