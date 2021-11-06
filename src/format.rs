@@ -1,36 +1,39 @@
+use std::fmt::Display;
+
 use async_trait::async_trait;
 use comfy_table as ct;
 use measurements::{Frequency, Power};
-#[cfg(feature = "nvml")]
-use nvml_facade as nvml;
-use zysfs::types as sysfs;
-use std::fmt::Display;
+#[cfg(feature = "nvml")] use nvml_facade as nvml;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
-use crate::{Error, Result, data::RaplSamplers};
+use zysfs::types as sysfs;
 
-const DOT: & str = "\u{2022}";
+use crate::data::RaplSamplers;
+use crate::{Error, Result};
+
+const DOT: &str = "\u{2022}";
 
 fn dot() -> String { DOT.to_string() }
 
-fn nl(mut s: String) -> String { s.push('\n'); s }
+fn nl(mut s: String) -> String {
+    s.push('\n');
+    s
+}
 
 fn uw(uw: u64) -> String {
     match uw {
         0 => "0 W".to_string(),
         _ => {
-            let scale = 10u64.pow(
-                match uw {
-                    v if v > 10u64.pow(18) => 15,
-                    v if v > 10u64.pow(15) => 12,
-                    v if v > 10u64.pow(12) => 9,
-                    v if v > 10u64.pow(9) => 6,
-                    v if v > 10u64.pow(6) => 3,
-                    _ => 0,
-                }
-            );
-            let uw = (uw/scale) * scale;
+            let scale = 10u64.pow(match uw {
+                v if v > 10u64.pow(18) => 15,
+                v if v > 10u64.pow(15) => 12,
+                v if v > 10u64.pow(12) => 9,
+                v if v > 10u64.pow(9) => 6,
+                v if v > 10u64.pow(6) => 3,
+                _ => 0,
+            });
+            let uw = (uw / scale) * scale;
             Power::from_microwatts(uw as f64).to_string()
-        }
+        },
     }
 }
 
@@ -39,60 +42,54 @@ fn hz(hz: u64) -> String {
         0 => "0 Hz".to_string(),
         _ => {
             let f = Frequency::from_hertz(hz as f64);
-            if hz < 10u64.pow(9) {
-                format!("{:.0}", f)
-            } else {
-                format!("{:.1}", f)
-            }
+            if hz < 10u64.pow(9) { format!("{:.0}", f) } else { format!("{:.1}", f) }
         },
     }
 }
 
 #[cfg(feature = "nvml")]
 fn bytes(b: u64) -> String {
-    if b < 1000 { format!("{} B", b) }
-    else if b < 1000u64.pow(2) { format!("{:.1} kB", b as f64/1000f64) }
-    else if b < 1000u64.pow(3) { format!("{:.1} MB", b as f64/(1000u64.pow(2) as f64)) }
-    else if b < 1000u64.pow(4) { format!("{:.1} GB", b as f64/(1000u64.pow(3) as f64)) }
-    else if b < 1000u64.pow(5) { format!("{:.1} TB", b as f64/(1000u64.pow(4) as f64)) }
-    else if b < 1000u64.pow(6) { format!("{:.1} PB", b as f64/(1000u64.pow(5) as f64)) }
-    else { format!("{:.1} TB", b as f64/(1000u64.pow(4) as f64)) }
+    if b < 1000 {
+        format!("{} B", b)
+    } else if b < 1000u64.pow(2) {
+        format!("{:.1} kB", b as f64 / 1000f64)
+    } else if b < 1000u64.pow(3) {
+        format!("{:.1} MB", b as f64 / (1000u64.pow(2) as f64))
+    } else if b < 1000u64.pow(4) {
+        format!("{:.1} GB", b as f64 / (1000u64.pow(3) as f64))
+    } else if b < 1000u64.pow(5) {
+        format!("{:.1} TB", b as f64 / (1000u64.pow(4) as f64))
+    } else if b < 1000u64.pow(6) {
+        format!("{:.1} PB", b as f64 / (1000u64.pow(5) as f64))
+    } else {
+        format!("{:.1} TB", b as f64 / (1000u64.pow(4) as f64))
+    }
 }
 
 #[derive(Debug)]
 struct Table(ct::Table);
 
 impl Table {
-    pub fn new(header: &[&str]) -> Self {
+    pub(crate) fn new(header: &[&str]) -> Self {
         let mut tab = ct::Table::new();
         tab.load_preset(ct::presets::NOTHING);
         tab.set_header(header);
-        tab.add_row(
-            header
-                .iter()
-                .map(|h| "-".repeat(h.len()))
-                .collect::<Vec<String>>()
-        );
+        tab.add_row(header.iter().map(|h| "-".repeat(h.len())).collect::<Vec<String>>());
         Self(tab)
     }
 
-    pub fn row<S: Display>(&mut self, row: &[S]) {
-        self.0.add_row(row);
-    }
+    pub(crate) fn row<S: Display>(&mut self, row: &[S]) { self.0.add_row(row); }
 }
 
 impl std::fmt::Display for Table {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}", self.0)
-    }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { writeln!(f, "{}", self.0) }
 }
 
 #[async_trait]
-pub trait FormatValues {
+pub(crate) trait FormatValues {
     type Arg;
-    type Err;
 
-    async fn format_values<W>(&self, w: &mut W, arg: Self::Arg) -> std::result::Result<(), Self::Err>
+    async fn format_values<W>(&self, w: &mut W, arg: Self::Arg) -> Result<()>
     where
         W: AsyncWrite + Send + Unpin;
 }
@@ -100,25 +97,29 @@ pub trait FormatValues {
 #[async_trait]
 impl FormatValues for (sysfs::cpu::Cpu, sysfs::cpufreq::Cpufreq) {
     type Arg = ();
-    type Err = Error;
 
     async fn format_values<W>(&self, w: &mut W, _: ()) -> Result<()>
     where
-        W: AsyncWrite + Send + Unpin
+        W: AsyncWrite + Send + Unpin,
     {
         fn khz(khz: u64) -> String { hz(khz * 10u64.pow(3)) }
 
-        fn cpu_cpufreq(cpu: &sysfs::cpu::Cpu, cpufreq: &sysfs::cpufreq::Cpufreq ) -> Option<String> {
+        fn cpu_cpufreq(cpu: &sysfs::cpu::Cpu, cpufreq: &sysfs::cpufreq::Cpufreq) -> Option<String> {
             let cpu_pols = cpu.policies.as_ref()?;
             let cpufreq_pol_default = sysfs::cpufreq::Policy::default();
-            let mut tab = Table::new(&["CPU", "Online", "Governor", "Cur", "Min", "Max", "CPU min", "CPU max"]);
+            let mut tab = Table::new(&[
+                "CPU", "Online", "Governor", "Cur", "Min", "Max", "CPU min", "CPU max",
+            ]);
             for cpu_pol in cpu_pols {
-                let id = if let Some(id) = cpu_pol.id { id } else { continue; };
-                let cpufreq_pol = cpufreq.policies
+                let id = if let Some(id) = cpu_pol.id {
+                    id
+                } else {
+                    continue;
+                };
+                let cpufreq_pol = cpufreq
+                    .policies
                     .as_ref()
-                    .and_then(|p| p
-                        .iter()
-                        .find(|p| Some(id) == p.id))
+                    .and_then(|p| p.iter().find(|p| Some(id) == p.id))
                     .unwrap_or(&cpufreq_pol_default);
                 tab.row(&[
                     id.to_string(),
@@ -140,7 +141,9 @@ impl FormatValues for (sysfs::cpu::Cpu, sysfs::cpufreq::Cpufreq) {
                 .iter()
                 .filter_map(|p| p.scaling_available_governors.as_deref().map(|g| g.join(" ")))
                 .collect();
-            if govs.is_empty() { return None; }
+            if govs.is_empty() {
+                return None;
+            }
             govs.sort_unstable();
             govs.dedup();
             let mut tab = Table::new(&["CPU", "Available governors"]);
@@ -150,7 +153,10 @@ impl FormatValues for (sysfs::cpu::Cpu, sysfs::cpufreq::Cpufreq) {
                 for p in policies {
                     tab.row(&[
                         p.id.map(|v| v.to_string()).unwrap_or_else(dot),
-                        p.scaling_available_governors.as_ref().map(|v| v.join(" ")).unwrap_or_else(dot),
+                        p.scaling_available_governors
+                            .as_ref()
+                            .map(|v| v.join(" "))
+                            .unwrap_or_else(dot),
                     ])
                 }
             }
@@ -158,8 +164,12 @@ impl FormatValues for (sysfs::cpu::Cpu, sysfs::cpufreq::Cpufreq) {
         }
 
         let (cpu, cpufreq) = self;
-        if let Some(s) = cpu_cpufreq(cpu, cpufreq) { w.write_all(s.as_bytes()).await.map_err(Error::Format)?; }
-        if let Some(s) = governors(cpufreq) { w.write_all(s.as_bytes()).await.map_err(Error::Format)?; }
+        if let Some(s) = cpu_cpufreq(cpu, cpufreq) {
+            w.write_all(s.as_bytes()).await.map_err(Error::Format)?;
+        }
+        if let Some(s) = governors(cpufreq) {
+            w.write_all(s.as_bytes()).await.map_err(Error::Format)?;
+        }
         Ok(())
     }
 }
@@ -167,11 +177,10 @@ impl FormatValues for (sysfs::cpu::Cpu, sysfs::cpufreq::Cpufreq) {
 #[async_trait]
 impl FormatValues for sysfs::drm::Drm {
     type Arg = ();
-    type Err = Error;
 
     async fn format_values<W>(&self, w: &mut W, _: ()) -> Result<()>
     where
-        W: AsyncWrite + Send + Unpin
+        W: AsyncWrite + Send + Unpin,
     {
         fn mhz(mhz: u64) -> String { hz(mhz * 10u64.pow(6)) }
 
@@ -181,8 +190,12 @@ impl FormatValues for sysfs::drm::Drm {
                 .iter()
                 .filter(|c| c.driver.as_ref().map(|d| "i915" == d).unwrap_or(false))
                 .collect();
-            if cards.is_empty() { return None; }
-            let mut tab = Table::new(&["Card", "Driver", "Actual", "Req'd", "Min", "Max", "Boost", "GPU min", "GPU max"]);
+            if cards.is_empty() {
+                return None;
+            }
+            let mut tab = Table::new(&[
+                "Card", "Driver", "Actual", "Req'd", "Min", "Max", "Boost", "GPU min", "GPU max",
+            ]);
             for card in cards {
                 if let Some(sysfs::drm::DriverPolicy::I915(policy)) = card.driver_policy.as_ref() {
                     tab.row(&[
@@ -212,11 +225,10 @@ impl FormatValues for sysfs::drm::Drm {
 #[async_trait]
 impl FormatValues for nvml::Nvml {
     type Arg = ();
-    type Err = Error;
 
     async fn format_values<W>(&self, w: &mut W, _: ()) -> Result<()>
     where
-        W: AsyncWrite + Send + Unpin
+        W: AsyncWrite + Send + Unpin,
     {
         fn mhz(mhz: u32) -> String { hz(mhz as u64 * 10u64.pow(6)) }
 
@@ -225,7 +237,7 @@ impl FormatValues for nvml::Nvml {
         fn pad(s: &str, left: bool) -> String {
             const WIDTH: i64 = 19; // width of the widest label we expect to display
             let len: i64 = s.len().try_into().unwrap();
-            let pad = (WIDTH-len).max(0) as usize;
+            let pad = (WIDTH - len).max(0) as usize;
             if left {
                 format!("{}{}", " ".repeat(pad), s)
             } else {
@@ -246,16 +258,19 @@ impl FormatValues for nvml::Nvml {
             fn new(devs: &'a [nvml::Device]) -> Option<Self> {
                 let mut header = vec![padl("Nvidia GPU")];
                 for dev in devs {
-                    let id = if let Some(id) = dev.card().id() { id } else { continue; };
+                    let id = if let Some(id) = dev.card().id() {
+                        id
+                    } else {
+                        continue;
+                    };
                     header.push(padr(&format!("{}", id)));
                 }
-                if header.len() == 1 { return None; }
+                if header.len() == 1 {
+                    return None;
+                }
                 let header: Vec<&str> = header.iter().map(String::as_str).collect();
                 let tab = Table::new(&header);
-                let s = Self {
-                    tab,
-                    devs,
-                };
+                let s = Self { tab, devs };
                 Some(s)
             }
 
@@ -264,7 +279,9 @@ impl FormatValues for nvml::Nvml {
                 F: FnMut(&nvml::Device) -> String,
             {
                 let mut row = vec![padl(label)];
-                for dev in self.devs { row.push(f(dev)) }
+                for dev in self.devs {
+                    row.push(f(dev))
+                }
                 self.tab.row(&row);
             }
 
@@ -273,14 +290,27 @@ impl FormatValues for nvml::Nvml {
 
         use nvml::Clock as _;
         const DEVICES_PER_TABLE: usize = 2;
-        let devices = if let Some(d) = Self::devices() { d } else { return Ok(()); };
-        if devices.is_empty() { return Ok(()); }
+        let devices = if let Some(d) = Self::devices() {
+            d
+        } else {
+            return Ok(());
+        };
+        if devices.is_empty() {
+            return Ok(());
+        }
         let spam = regex::Regex::new("(?i)nvidia ").unwrap();
         for devs in devices.chunks(DEVICES_PER_TABLE) {
-            let mut tab = if let Some(tab) = NvmlTable::new(devs) { tab } else { continue; };
-            tab.row("Name", |d|
-                d.hardware().name().map(|v| spam.replace_all(&v, "").into_owned()).unwrap_or_else(dot)
-            );
+            let mut tab = if let Some(tab) = NvmlTable::new(devs) {
+                tab
+            } else {
+                continue;
+            };
+            tab.row("Name", |d| {
+                d.hardware()
+                    .name()
+                    .map(|v| spam.replace_all(&v, "").into_owned())
+                    .unwrap_or_else(dot)
+            });
             tab.row("PCI ID", |d| d.pci().bus_id().unwrap_or_else(dot));
             tab.row("Graphics cur/max", |d| {
                 format!(
@@ -331,7 +361,9 @@ impl FormatValues for nvml::Nvml {
                     d.power().max().map(mw).unwrap_or_else(dot),
                 )
             });
-            w.write_all(nl(tab.into_table().to_string()).as_bytes()).await.map_err(Error::Format)?;
+            w.write_all(nl(tab.into_table().to_string()).as_bytes())
+                .await
+                .map_err(Error::Format)?;
         }
         Ok(())
     }
@@ -340,37 +372,31 @@ impl FormatValues for nvml::Nvml {
 #[async_trait]
 impl FormatValues for sysfs::intel_pstate::IntelPstate {
     type Arg = ();
-    type Err = Error;
 
     async fn format_values<W>(&self, w: &mut W, _: ()) -> Result<()>
     where
-        W: AsyncWrite + Send + Unpin
+        W: AsyncWrite + Send + Unpin,
     {
-
-        fn system_status(status: &str) -> String {
-            format!(" intel_pstate: {}\n\n", status)
-        }
+        fn system_status(status: &str) -> String { format!(" intel_pstate: {}\n\n", status) }
 
         fn epb_epp(policies: &[sysfs::intel_pstate::Policy]) -> Option<String> {
             let mut values: Vec<(u64, String)> = policies
                 .iter()
-                .filter_map(|p| p.energy_perf_bias
-                    .and_then(|epb| p.energy_performance_preference
-                        .as_ref()
-                        .map(|epp| (epb, epp.to_string())))
-                )
+                .filter_map(|p| {
+                    p.energy_perf_bias.and_then(|epb| {
+                        p.energy_performance_preference.as_ref().map(|epp| (epb, epp.to_string()))
+                    })
+                })
                 .collect();
-            if values.is_empty() { return None; }
+            if values.is_empty() {
+                return None;
+            }
             values.sort_unstable();
             values.dedup();
             let mut tab = Table::new(&["CPU", "EP bias", "EP preference"]);
             if values.len() == 1 {
                 let values = values.into_iter().next().unwrap();
-                tab.row(&[
-                    "all".to_string(),
-                    values.0.to_string(),
-                    values.1,
-                ]);
+                tab.row(&["all".to_string(), values.0.to_string(), values.1]);
             } else {
                 for policy in policies {
                     tab.row(&[
@@ -386,11 +412,15 @@ impl FormatValues for sysfs::intel_pstate::IntelPstate {
         fn epps(policies: &[sysfs::intel_pstate::Policy]) -> Option<String> {
             let mut prefs: Vec<String> = policies
                 .iter()
-                .filter_map(|p| p.energy_performance_available_preferences.clone().map(|p| p.join(" ")))
+                .filter_map(|p| {
+                    p.energy_performance_available_preferences.clone().map(|p| p.join(" "))
+                })
                 .collect();
             prefs.sort_unstable();
             prefs.dedup();
-            if prefs.is_empty() { return None; }
+            if prefs.is_empty() {
+                return None;
+            }
             let mut tab = Table::new(&["CPU", "Available EP preferences"]);
             if prefs.len() == 1 {
                 tab.row(&["all", &prefs[0]]);
@@ -398,7 +428,11 @@ impl FormatValues for sysfs::intel_pstate::IntelPstate {
                 for policy in policies {
                     tab.row(&[
                         policy.id.map(|v| v.to_string()).unwrap_or_else(dot),
-                        policy.energy_performance_available_preferences.clone().map(|v| v.join(" ")).unwrap_or_else(dot),
+                        policy
+                            .energy_performance_available_preferences
+                            .clone()
+                            .map(|v| v.join(" "))
+                            .unwrap_or_else(dot),
                     ]);
                 }
             }
@@ -410,8 +444,12 @@ impl FormatValues for sysfs::intel_pstate::IntelPstate {
                 if let Ok(status) = sysfs::intel_pstate::io::tokio::status().await {
                     w.write_all(system_status(&status).as_bytes()).await.map_err(Error::Format)?;
                     if status == "active" {
-                        if let Some(s) = epb_epp(p) { w.write_all(s.as_bytes()).await.map_err(Error::Format)?; }
-                        if let Some(s) = epps(p) { w.write_all(s.as_bytes()).await.map_err(Error::Format)?; }
+                        if let Some(s) = epb_epp(p) {
+                            w.write_all(s.as_bytes()).await.map_err(Error::Format)?;
+                        }
+                        if let Some(s) = epps(p) {
+                            w.write_all(s.as_bytes()).await.map_err(Error::Format)?;
+                        }
                     }
                 }
             }
@@ -423,28 +461,42 @@ impl FormatValues for sysfs::intel_pstate::IntelPstate {
 #[async_trait]
 impl FormatValues for sysfs::intel_rapl::IntelRapl {
     type Arg = Option<RaplSamplers>;
-    type Err = Error;
 
     async fn format_values<W>(&self, w: &mut W, samplers: Option<RaplSamplers>) -> Result<()>
     where
-        W: AsyncWrite + Send + Unpin
+        W: AsyncWrite + Send + Unpin,
     {
-        let policies = if let Some(p) = self.policies.as_ref() { p } else { return Ok(()); };
-        if policies.is_empty() { return Ok(()); }
-        let mut tab = Table::new(&["Zone name", "Zone", "Long lim", "Short lim", "Long win", "Short win", "Usage"]);
+        let policies = if let Some(p) = self.policies.as_ref() {
+            p
+        } else {
+            return Ok(());
+        };
+        if policies.is_empty() {
+            return Ok(());
+        }
+        let mut tab = Table::new(&[
+            "Zone name",
+            "Zone",
+            "Long lim",
+            "Short lim",
+            "Long win",
+            "Short win",
+            "Usage",
+        ]);
         for policy in policies {
-            let zone = if let Some(id) = policy.id { id } else { continue; };
-            let long = policy.constraints
-                .as_deref()
-                .and_then(|v| v
-                    .iter()
-                    .find(|p| p.name.as_ref().map(|s| s == "long_term").unwrap_or(false)));
-            let short = policy.constraints
-                .as_deref()
-                .and_then(|v| v
-                    .iter()
-                    .find(|p| p.name.as_ref().map(|s| s == "short_term").unwrap_or(false)));
-            let watt_seconds = if let Some(s) = &samplers { s.watt_seconds(zone).await } else { None };
+            let zone = if let Some(id) = policy.id {
+                id
+            } else {
+                continue;
+            };
+            let long = policy.constraints.as_deref().and_then(|v| {
+                v.iter().find(|p| p.name.as_ref().map(|s| s == "long_term").unwrap_or(false))
+            });
+            let short = policy.constraints.as_deref().and_then(|v| {
+                v.iter().find(|p| p.name.as_ref().map(|s| s == "short_term").unwrap_or(false))
+            });
+            let watt_seconds =
+                if let Some(s) = &samplers { s.watt_seconds(zone).await } else { None };
             tab.row(&[
                 policy.name.clone().unwrap_or_else(dot),
                 format!(
@@ -452,16 +504,9 @@ impl FormatValues for sysfs::intel_rapl::IntelRapl {
                     zone.zone,
                     zone.subzone.map(|v| format!(":{}", v)).unwrap_or_else(String::new)
                 ),
-                long
-                    .and_then(|v| v.power_limit_uw)
-                    .map(uw)
-                    .unwrap_or_else(dot),
-                short
-                    .and_then(|v| v.power_limit_uw)
-                    .map(uw)
-                    .unwrap_or_else(dot),
-                long
-                    .and_then(|v| v.time_window_us)
+                long.and_then(|v| v.power_limit_uw).map(uw).unwrap_or_else(dot),
+                short.and_then(|v| v.power_limit_uw).map(uw).unwrap_or_else(dot),
+                long.and_then(|v| v.time_window_us)
                     .map(|v| format!("{} us", v))
                     .unwrap_or_else(dot),
                 short
@@ -469,7 +514,13 @@ impl FormatValues for sysfs::intel_rapl::IntelRapl {
                     .map(|v| format!("{} us", v))
                     .unwrap_or_else(dot),
                 watt_seconds
-                    .map(|p| if p.as_microwatts() == 0. { "0 W".to_string() } else { format!("{:.1}", p) })
+                    .map(|p| {
+                        if p.as_microwatts() == 0. {
+                            "0 W".to_string()
+                        } else {
+                            format!("{:.1}", p)
+                        }
+                    })
                     .unwrap_or_else(dot),
             ]);
         }

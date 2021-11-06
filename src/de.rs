@@ -1,8 +1,12 @@
+use std::str::FromStr;
+use std::time::Duration;
+
 use measurements::{Frequency, Power};
-use serde::{Deserialize, Deserializer, de::Error as _};
-use std::{str::FromStr, time::Duration};
-use crate::{CardId, Chain, Knobs};
+use serde::de::Error as _;
+use serde::{Deserialize, Deserializer};
+
 use crate::parse::{BoolStr, CardIds, DurationStr, FrequencyStr, Indices, PowerStr, Toggles};
+use crate::{CardId, Chain, Knobs};
 
 impl<'de> Deserialize<'de> for BoolStr {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
@@ -102,7 +106,9 @@ where
     Ok(Some(v.into()))
 }
 
-pub(super) fn card_ids<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<CardId>>, D::Error>
+pub(super) fn card_ids<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<Vec<CardId>>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -142,7 +148,9 @@ where
     Ok(Some(v.into()))
 }
 
-pub(super) fn toggles<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<(u64, bool)>>, D::Error>
+pub(super) fn toggles<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<Vec<(u64, bool)>>, D::Error>
 where
     D: Deserializer<'de>,
 {

@@ -2,58 +2,59 @@ mod app;
 mod parse;
 mod sampler;
 
-use zysfs::types::{self as sysfs, tokio::Read as SysfsRead};
-use tokio::io::{AsyncWriteExt as _, stdout};
-use crate::{NAME, Error, Result, counter, logging};
+use tokio::io::{stdout, AsyncWriteExt as _};
+use zysfs::types as sysfs;
+use zysfs::types::tokio::Read as SysfsRead;
+
 use crate::profile::Profile;
-use crate::Chain;
+use crate::{counter, logging, Chain, Error, Result, NAME};
 
-const ARG_QUIET: &str             = "quiet";
+const ARG_QUIET: &str = "quiet";
 
-const ARG_SHOW_CPU: &str          = "show-cpu";
-const ARG_SHOW_DRM: &str          = "show-drm";
+const ARG_SHOW_CPU: &str = "show-cpu";
+const ARG_SHOW_DRM: &str = "show-drm";
 #[cfg(feature = "nvml")]
-const ARG_SHOW_NVML: &str         = "show-nvml";
-const ARG_SHOW_PSTATE: &str       = "show-pstate";
-const ARG_SHOW_RAPL: &str         = "show-rapl";
+const ARG_SHOW_NVML: &str = "show-nvml";
+const ARG_SHOW_PSTATE: &str = "show-pstate";
+const ARG_SHOW_RAPL: &str = "show-rapl";
 
-const ARG_CPU: &str               = "cpu";
-const ARG_CPU_ON: &str            = "cpu-on";
-const ARG_CPU_ON_EACH: &str       = "cpu-on-each";
+const ARG_CPU: &str = "cpu";
+const ARG_CPU_ON: &str = "cpu-on";
+const ARG_CPU_ON_EACH: &str = "cpu-on-each";
 
-const ARG_CPUFREQ_GOV: &str       = "cpufreq-gov";
-const ARG_CPUFREQ_MIN: &str       = "cpufreq-min";
-const ARG_CPUFREQ_MAX: &str       = "cpufreq-max";
+const ARG_CPUFREQ_GOV: &str = "cpufreq-gov";
+const ARG_CPUFREQ_MIN: &str = "cpufreq-min";
+const ARG_CPUFREQ_MAX: &str = "cpufreq-max";
 
-const ARG_DRM_I915: &str          = "drm-i915";
-const ARG_DRM_I915_MIN: &str      = "drm-i915-min";
-const ARG_DRM_I915_MAX: &str      = "drm-i915-max";
-const ARG_DRM_I915_BOOST: &str    = "drm-i915-boost";
+const ARG_DRM_I915: &str = "drm-i915";
+const ARG_DRM_I915_MIN: &str = "drm-i915-min";
+const ARG_DRM_I915_MAX: &str = "drm-i915-max";
+const ARG_DRM_I915_BOOST: &str = "drm-i915-boost";
 
 #[cfg(feature = "nvml")]
-const ARG_NVML: &str              = "nvml";
+const ARG_NVML: &str = "nvml";
 #[cfg(feature = "nvml")]
-const ARG_NVML_GPU_MIN: &str      = "nvml-gpu-min";
+const ARG_NVML_GPU_MIN: &str = "nvml-gpu-min";
 #[cfg(feature = "nvml")]
-const ARG_NVML_GPU_MAX: &str      = "nvml-gpu-max";
+const ARG_NVML_GPU_MAX: &str = "nvml-gpu-max";
 #[cfg(feature = "nvml")]
-const ARG_NVML_GPU_RESET: &str    = "nvml-gpu-reset";
+const ARG_NVML_GPU_RESET: &str = "nvml-gpu-reset";
 #[cfg(feature = "nvml")]
-const ARG_NVML_POWER_LIMIT: &str  = "nvml-power-limit";
+const ARG_NVML_POWER_LIMIT: &str = "nvml-power-limit";
 
-const ARG_PSTATE_EPB: &str        = "pstate-epb";
-const ARG_PSTATE_EPP: &str        = "pstate-epp";
+const ARG_PSTATE_EPB: &str = "pstate-epb";
+const ARG_PSTATE_EPP: &str = "pstate-epp";
 
-const ARG_RAPL_PACKAGE: &str      = "rapl-package";
-const ARG_RAPL_ZONE: &str         = "rapl-zone";
-const ARG_RAPL_LONG_LIMIT: &str   = "rapl-long-limit";
-const ARG_RAPL_LONG_WINDOW: &str  = "rapl-long-window";
-const ARG_RAPL_SHORT_LIMIT: &str  = "rapl-short-limit";
+const ARG_RAPL_PACKAGE: &str = "rapl-package";
+const ARG_RAPL_ZONE: &str = "rapl-zone";
+const ARG_RAPL_LONG_LIMIT: &str = "rapl-long-limit";
+const ARG_RAPL_LONG_WINDOW: &str = "rapl-long-window";
+const ARG_RAPL_SHORT_LIMIT: &str = "rapl-short-limit";
 const ARG_RAPL_SHORT_WINDOW: &str = "rapl-short-window";
 
-const ARG_PROFILE: &str           = "PROFILE";
+const ARG_PROFILE: &str = "PROFILE";
 
-const ARG_CHAIN: &str             = "CHAIN";
+const ARG_CHAIN: &str = "CHAIN";
 
 const AFTER_HELP: &str = r#"            BOOL   0, 1, true, false
              IDS   comma-delimited sequence of integers and/or integer ranges
@@ -92,20 +93,23 @@ struct Cli {
 impl Cli {
     // Create a new instance for the given argv.
     async fn new(argv: &[String]) -> Result<Self> {
-        log::debug!("Profile config paths: {:#?}", Profile::config_paths().await);
+        log::debug!("Profile config paths: {:#?}", Profile::paths().await);
         let p = parse::Parser::new(argv)?;
         let mut chains = vec![];
-        let profile =
-            if let Some(name) = p.str(ARG_PROFILE) {
-                if let Some(profile) = Profile::new(name).await? {
-                    let mut c = profile.read().await?;
-                    if c.has_values() {
-                        c.resolve().await;
-                        chains.push(c);
-                    }
-                    Some(profile)
-                } else { None }
-            } else { None };
+        let profile = if let Some(name) = p.str(ARG_PROFILE) {
+            if let Some(profile) = Profile::new(name).await? {
+                let mut c = profile.read().await?;
+                if c.has_values() {
+                    c.resolve().await;
+                    chains.push(c);
+                }
+                Some(profile)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
         let mut c = Chain::try_from(&p)?;
         if c.has_values() {
             c.resolve().await;
@@ -127,10 +131,10 @@ impl Cli {
 
     // Return true if --show-* args are present.
     fn has_show_args(&self) -> bool {
-        let b = self.show_cpu.is_some() ||
-            self.show_drm.is_some() ||
-            self.show_pstate.is_some() ||
-            self.show_rapl.is_some();
+        let b = self.show_cpu.is_some()
+            || self.show_drm.is_some()
+            || self.show_pstate.is_some()
+            || self.show_rapl.is_some();
         #[cfg(feature = "nvml")]
         let b = b || self.show_nvml.is_some();
         b
@@ -169,7 +173,7 @@ impl Cli {
         }
         let s = String::from_utf8_lossy(&buf);
         let mut stdout = stdout();
-        stdout.write_all(s[..s.len()-1].as_bytes()).await.unwrap();
+        stdout.write_all(s[..s.len() - 1].as_bytes()).await.unwrap();
         stdout.flush().await.unwrap();
         Ok(())
     }
@@ -178,12 +182,19 @@ impl Cli {
     async fn run(&self) -> Result<()> {
         let mut samplers = sampler::Samplers::new(self).await;
         let begin = counter::delta().await;
-        for chain in &self.chains { chain.apply().await; }
-        if let Some(p) = self.profile.as_ref() {
-            let r = p.set_most_recent().await;
-            if r.is_err() { samplers.stop().await; r? }
+        for chain in &self.chains {
+            chain.apply().await;
         }
-        if self.quiet.is_some() { return Ok(()); } // samplers will not start if quiet
+        if let Some(p) = self.profile.as_ref() {
+            let r = p.set_recent().await;
+            if r.is_err() {
+                samplers.stop().await;
+                r?;
+            }
+        }
+        if self.quiet.is_some() {
+            return Ok(());
+        } // samplers do not start when quiet
         samplers.wait(begin).await;
         let r = self.print_values(&samplers).await;
         samplers.stop().await;
@@ -197,7 +208,6 @@ impl Cli {
 pub struct App;
 
 impl App {
-
     // Try run app with args.
     pub async fn try_run_with_args(args: &[String]) -> Result<()> {
         logging::configure().await;
@@ -208,14 +218,13 @@ impl App {
     pub async fn run_with_args(args: &[String]) {
         logging::configure().await;
         match Cli::new(args).await {
-            Ok(cli) =>
-                match cli.run().await {
-                    Ok(()) => std::process::exit(0),
-                    Err(e) => {
-                        log::error!("Error: {}", e);
-                        std::process::exit(2);
-                    },
+            Ok(cli) => match cli.run().await {
+                Ok(()) => std::process::exit(0),
+                Err(e) => {
+                    log::error!("Error: {}", e);
+                    std::process::exit(2);
                 },
+            },
             Err(e) => {
                 if let Error::Clap(e) = &e {
                     if let clap::ErrorKind::HelpDisplayed = e.kind {

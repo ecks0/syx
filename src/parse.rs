@@ -1,7 +1,9 @@
+use std::str::FromStr;
+use std::time::Duration;
+
 use measurements::{Frequency, Power};
-use std::{str::FromStr, time::Duration};
-use crate::{Error, Result};
-use crate::CardId;
+
+use crate::{CardId, Error, Result};
 
 fn start_of_unit(s: &str) -> Option<usize> {
     for (i, c) in s.chars().enumerate() {
@@ -14,7 +16,7 @@ fn start_of_unit(s: &str) -> Option<usize> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct BoolStr(bool);
+pub(crate) struct BoolStr(bool);
 
 impl FromStr for BoolStr {
     type Err = Error;
@@ -39,7 +41,8 @@ impl FromStr for CardId {
         if s.contains(':') {
             Ok(Self::PciId(s.into()))
         } else {
-            let id = s.parse::<u64>()
+            let id = s
+                .parse::<u64>()
                 .map_err(|_| Error::ParseValue("Expected id integer or pci id string".into()))?;
             Ok(Self::Id(id))
         }
@@ -47,7 +50,7 @@ impl FromStr for CardId {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct CardIds(Vec<CardId>);
+pub(crate) struct CardIds(Vec<CardId>);
 
 impl FromStr for CardIds {
     type Err = Error;
@@ -78,7 +81,7 @@ impl From<CardIds> for Vec<CardId> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct DurationStr(Duration);
+pub(crate) struct DurationStr(Duration);
 
 impl FromStr for DurationStr {
     type Err = Error;
@@ -93,12 +96,16 @@ impl FromStr for DurationStr {
                     "s" => Ok(Self(Duration::from_secs(v))),
                     _ => Err(Error::ParseValue("Unrecognized duration unit".into())),
                 },
-                Err(_) => Err(Error::ParseValue("Expected duration value, ex. 2000, 2000ms, 2s".into())),
+                Err(_) => Err(Error::ParseValue(
+                    "Expected duration value, ex. 2000, 2000ms, 2s".into(),
+                )),
             }
         } else {
             match s.parse::<u64>() {
                 Ok(v) => Ok(Self(Duration::from_millis(v))),
-                Err(_) => Err(Error::ParseValue("Expected duration value, ex. 3000, 3000ms, 3s".into())),
+                Err(_) => Err(Error::ParseValue(
+                    "Expected duration value, ex. 3000, 3000ms, 3s".into(),
+                )),
             }
         }
     }
@@ -109,7 +116,7 @@ impl From<DurationStr> for Duration {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct FrequencyStr(Frequency);
+pub(crate) struct FrequencyStr(Frequency);
 
 impl FromStr for FrequencyStr {
     type Err = Error;
@@ -125,12 +132,20 @@ impl FromStr for FrequencyStr {
                     "t" | "thz" => Frequency::from_terahertz(v),
                     _ => return Err(Error::ParseValue("Unrecognized frequency unit".into())),
                 },
-                Err(_) => return Err(Error::ParseValue("Expected frequency value with optional unit".into())),
+                Err(_) => {
+                    return Err(Error::ParseValue(
+                        "Expected frequency value with optional unit".into(),
+                    ));
+                },
             },
             None => match s.parse::<f64>() {
                 Ok(v) => Frequency::from_megahertz(v),
-                Err(_) => return Err(Error::ParseValue("Expected frequency value with optional unit".into())),
-            }
+                Err(_) => {
+                    return Err(Error::ParseValue(
+                        "Expected frequency value with optional unit".into(),
+                    ));
+                },
+            },
         };
         Ok(Self(f))
     }
@@ -141,7 +156,7 @@ impl From<FrequencyStr> for Frequency {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct Indices(Vec<u64>);
+pub(crate) struct Indices(Vec<u64>);
 
 impl FromStr for Indices {
     type Err = Error;
@@ -152,17 +167,24 @@ impl FromStr for Indices {
         for item in s.split(',') {
             let s: Vec<&str> = item.split('-').collect();
             match &s[..] {
-                [id] => ids.push(id.parse::<u64>()
-                    .map_err(|_| Error::ParseValue("Index is not an integer".into()))?),
-                [start, end] =>
-                    std::ops::Range {
-                        start: start.parse::<u64>()
-                            .map_err(|_| Error::ParseValue("Start of range is not an integer".into()))?,
-                        end: 1 + end.parse::<u64>()
-                            .map_err(|_| Error::ParseValue("End of range is not an integer".into()))?,
-                    }
-                    .for_each(|i| ids.push(i)),
-                _ => return Err(Error::ParseValue("Expected comma-delimited list of integers and/or integer ranges".into())),
+                [id] => ids.push(
+                    id.parse::<u64>()
+                        .map_err(|_| Error::ParseValue("Index is not an integer".into()))?,
+                ),
+                [start, end] => std::ops::Range {
+                    start: start.parse::<u64>().map_err(|_| {
+                        Error::ParseValue("Start of range is not an integer".into())
+                    })?,
+                    end: 1 + end
+                        .parse::<u64>()
+                        .map_err(|_| Error::ParseValue("End of range is not an integer".into()))?,
+                }
+                .for_each(|i| ids.push(i)),
+                _ => {
+                    return Err(Error::ParseValue(
+                        "Expected comma-delimited list of integers and/or integer ranges".into(),
+                    ));
+                },
             }
         }
         ids.sort_unstable();
@@ -176,7 +198,7 @@ impl From<Indices> for Vec<u64> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct PowerStr(Power);
+pub(crate) struct PowerStr(Power);
 
 impl FromStr for PowerStr {
     type Err = Error;
@@ -207,7 +229,7 @@ impl From<PowerStr> for Power {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
-pub struct Toggles(Vec<(u64, bool)>);
+pub(crate) struct Toggles(Vec<(u64, bool)>);
 
 impl FromStr for Toggles {
     type Err = Error;
@@ -215,17 +237,12 @@ impl FromStr for Toggles {
     fn from_str(s: &str) -> Result<Self> {
         let mut toggles = vec![];
         for (i, c) in s.chars().enumerate() {
-            toggles.push(
-                (
-                    i as u64,
-                    match c {
-                        '_' | '-' => continue,
-                        '0' => false,
-                        '1' => true,
-                        _ => return Err(Error::ParseValue("Expected sequence of 0, 1, or -".into())),
-                    },
-                )
-            );
+            toggles.push((i as u64, match c {
+                '_' | '-' => continue,
+                '0' => false,
+                '1' => true,
+                _ => return Err(Error::ParseValue("Expected sequence of 0, 1, or -".into())),
+            }));
         }
         Ok(Self(toggles))
     }
