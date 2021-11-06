@@ -7,7 +7,7 @@ use zysfs::types as sysfs;
 use zysfs::types::tokio::Read as SysfsRead;
 
 use crate::profile::Profile;
-use crate::{counter, logging, Chain, Error, Result, NAME};
+use crate::{logging, Chain, Error, Result, NAME};
 
 const ARG_QUIET: &str = "quiet";
 
@@ -78,7 +78,7 @@ const AFTER_HELP: &str = r#"            BOOL   0, 1, true, false
 
 // Command-line interface.
 #[derive(Clone, Debug)]
-struct Cli {
+pub struct Cli {
     quiet: Option<()>,
     show_cpu: Option<()>,
     show_drm: Option<()>,
@@ -92,7 +92,7 @@ struct Cli {
 
 impl Cli {
     // Create a new instance for the given argv.
-    async fn new(argv: &[String]) -> Result<Self> {
+    pub async fn new(argv: &[String]) -> Result<Self> {
         log::debug!("Profile config paths: {:#?}", Profile::paths().await);
         let p = parse::Parser::new(argv)?;
         let mut chains = vec![];
@@ -130,6 +130,7 @@ impl Cli {
     }
 
     // Return true if --show-* args are present.
+    #[allow(clippy::let_and_return)]
     fn has_show_args(&self) -> bool {
         let b = self.show_cpu.is_some()
             || self.show_drm.is_some()
@@ -179,9 +180,8 @@ impl Cli {
     }
 
     // Command-line interface app logic.
-    async fn run(&self) -> Result<()> {
-        let mut samplers = sampler::Samplers::new(self).await;
-        let begin = counter::delta().await;
+    pub async fn run(&self) -> Result<()> {
+        let mut samplers = sampler::Samplers::start(self).await;
         for chain in &self.chains {
             chain.apply().await;
         }
@@ -195,7 +195,7 @@ impl Cli {
         if self.quiet.is_some() {
             return Ok(());
         } // samplers do not start when quiet
-        samplers.wait(begin).await;
+        samplers.wait().await;
         let r = self.print_values(&samplers).await;
         samplers.stop().await;
         r?;
@@ -208,12 +208,6 @@ impl Cli {
 pub struct App;
 
 impl App {
-    // Try run app with args.
-    pub async fn try_run_with_args(args: &[String]) -> Result<()> {
-        logging::configure().await;
-        Ok(Cli::new(args).await?.run().await?)
-    }
-
     // Run app with args.
     pub async fn run_with_args(args: &[String]) {
         logging::configure().await;

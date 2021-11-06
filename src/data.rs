@@ -93,8 +93,6 @@ impl RaplSampler {
 
     pub(crate) async fn stop(&mut self) { self.swap_working(false); }
 
-    pub(crate) fn zone(&self) -> sysfs::intel_rapl::ZoneId { self.zone }
-
     async fn values(&self) -> Vec<u64> { { self.values.lock().await.clone() }.into() }
 
     pub(crate) async fn watt_seconds(&self) -> Option<Power> {
@@ -144,7 +142,7 @@ impl RaplSamplers {
 
 impl From<Vec<RaplSampler>> for RaplSamplers {
     fn from(v: Vec<RaplSampler>) -> Self {
-        let samplers = v.into_iter().map(|c| (c.zone(), c)).collect();
+        let samplers = v.into_iter().map(|c| (c.zone, c)).collect();
         Self { samplers }
     }
 }

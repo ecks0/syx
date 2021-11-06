@@ -1,5 +1,4 @@
 mod cli;
-mod counter;
 mod data;
 mod de;
 mod env;
@@ -11,7 +10,7 @@ mod policy;
 mod profile;
 
 pub use clap::{Error as ClapError, ErrorKind as ClapErrorKind};
-pub use cli::App;
+pub use cli::{App, Cli};
 pub use profile::Error as ProfileError;
 pub use tokio::io::{Error as IoError, ErrorKind as IoErrorKind};
 
@@ -34,9 +33,15 @@ pub enum Error {
 }
 
 impl Error {
-    fn parse_flag(flag: &str, message: String) -> Self {
+    fn parse_flag<S: Display>(flag: &str, message: S) -> Self {
         let flag = flag.to_string();
+        let message = message.to_string();
         Self::ParseFlag { flag, message }
+    }
+
+    fn parse_value<S: Display>(message: S) -> Self {
+        let message = s.to_string();
+        Self::ParseValue(message)
     }
 }
 
@@ -45,6 +50,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 const NAME: &str = "knobs";
 
 use std::collections::HashSet;
+use std::fmt::Display;
 use std::time::Duration;
 
 use measurements::{Frequency, Power};
@@ -63,90 +69,90 @@ enum CardId {
 struct Knobs {
     #[serde(default)]
     #[serde(deserialize_with = "de::indices")]
-    pub(crate) cpu: Option<Vec<u64>>,
+    cpu: Option<Vec<u64>>,
 
     #[serde(default)]
     #[serde(deserialize_with = "de::bool")]
-    pub(crate) cpu_on: Option<bool>,
+    cpu_on: Option<bool>,
 
     #[serde(default)]
     #[serde(deserialize_with = "de::toggles")]
-    pub(crate) cpu_on_each: Option<Vec<(u64, bool)>>,
+    cpu_on_each: Option<Vec<(u64, bool)>>,
 
-    pub(crate) cpufreq_gov: Option<String>,
-
-    #[serde(default)]
-    #[serde(deserialize_with = "de::frequency")]
-    pub(crate) cpufreq_min: Option<Frequency>,
+    cpufreq_gov: Option<String>,
 
     #[serde(default)]
     #[serde(deserialize_with = "de::frequency")]
-    pub(crate) cpufreq_max: Option<Frequency>,
+    cpufreq_min: Option<Frequency>,
+
+    #[serde(default)]
+    #[serde(deserialize_with = "de::frequency")]
+    cpufreq_max: Option<Frequency>,
 
     #[serde(default)]
     #[serde(deserialize_with = "de::card_ids")]
-    pub(crate) drm_i915: Option<Vec<CardId>>,
+    drm_i915: Option<Vec<CardId>>,
 
     #[serde(default)]
     #[serde(deserialize_with = "de::frequency")]
-    pub(crate) drm_i915_min: Option<Frequency>,
+    drm_i915_min: Option<Frequency>,
 
     #[serde(default)]
     #[serde(deserialize_with = "de::frequency")]
-    pub(crate) drm_i915_max: Option<Frequency>,
+    drm_i915_max: Option<Frequency>,
 
     #[serde(default)]
     #[serde(deserialize_with = "de::frequency")]
-    pub(crate) drm_i915_boost: Option<Frequency>,
+    drm_i915_boost: Option<Frequency>,
 
     #[cfg(feature = "nvml")]
     #[serde(default)]
     #[serde(deserialize_with = "de::card_ids")]
-    pub(crate) nvml: Option<Vec<CardId>>,
+    nvml: Option<Vec<CardId>>,
 
     #[cfg(feature = "nvml")]
     #[serde(default)]
     #[serde(deserialize_with = "de::frequency")]
-    pub(crate) nvml_gpu_min: Option<Frequency>,
+    nvml_gpu_min: Option<Frequency>,
 
     #[cfg(feature = "nvml")]
     #[serde(default)]
     #[serde(deserialize_with = "de::frequency")]
-    pub(crate) nvml_gpu_max: Option<Frequency>,
+    nvml_gpu_max: Option<Frequency>,
 
     #[cfg(feature = "nvml")]
     #[serde(default)]
     #[serde(deserialize_with = "de::bool")]
-    pub(crate) nvml_gpu_reset: Option<bool>,
+    nvml_gpu_reset: Option<bool>,
 
     #[cfg(feature = "nvml")]
     #[serde(default)]
     #[serde(deserialize_with = "de::power")]
-    pub(crate) nvml_power_limit: Option<Power>,
+    nvml_power_limit: Option<Power>,
 
-    pub(crate) pstate_epb: Option<u64>,
+    pstate_epb: Option<u64>,
 
-    pub(crate) pstate_epp: Option<String>,
+    pstate_epp: Option<String>,
 
-    pub(crate) rapl_package: Option<u64>,
+    rapl_package: Option<u64>,
 
-    pub(crate) rapl_zone: Option<u64>,
-
-    #[serde(default)]
-    #[serde(deserialize_with = "de::power")]
-    pub(crate) rapl_long_limit: Option<Power>,
-
-    #[serde(default)]
-    #[serde(deserialize_with = "de::duration")]
-    pub(crate) rapl_long_window: Option<Duration>,
+    rapl_zone: Option<u64>,
 
     #[serde(default)]
     #[serde(deserialize_with = "de::power")]
-    pub(crate) rapl_short_limit: Option<Power>,
+    rapl_long_limit: Option<Power>,
 
     #[serde(default)]
     #[serde(deserialize_with = "de::duration")]
-    pub(crate) rapl_short_window: Option<Duration>,
+    rapl_long_window: Option<Duration>,
+
+    #[serde(default)]
+    #[serde(deserialize_with = "de::power")]
+    rapl_short_limit: Option<Power>,
+
+    #[serde(default)]
+    #[serde(deserialize_with = "de::duration")]
+    rapl_short_window: Option<Duration>,
 }
 
 impl Knobs {
@@ -187,6 +193,7 @@ impl Knobs {
             || self.rapl_short_window.is_some()
     }
 
+    #[allow(clippy::let_and_return)]
     pub(crate) fn has_values(&self) -> bool {
         let b = self.has_cpu_related_values() || self.has_drm_values() || self.has_rapl_values();
         #[cfg(feature = "nvml")]
@@ -331,8 +338,8 @@ impl Chain {
         }
         for (i, k) in self.knobses.iter().enumerate() {
             log::debug!("Group {} Pass 1", i);
-            k.apply_cpu().await;
             if k.has_cpu_values() {
+                k.apply_cpu().await;
                 Self::cpu_onoff_wait().await;
             }
             k.apply_rapl().await;

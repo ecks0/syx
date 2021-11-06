@@ -25,7 +25,7 @@ impl FromStr for BoolStr {
         match s {
             "0" | "false" => Ok(Self(false)),
             "1" | "true" => Ok(Self(true)),
-            _ => Err(Error::ParseValue("Expected 0, 1, false, or true".into())),
+            _ => Err(Error::parse_value("Expected 0, 1, false, or true")),
         }
     }
 }
@@ -43,7 +43,7 @@ impl FromStr for CardId {
         } else {
             let id = s
                 .parse::<u64>()
-                .map_err(|_| Error::ParseValue("Expected id integer or pci id string".into()))?;
+                .map_err(|_| Error::parse_value("Expected id integer or pci id string"))?;
             Ok(Self::Id(id))
         }
     }
@@ -94,17 +94,17 @@ impl FromStr for DurationStr {
                     "u" | "us" => Ok(Self(Duration::from_micros(v))),
                     "m" | "ms" => Ok(Self(Duration::from_millis(v))),
                     "s" => Ok(Self(Duration::from_secs(v))),
-                    _ => Err(Error::ParseValue("Unrecognized duration unit".into())),
+                    _ => Err(Error::parse_value("Unrecognized duration unit")),
                 },
-                Err(_) => Err(Error::ParseValue(
-                    "Expected duration value, ex. 2000, 2000ms, 2s".into(),
+                Err(_) => Err(Error::parse_value(
+                    "Expected duration value, ex. 2000, 2000ms, 2s",
                 )),
             }
         } else {
             match s.parse::<u64>() {
                 Ok(v) => Ok(Self(Duration::from_millis(v))),
-                Err(_) => Err(Error::ParseValue(
-                    "Expected duration value, ex. 3000, 3000ms, 3s".into(),
+                Err(_) => Err(Error::parse_value(
+                    "Expected duration value, ex. 3000, 3000ms, 3s",
                 )),
             }
         }
@@ -130,19 +130,19 @@ impl FromStr for FrequencyStr {
                     "m" | "mhz" => Frequency::from_megahertz(v),
                     "g" | "ghz" => Frequency::from_gigahertz(v),
                     "t" | "thz" => Frequency::from_terahertz(v),
-                    _ => return Err(Error::ParseValue("Unrecognized frequency unit".into())),
+                    _ => return Err(Error::parse_value("Unrecognized frequency unit")),
                 },
                 Err(_) => {
-                    return Err(Error::ParseValue(
-                        "Expected frequency value with optional unit".into(),
+                    return Err(Error::parse_value(
+                        "Expected frequency value with optional unit",
                     ));
                 },
             },
             None => match s.parse::<f64>() {
                 Ok(v) => Frequency::from_megahertz(v),
                 Err(_) => {
-                    return Err(Error::ParseValue(
-                        "Expected frequency value with optional unit".into(),
+                    return Err(Error::parse_value(
+                        "Expected frequency value with optional unit",
                     ));
                 },
             },
@@ -168,21 +168,20 @@ impl FromStr for Indices {
             let s: Vec<&str> = item.split('-').collect();
             match &s[..] {
                 [id] => ids.push(
-                    id.parse::<u64>()
-                        .map_err(|_| Error::ParseValue("Index is not an integer".into()))?,
+                    id.parse::<u64>().map_err(|_| Error::parse_value("Index is not an integer"))?,
                 ),
                 [start, end] => std::ops::Range {
-                    start: start.parse::<u64>().map_err(|_| {
-                        Error::ParseValue("Start of range is not an integer".into())
-                    })?,
+                    start: start
+                        .parse::<u64>()
+                        .map_err(|_| Error::parse_value("Start of range is not an integer"))?,
                     end: 1 + end
                         .parse::<u64>()
-                        .map_err(|_| Error::ParseValue("End of range is not an integer".into()))?,
+                        .map_err(|_| Error::parse_value("End of range is not an integer"))?,
                 }
                 .for_each(|i| ids.push(i)),
                 _ => {
-                    return Err(Error::ParseValue(
-                        "Expected comma-delimited list of integers and/or integer ranges".into(),
+                    return Err(Error::parse_value(
+                        "Expected comma-delimited list of integers and/or integer ranges",
                     ));
                 },
             }
@@ -211,14 +210,14 @@ impl FromStr for PowerStr {
                     "m" | "mw" => Ok(Self(Power::from_milliwatts(v))),
                     "w" => Ok(Self(Power::from_watts(v))),
                     "k" | "kw" => Ok(Self(Power::from_kilowatts(v))),
-                    _ => Err(Error::ParseValue("Unrecognized power unit".into())),
+                    _ => Err(Error::parse_value("Unrecognized power unit")),
                 },
-                Err(_) => Err(Error::ParseValue("Expected power value".into())),
+                Err(_) => Err(Error::parse_value("Expected power value")),
             }
         } else {
             match s.parse::<f64>() {
                 Ok(v) => Ok(Self(Power::from_watts(v))),
-                Err(_) => Err(Error::ParseValue("Expected power value".into())),
+                Err(_) => Err(Error::parse_value("Expected power value")),
             }
         }
     }
@@ -241,7 +240,7 @@ impl FromStr for Toggles {
                 '_' | '-' => continue,
                 '0' => false,
                 '1' => true,
-                _ => return Err(Error::ParseValue("Expected sequence of 0, 1, or -".into())),
+                _ => return Err(Error::parse_value("Expected sequence of 0, 1, or -")),
             }));
         }
         Ok(Self(toggles))

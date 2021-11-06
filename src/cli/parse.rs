@@ -29,7 +29,8 @@ impl<'a> Parser<'a> {
     // Return true if the given argument is present in argv. (Env vars not checked).
     fn arg_present(&self, name: &str) -> bool { self.0.is_present(name) }
 
-    // Return the values for an argument from argv. (Env vars not checked).
+    // Return an iterator over the values for an argument from argv. (Env vars not
+    // checked).
     fn arg_values(&self, name: &str) -> Option<clap::Values> { self.0.values_of(name) }
 
     // Parse a flag argument from the argv or env vars.
@@ -51,17 +52,19 @@ impl<'a> Parser<'a> {
     where
         T: FromStr<Err = std::num::ParseIntError>,
     {
-        match self.0.value_of(name).map(|v| v.to_string()).or_else(|| var(name)) {
-            Some(v) => Ok(Some(T::from_str(&v).map_err(|_| {
-                Error::parse_flag(name, "Expected integer value".into())
-            })?)),
+        match self.0.value_of(name).map(String::from).or_else(|| var(name)) {
+            Some(v) => {
+                Ok(Some(T::from_str(&v).map_err(|_| {
+                    Error::parse_flag(name, "Expected integer value")
+                })?))
+            },
             None => Ok(None),
         }
     }
 
     // Parse a string argument from the argv or env vars.
     pub(super) fn str(&self, name: &str) -> Option<String> {
-        self.0.value_of(name).map(|v| v.to_string()).or_else(|| var(name))
+        self.0.value_of(name).map(String::from).or_else(|| var(name))
     }
 
     // Parse an argument using `FromStr` from the argv or env vars.
@@ -71,7 +74,7 @@ impl<'a> Parser<'a> {
     {
         match self.0.value_of(name).map(String::from).or_else(|| var(name)) {
             Some(v) => Ok(Some(
-                S::from_str(&v).map_err(|e| Error::parse_flag(name, e.to_string()))?,
+                S::from_str(&v).map_err(|e| Error::parse_flag(name, e))?,
             )),
             None => Ok(None),
         }

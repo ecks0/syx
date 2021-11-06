@@ -8,6 +8,8 @@ use serde::{Deserialize, Deserializer};
 use crate::parse::{BoolStr, CardIds, DurationStr, FrequencyStr, Indices, PowerStr, Toggles};
 use crate::{CardId, Chain, Knobs};
 
+// Custom deserializers for parsed types.
+
 impl<'de> Deserialize<'de> for BoolStr {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
@@ -97,6 +99,9 @@ impl<'de> Deserialize<'de> for Toggles {
         Self::from_str(&s).map_err(D::Error::custom)
     }
 }
+
+// Helper functions which map parsed types to the types expected by `struct
+// Knobs` fields.
 
 pub(super) fn bool<'de, D>(deserializer: D) -> std::result::Result<Option<bool>, D::Error>
 where

@@ -1,15 +1,13 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tokio::time::sleep;
-use zysfs::types as sysfs;
-use zysfs::types::tokio::Feature as _;
 
 use crate::cli::Cli;
-use crate::counter;
 use crate::data::{RaplSampler, RaplSamplers};
 
 #[derive(Clone, Debug)]
 pub(super) struct Samplers {
+    begin: Instant,
     samplers: Option<RaplSamplers>,
 }
 
@@ -19,11 +17,8 @@ impl Samplers {
     // Minimum run time required to get give useful data.
     const RUNTIME: Duration = Duration::from_millis(400);
 
-    pub(super) async fn new(cli: &Cli) -> Self {
-        let samplers = if cli.quiet.is_none()
-            && (!cli.has_show_args() || cli.show_rapl.is_some())
-            && sysfs::intel_rapl::IntelRapl::present().await
-        {
+    pub(super) async fn start(cli: &Cli) -> Self {
+        let samplers = if cli.quiet.is_none() && (!cli.has_show_args() || cli.show_rapl.is_some()) {
             if let Some(s) = RaplSampler::all(Self::INTERVAL).await {
                 log::debug!("Starting rapl samplers");
                 let mut s = RaplSamplers::from(s);
@@ -35,7 +30,8 @@ impl Samplers {
         } else {
             None
         };
-        Self { samplers }
+        let begin = Instant::now();
+        Self { begin, samplers }
     }
 
     pub(super) async fn stop(&mut self) {
@@ -44,10 +40,10 @@ impl Samplers {
         }
     }
 
-    pub(super) async fn wait(&self, begin: Duration) {
+    pub(super) async fn wait(&self) {
         if let Some(s) = self.samplers.as_ref() {
             if s.working().await {
-                let runtime = counter::delta().await - begin;
+                let runtime = Instant::now() - self.begin;
                 if runtime < Self::RUNTIME {
                     sleep(Self::RUNTIME - runtime).await;
                 }
