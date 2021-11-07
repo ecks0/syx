@@ -143,13 +143,7 @@ pub(crate) mod profile {
         if Uid::effective().is_root() {
             Some(state::sys_with(STATE_FILE_NAME))
         } else {
-            let s = state::home_with(STATE_FILE_NAME);
-            if s.is_none() {
-                log::error!(
-                    "ERR knobs r Profile::state_path() Could not determine user state directory"
-                );
-            }
-            s
+            state::home_with(STATE_FILE_NAME)
         }
     }
 }

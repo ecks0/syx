@@ -16,16 +16,19 @@ pub enum Error {
     Io { path: String, message: String },
 
     #[error("No profile config exists in {search_paths:#?}")]
-    NoConfig { search_paths: Vec<String> },
+    ConfigMissing { search_paths: Vec<String> },
 
     #[error("Profile '{profile}' not found in {path}")]
-    NoProfile { path: String, profile: String },
+    ProfileMissing { path: String, profile: String },
+
+    #[error("Corrupt state file at {path}")]
+    StateCorrupt { path: String },
 
     #[error("Previous profile state not found at {path}")]
-    NoState { path: String },
+    StateMissing { path: String },
 
-    #[error("{action}: unable to determine xdg user state directory")]
-    NoStatePath { action: String },
+    #[error("{activity}: unable to determine xdg user state directory")]
+    StatePathMissing { activity: String },
 
     #[error("{message}")]
     Se { message: String },
@@ -46,25 +49,30 @@ impl Error {
         Self::Io { path, message }
     }
 
-    fn no_config(search_paths: Vec<PathBuf>) -> Self {
+    fn config_missing(search_paths: Vec<PathBuf>) -> Self {
         let search_paths = search_paths.into_iter().map(|p| Self::path_to_str(&p)).collect();
-        Self::NoConfig { search_paths }
+        Self::ConfigMissing { search_paths }
     }
 
-    fn no_profile<S: Display>(path: &Path, profile: S) -> Self {
+    fn profile_missing<S: Display>(path: &Path, profile: S) -> Self {
         let path = Self::path_to_str(path);
         let profile = profile.to_string();
-        Self::NoProfile { path, profile }
+        Self::ProfileMissing { path, profile }
     }
 
-    fn no_state(path: &Path) -> Self {
+    fn state_corrupt(path: &Path) -> Self {
         let path = Self::path_to_str(path);
-        Self::NoState { path }
+        Self::StateCorrupt { path }
     }
 
-    fn no_state_path<S: Display>(action: S) -> Self {
-        let action = action.to_string();
-        Self::NoStatePath { action }
+    fn state_missing(path: &Path) -> Self {
+        let path = Self::path_to_str(path);
+        Self::StateMissing { path }
+    }
+
+    fn state_path_missing<S: Display>(activity: S) -> Self {
+        let action = activity.to_string();
+        Self::StatePathMissing { activity: action }
     }
 
     fn se<S: Display>(message: S) -> Self {
@@ -89,60 +97,52 @@ impl Profile {
     pub(crate) async fn paths() -> Vec<PathBuf> { path::config_paths().await }
 
     // Return the most recently applied profile.
-    async fn recent() -> Result<Option<Self>> {
-        use tokio::fs::{read_to_string, remove_file};
+    async fn recent() -> Result<Self> {
+        use tokio::fs::read_to_string;
         let p = if let Some(p) = path::state_path().await {
             p
         } else {
-            return Err(Error::no_state_path("Read recent profile"));
+            return Err(Error::state_path_missing("Read recent profile"));
         };
         let s = match read_to_string(&p).await {
             Ok(s) => s,
             Err(e) => match e.kind() {
-                crate::IoErrorKind::NotFound => return Err(Error::no_state(&p)),
+                crate::IoErrorKind::NotFound => return Err(Error::state_missing(&p)),
                 _ => return Err(Error::io(&p, e)),
             },
         };
         match serde_yaml::from_str(&s) {
-            Ok(r) => Ok(Some(r)),
-            Err(e) => {
-                log::error!(
-                    "ERR knobs r Profile::previous() Discarding recent profile state due to parse \
-                     error:"
-                );
-                log::error!("ERR knobs r Profile::previous() {}: {}", p.display(), e);
-                remove_file(&p).await.map_err(|e| Error::io(&p, e))?;
-                Ok(None)
-            },
+            Ok(r) => Ok(r),
+            Err(_) => Err(Error::state_corrupt(&p)),
         }
     }
 
-    pub(crate) async fn new<S: Into<String>>(name: S) -> Result<Option<Self>> {
+    pub(crate) async fn new<S: Into<String>>(name: S) -> Result<Self> {
         let name = name.into();
         if name == Self::RECENT_PROFILE_STR {
             Self::recent().await
         } else {
-            let s = path::config_path().await.map(|path| Self { name, path });
-            Ok(s)
+            match path::config_path().await {
+                Some(path) => Ok(Self { name, path }),
+                None => Err(Error::config_missing(Self::paths().await)),
+            }
         }
     }
 
     pub(crate) async fn read(&self) -> Result<Chain> {
-        let path = if let Some(p) = path::config_path().await {
-            p
-        } else {
-            return Err(Error::no_config(Self::paths().await));
-        };
-        log::debug!("Reading profiles from {}", path.display());
-        match tokio::fs::read_to_string(&path).await {
+        log::debug!("Reading profiles from {}", self.path.display());
+        match tokio::fs::read_to_string(&self.path).await {
             Ok(s) => match serde_yaml::from_str::<HashMap<String, Chain>>(&s) {
                 Ok(p) => match p.into_iter().find(|(n, _)| n == &self.name) {
                     Some((_, c)) => Ok(c),
-                    None => Err(Error::no_profile(&path, &self.name)),
+                    None => Err(Error::profile_missing(&self.path, &self.name)),
                 },
-                Err(e) => Err(Error::de(&path, e)),
+                Err(e) => Err(Error::de(&self.path, e)),
             },
-            Err(e) => Err(Error::io(&path, e)),
+            Err(e) => match e.kind() {
+                crate::IoErrorKind::NotFound => Err(Error::config_missing(Self::paths().await)),
+                _ => Err(Error::io(&self.path, e)),
+            },
         }
     }
 
@@ -151,7 +151,7 @@ impl Profile {
         let p = if let Some(p) = path::state_path().await {
             p
         } else {
-            return Err(Error::no_state_path("Write recent profile"));
+            return Err(Error::state_path_missing("Write recent profile"));
         };
         if let Some(parent) = p.parent() {
             if !parent.is_dir() {

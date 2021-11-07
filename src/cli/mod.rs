@@ -5,7 +5,7 @@ mod sampler;
 use tokio::io::{stdout, AsyncWriteExt as _};
 use zysfs::tokio::Read as ZysfsRead;
 
-use crate::profile::Profile;
+use crate::profile::{Error as ProfileError, Profile};
 use crate::{logging, Chain, Error, Result, NAME};
 
 const ARG_QUIET: &str = "quiet";
@@ -95,17 +95,14 @@ impl Cli {
         log::debug!("Profile config paths: {:#?}", Profile::paths().await);
         let p = parse::Parser::new(argv)?;
         let mut chains = vec![];
-        let profile = if let Some(name) = p.str(ARG_PROFILE) {
-            if let Some(profile) = Profile::new(name).await? {
-                let mut c = profile.read().await?;
-                if c.has_values() {
-                    c.resolve().await;
-                    chains.push(c);
-                }
-                Some(profile)
-            } else {
-                None
+        let profile = if let Some(pr) = p.str(ARG_PROFILE) {
+            let pr = Profile::new(pr).await?;
+            let mut c = pr.read().await?;
+            if c.has_values() {
+                c.resolve().await;
+                chains.push(c);
             }
+            Some(pr)
         } else {
             None
         };
@@ -215,21 +212,37 @@ impl App {
                 Ok(()) => std::process::exit(0),
                 Err(e) => {
                     log::error!("Error: {}", e);
-                    std::process::exit(2);
+                    std::process::exit(1);
                 },
             },
-            Err(e) => {
-                if let Error::Clap(e) = &e {
+            Err(e) => match &e {
+                Error::Clap(e) => {
                     if let clap::ErrorKind::HelpDisplayed = e.kind {
                         let mut s = stdout();
                         s.write_all(e.message.as_bytes()).await.unwrap();
                         s.write_all("\n".as_bytes()).await.unwrap();
                         s.flush().await.unwrap();
                         std::process::exit(0);
+                    } else {
+                        log::error!("{}", e);
+                        std::process::exit(1);
                     }
-                }
-                log::error!("Error: {}", e);
-                std::process::exit(1);
+                },
+                Error::Profile(ProfileError::StateCorrupt { path }) => {
+                    use tokio::fs::remove_file;
+                    log::error!("Error: profile state file corrupted, removing {}", path);
+                    match remove_file(path).await {
+                        Ok(()) => std::process::exit(1),
+                        Err(e) => {
+                            log::error!("Error: {}", e);
+                            std::process::exit(1);
+                        },
+                    }
+                },
+                _ => {
+                    log::error!("Error: {}", e);
+                    std::process::exit(1);
+                },
             },
         }
     }
