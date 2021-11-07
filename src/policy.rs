@@ -1,24 +1,23 @@
 use tokio::sync::OnceCell;
-use zysfs::io::cpu::tokio::{cpu_online, set_cpu_online};
-use zysfs::types as sysfs;
-use zysfs::types::tokio::Read as _;
+use zysfs::cpu::tokio::{cpu_online, set_cpu_online};
+use zysfs::tokio::Read as _;
 
 use crate::{CardId, Knobs};
 
 pub(crate) async fn cpu_ids() -> Option<Vec<u64>> {
     static CPU_IDS: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
-    async fn cpu_ids() -> Option<Vec<u64>> { sysfs::cpu::Policy::ids().await }
+    async fn cpu_ids() -> Option<Vec<u64>> { zysfs::cpu::Policy::ids().await }
     CPU_IDS.get_or_init(cpu_ids).await.clone()
 }
 
 pub(crate) async fn drm_ids() -> Option<Vec<u64>> {
     static DRM_IDS: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
-    async fn drm_ids() -> Option<Vec<u64>> { sysfs::drm::Card::ids().await }
+    async fn drm_ids() -> Option<Vec<u64>> { zysfs::drm::Card::ids().await }
     DRM_IDS.get_or_init(drm_ids).await.clone()
 }
 
 pub(crate) async fn drm_i915_ids() -> Option<Vec<u64>> {
-    use sysfs::drm::io::tokio::driver;
+    use zysfs::drm::tokio::driver;
     static DRM_I915_IDS: OnceCell<Option<Vec<u64>>> = OnceCell::const_new();
     async fn drm_i915_ids() -> Option<Vec<u64>> {
         let mut ids = vec![];
@@ -67,17 +66,17 @@ pub(crate) async fn set_cpus_offline(cpu_ids: Vec<u64>) -> Vec<u64> {
     offlined
 }
 
-impl From<&Knobs> for Option<sysfs::cpu::Cpu> {
+impl From<&Knobs> for Option<zysfs::cpu::Cpu> {
     fn from(k: &Knobs) -> Self {
         if !k.has_cpu_values() {
             return None;
         }
-        let mut policies: Vec<sysfs::cpu::Policy> = k
+        let mut policies: Vec<zysfs::cpu::Policy> = k
             .cpu
             .clone()
             .map(|ids| {
                 ids.into_iter()
-                    .map(|id| sysfs::cpu::Policy {
+                    .map(|id| zysfs::cpu::Policy {
                         id: Some(id),
                         cpu_online: k.cpu_on,
                     })
@@ -89,7 +88,7 @@ impl From<&Knobs> for Option<sysfs::cpu::Cpu> {
                 if let Some(mut p) = policies.iter_mut().find(|p| p.id == Some(id)) {
                     p.cpu_online = Some(v);
                 } else {
-                    let p = sysfs::cpu::Policy {
+                    let p = zysfs::cpu::Policy {
                         id: Some(id),
                         cpu_online: Some(v),
                     };
@@ -103,21 +102,21 @@ impl From<&Knobs> for Option<sysfs::cpu::Cpu> {
             policies.sort_unstable_by(|a, b| a.id.cmp(&b.id));
             Some(policies)
         };
-        let s = sysfs::cpu::Cpu { policies };
+        let s = zysfs::cpu::Cpu { policies };
         Some(s)
     }
 }
 
-impl From<&Knobs> for Option<sysfs::cpufreq::Cpufreq> {
+impl From<&Knobs> for Option<zysfs::cpufreq::Cpufreq> {
     fn from(k: &Knobs) -> Self {
         if !k.has_cpufreq_values() {
             return None;
         }
         let scaling_min_freq = k.cpufreq_min.map(|f| f.as_kilohertz().round() as u64);
         let scaling_max_freq = k.cpufreq_max.map(|f| f.as_kilohertz().round() as u64);
-        let policies: Option<Vec<sysfs::cpufreq::Policy>> = k.cpu.clone().map(|ids| {
+        let policies: Option<Vec<zysfs::cpufreq::Policy>> = k.cpu.clone().map(|ids| {
             ids.into_iter()
-                .map(|id| sysfs::cpufreq::Policy {
+                .map(|id| zysfs::cpufreq::Policy {
                     id: Some(id),
                     scaling_governor: k.cpufreq_gov.clone(),
                     scaling_min_freq,
@@ -129,7 +128,7 @@ impl From<&Knobs> for Option<sysfs::cpufreq::Cpufreq> {
         if policies.as_ref().map(|p| p.is_empty()).unwrap_or(true) {
             return None;
         }
-        let s = sysfs::cpufreq::Cpufreq {
+        let s = zysfs::cpufreq::Cpufreq {
             policies,
             ..Default::default()
         };
@@ -137,7 +136,7 @@ impl From<&Knobs> for Option<sysfs::cpufreq::Cpufreq> {
     }
 }
 
-impl From<&Knobs> for Option<sysfs::drm::Drm> {
+impl From<&Knobs> for Option<zysfs::drm::Drm> {
     fn from(k: &Knobs) -> Self {
         if !k.has_drm_values() {
             return None;
@@ -152,7 +151,7 @@ impl From<&Knobs> for Option<sysfs::drm::Drm> {
                         .clone()
                         .map(|ids| {
                             ids.into_iter()
-                                .map(|id| sysfs::drm::Card {
+                                .map(|id| zysfs::drm::Card {
                                     id: match id {
                                         CardId::Id(id) => Some(id),
                                         CardId::PciId(_) => {
@@ -162,8 +161,8 @@ impl From<&Knobs> for Option<sysfs::drm::Drm> {
                                             )
                                         },
                                     },
-                                    driver_policy: Some(sysfs::drm::DriverPolicy::I915(
-                                        sysfs::drm::I915 {
+                                    driver_policy: Some(zysfs::drm::DriverPolicy::I915(
+                                        zysfs::drm::I915 {
                                             min_freq_mhz,
                                             max_freq_mhz,
                                             boost_freq_mhz,
@@ -180,11 +179,11 @@ impl From<&Knobs> for Option<sysfs::drm::Drm> {
             },
             // ... insert amd gpu support here ...
         ];
-        let cards: Vec<sysfs::drm::Card> = cards.into_iter().flatten().collect();
+        let cards: Vec<zysfs::drm::Card> = cards.into_iter().flatten().collect();
         if cards.is_empty() {
             return None;
         }
-        let s = sysfs::drm::Drm { cards: Some(cards) };
+        let s = zysfs::drm::Drm { cards: Some(cards) };
         Some(s)
     }
 }
@@ -279,14 +278,14 @@ impl From<&Knobs> for Option<NvmlPolicies> {
     }
 }
 
-impl From<&Knobs> for Option<sysfs::intel_pstate::IntelPstate> {
+impl From<&Knobs> for Option<zysfs::intel_pstate::IntelPstate> {
     fn from(k: &Knobs) -> Self {
         if !k.has_pstate_values() {
             return None;
         }
-        let policies: Option<Vec<sysfs::intel_pstate::Policy>> = k.cpu.clone().map(|ids| {
+        let policies: Option<Vec<zysfs::intel_pstate::Policy>> = k.cpu.clone().map(|ids| {
             ids.into_iter()
-                .map(|id| sysfs::intel_pstate::Policy {
+                .map(|id| zysfs::intel_pstate::Policy {
                     id: Some(id),
                     energy_perf_bias: k.pstate_epb,
                     energy_performance_preference: k.pstate_epp.clone(),
@@ -297,7 +296,7 @@ impl From<&Knobs> for Option<sysfs::intel_pstate::IntelPstate> {
         if policies.as_ref().map(|p| p.is_empty()).unwrap_or(true) {
             return None;
         }
-        let s = sysfs::intel_pstate::IntelPstate {
+        let s = zysfs::intel_pstate::IntelPstate {
             policies,
             ..Default::default()
         };
@@ -305,24 +304,24 @@ impl From<&Knobs> for Option<sysfs::intel_pstate::IntelPstate> {
     }
 }
 
-impl From<&Knobs> for Option<sysfs::intel_rapl::IntelRapl> {
+impl From<&Knobs> for Option<zysfs::intel_rapl::IntelRapl> {
     fn from(k: &Knobs) -> Self {
         if !k.has_rapl_values() {
             return None;
         }
 
-        let id = sysfs::intel_rapl::ZoneId {
+        let id = zysfs::intel_rapl::ZoneId {
             zone: k.rapl_package?,
             subzone: k.rapl_zone,
         };
-        let constraints: Vec<sysfs::intel_rapl::Constraint> = [
+        let constraints: Vec<zysfs::intel_rapl::Constraint> = [
             ("long_term", k.rapl_long_limit, k.rapl_long_window),
             ("short_term", k.rapl_short_limit, k.rapl_short_window),
         ]
         .iter()
         .filter_map(|(name, limit, window)| {
             if limit.is_some() || window.is_some() {
-                let c = sysfs::intel_rapl::Constraint {
+                let c = zysfs::intel_rapl::Constraint {
                     name: Some(name.to_string()),
                     power_limit_uw: limit.map(|v| v.as_microwatts().round() as u64),
                     time_window_us: window.map(|v| v.as_micros().try_into().unwrap()),
@@ -334,8 +333,8 @@ impl From<&Knobs> for Option<sysfs::intel_rapl::IntelRapl> {
             }
         })
         .collect();
-        let s = sysfs::intel_rapl::IntelRapl {
-            policies: Some(vec![sysfs::intel_rapl::Policy {
+        let s = zysfs::intel_rapl::IntelRapl {
+            policies: Some(vec![zysfs::intel_rapl::Policy {
                 id: Some(id),
                 constraints: Some(constraints),
                 ..Default::default()

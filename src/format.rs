@@ -5,7 +5,6 @@ use comfy_table as ct;
 use measurements::{Frequency, Power};
 #[cfg(feature = "nvml")] use nvml_facade as nvml;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
-use zysfs::types as sysfs;
 
 use crate::data::RaplSamplers;
 use crate::{Error, Result};
@@ -95,7 +94,7 @@ pub(crate) trait FormatValues {
 }
 
 #[async_trait]
-impl FormatValues for (sysfs::cpu::Cpu, sysfs::cpufreq::Cpufreq) {
+impl FormatValues for (zysfs::cpu::Cpu, zysfs::cpufreq::Cpufreq) {
     type Arg = ();
 
     async fn format_values<W>(&self, w: &mut W, _: ()) -> Result<()>
@@ -104,9 +103,9 @@ impl FormatValues for (sysfs::cpu::Cpu, sysfs::cpufreq::Cpufreq) {
     {
         fn khz(khz: u64) -> String { hz(khz * 10u64.pow(3)) }
 
-        fn cpu_cpufreq(cpu: &sysfs::cpu::Cpu, cpufreq: &sysfs::cpufreq::Cpufreq) -> Option<String> {
+        fn cpu_cpufreq(cpu: &zysfs::cpu::Cpu, cpufreq: &zysfs::cpufreq::Cpufreq) -> Option<String> {
             let cpu_pols = cpu.policies.as_ref()?;
-            let cpufreq_pol_default = sysfs::cpufreq::Policy::default();
+            let cpufreq_pol_default = zysfs::cpufreq::Policy::default();
             let mut tab = Table::new(&[
                 "CPU", "Online", "Governor", "Cur", "Min", "Max", "CPU min", "CPU max",
             ]);
@@ -135,7 +134,7 @@ impl FormatValues for (sysfs::cpu::Cpu, sysfs::cpufreq::Cpufreq) {
             Some(nl(tab.to_string()))
         }
 
-        fn governors(cpufreq: &sysfs::cpufreq::Cpufreq) -> Option<String> {
+        fn governors(cpufreq: &zysfs::cpufreq::Cpufreq) -> Option<String> {
             let policies = cpufreq.policies.as_deref()?;
             let mut govs: Vec<String> = policies
                 .iter()
@@ -175,7 +174,7 @@ impl FormatValues for (sysfs::cpu::Cpu, sysfs::cpufreq::Cpufreq) {
 }
 
 #[async_trait]
-impl FormatValues for sysfs::drm::Drm {
+impl FormatValues for zysfs::drm::Drm {
     type Arg = ();
 
     async fn format_values<W>(&self, w: &mut W, _: ()) -> Result<()>
@@ -185,8 +184,8 @@ impl FormatValues for sysfs::drm::Drm {
         fn mhz(mhz: u64) -> String { hz(mhz * 10u64.pow(6)) }
 
         #[allow(clippy::ptr_arg)]
-        fn i915(cards: &Vec<sysfs::drm::Card>) -> Option<String> {
-            let cards: Vec<&sysfs::drm::Card> = cards
+        fn i915(cards: &Vec<zysfs::drm::Card>) -> Option<String> {
+            let cards: Vec<&zysfs::drm::Card> = cards
                 .iter()
                 .filter(|c| c.driver.as_ref().map(|d| "i915" == d).unwrap_or(false))
                 .collect();
@@ -197,7 +196,7 @@ impl FormatValues for sysfs::drm::Drm {
                 "Card", "Driver", "Actual", "Req'd", "Min", "Max", "Boost", "GPU min", "GPU max",
             ]);
             for card in cards {
-                if let Some(sysfs::drm::DriverPolicy::I915(policy)) = card.driver_policy.as_ref() {
+                if let Some(zysfs::drm::DriverPolicy::I915(policy)) = card.driver_policy.as_ref() {
                     tab.row(&[
                         card.id.map(|v| v.to_string()).unwrap_or_else(dot),
                         card.driver.clone().unwrap_or_else(dot),
@@ -370,7 +369,7 @@ impl FormatValues for nvml::Nvml {
 }
 
 #[async_trait]
-impl FormatValues for sysfs::intel_pstate::IntelPstate {
+impl FormatValues for zysfs::intel_pstate::IntelPstate {
     type Arg = ();
 
     async fn format_values<W>(&self, w: &mut W, _: ()) -> Result<()>
@@ -379,7 +378,7 @@ impl FormatValues for sysfs::intel_pstate::IntelPstate {
     {
         fn system_status(status: &str) -> String { format!(" intel_pstate: {}\n\n", status) }
 
-        fn epb_epp(policies: &[sysfs::intel_pstate::Policy]) -> Option<String> {
+        fn epb_epp(policies: &[zysfs::intel_pstate::Policy]) -> Option<String> {
             let mut values: Vec<(u64, String)> = policies
                 .iter()
                 .filter_map(|p| {
@@ -409,7 +408,7 @@ impl FormatValues for sysfs::intel_pstate::IntelPstate {
             Some(nl(tab.to_string()))
         }
 
-        fn epps(policies: &[sysfs::intel_pstate::Policy]) -> Option<String> {
+        fn epps(policies: &[zysfs::intel_pstate::Policy]) -> Option<String> {
             let mut prefs: Vec<String> = policies
                 .iter()
                 .filter_map(|p| {
@@ -441,7 +440,7 @@ impl FormatValues for sysfs::intel_pstate::IntelPstate {
 
         if let Some(p) = &self.policies {
             if !p.is_empty() {
-                if let Ok(status) = sysfs::intel_pstate::io::tokio::status().await {
+                if let Ok(status) = zysfs::intel_pstate::tokio::status().await {
                     w.write_all(system_status(&status).as_bytes()).await.map_err(Error::Format)?;
                     if status == "active" {
                         if let Some(s) = epb_epp(p) {
@@ -459,7 +458,7 @@ impl FormatValues for sysfs::intel_pstate::IntelPstate {
 }
 
 #[async_trait]
-impl FormatValues for sysfs::intel_rapl::IntelRapl {
+impl FormatValues for zysfs::intel_rapl::IntelRapl {
     type Arg = Option<RaplSamplers>;
 
     async fn format_values<W>(&self, w: &mut W, samplers: Option<RaplSamplers>) -> Result<()>

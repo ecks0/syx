@@ -145,8 +145,8 @@ pub(crate) mod profile {
         } else {
             let s = state::home_with(STATE_FILE_NAME);
             if s.is_none() {
-                log::warn!(
-                    "ERR knobs w Profile::state_path() Could not determine user state directory"
+                log::error!(
+                    "ERR knobs r Profile::state_path() Could not determine user state directory"
                 );
             }
             s

@@ -56,8 +56,7 @@ use std::time::Duration;
 use measurements::{Frequency, Power};
 use serde::Deserialize;
 use tokio::time::sleep;
-use zysfs::types as sysfs;
-use zysfs::types::tokio::Write as _;
+use zysfs::tokio::Write as _;
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 enum CardId {
@@ -217,21 +216,21 @@ impl Knobs {
     }
 
     async fn apply_cpu(&self) {
-        let cpu: Option<sysfs::cpu::Cpu> = self.into();
+        let cpu: Option<zysfs::cpu::Cpu> = self.into();
         if let Some(cpu) = cpu {
             cpu.write().await;
         };
     }
 
     async fn apply_cpufreq(&self) {
-        let cpufreq: Option<sysfs::cpufreq::Cpufreq> = self.into();
+        let cpufreq: Option<zysfs::cpufreq::Cpufreq> = self.into();
         if let Some(cpufreq) = cpufreq {
             cpufreq.write().await;
         };
     }
 
     async fn apply_drm(&self) {
-        let drm: Option<sysfs::drm::Drm> = self.into();
+        let drm: Option<zysfs::drm::Drm> = self.into();
         if let Some(drm) = drm {
             drm.write().await;
         };
@@ -246,14 +245,14 @@ impl Knobs {
     }
 
     async fn apply_pstate(&self) {
-        let intel_pstate: Option<sysfs::intel_pstate::IntelPstate> = self.into();
+        let intel_pstate: Option<zysfs::intel_pstate::IntelPstate> = self.into();
         if let Some(intel_pstate) = intel_pstate {
             intel_pstate.write().await;
         }
     }
 
     async fn apply_rapl(&self) {
-        let intel_rapl: Option<sysfs::intel_rapl::IntelRapl> = self.into();
+        let intel_rapl: Option<zysfs::intel_rapl::IntelRapl> = self.into();
         if let Some(intel_rapl) = intel_rapl {
             intel_rapl.write().await;
         }

@@ -3,8 +3,7 @@ mod parse;
 mod sampler;
 
 use tokio::io::{stdout, AsyncWriteExt as _};
-use zysfs::types as sysfs;
-use zysfs::types::tokio::Read as SysfsRead;
+use zysfs::tokio::Read as ZysfsRead;
 
 use crate::profile::Profile;
 use crate::{logging, Chain, Error, Result, NAME};
@@ -147,24 +146,24 @@ impl Cli {
         let mut buf = Vec::with_capacity(3000);
         let show_all = !self.has_show_args();
         if show_all || self.show_cpu.is_some() {
-            if let Some(cpu) = sysfs::cpu::Cpu::read(()).await {
-                if let Some(cpufreq) = sysfs::cpufreq::Cpufreq::read(()).await {
+            if let Some(cpu) = zysfs::cpu::Cpu::read(()).await {
+                if let Some(cpufreq) = zysfs::cpufreq::Cpufreq::read(()).await {
                     (cpu, cpufreq).format_values(&mut buf, ()).await?;
                 }
             }
         }
         if show_all || self.show_pstate.is_some() {
-            if let Some(intel_pstate) = sysfs::intel_pstate::IntelPstate::read(()).await {
+            if let Some(intel_pstate) = zysfs::intel_pstate::IntelPstate::read(()).await {
                 intel_pstate.format_values(&mut buf, ()).await?;
             }
         }
         if show_all || self.show_rapl.is_some() {
-            if let Some(intel_rapl) = sysfs::intel_rapl::IntelRapl::read(()).await {
+            if let Some(intel_rapl) = zysfs::intel_rapl::IntelRapl::read(()).await {
                 intel_rapl.format_values(&mut buf, samplers.clone().into_samplers()).await?;
             }
         }
         if show_all || self.show_drm.is_some() {
-            if let Some(drm) = sysfs::drm::Drm::read(()).await {
+            if let Some(drm) = zysfs::drm::Drm::read(()).await {
                 drm.format_values(&mut buf, ()).await?;
             }
         }

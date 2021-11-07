@@ -6,9 +6,8 @@ use std::time::{Duration, Instant};
 use measurements::Power;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
-use zysfs::io::intel_rapl::tokio::energy_uj;
-use zysfs::types as sysfs;
-use zysfs::types::tokio::Read as _;
+use zysfs::intel_rapl::tokio::energy_uj;
+use zysfs::tokio::Read as _;
 
 fn mean(n: Vec<u64>) -> f64 {
     let sum: u64 = n.iter().sum();
@@ -28,7 +27,7 @@ fn mean(n: Vec<u64>) -> f64 {
 // Sample rapl energy usage at a regular interval.
 #[derive(Clone, Debug)]
 pub(crate) struct RaplSampler {
-    zone: sysfs::intel_rapl::ZoneId,
+    zone: zysfs::intel_rapl::ZoneId,
     interval: Duration,
     values: Arc<Mutex<VecDeque<u64>>>,
     working: Arc<AtomicBool>,
@@ -38,12 +37,12 @@ impl RaplSampler {
     const COUNT: usize = 11;
 
     pub(crate) async fn all(interval: Duration) -> Option<Vec<RaplSampler>> {
-        sysfs::intel_rapl::Policy::ids()
+        zysfs::intel_rapl::Policy::ids()
             .await
             .map(|zones| zones.into_iter().map(|zone| Self::new(zone, interval)).collect())
     }
 
-    pub(crate) fn new(zone: sysfs::intel_rapl::ZoneId, interval: Duration) -> Self {
+    pub(crate) fn new(zone: zysfs::intel_rapl::ZoneId, interval: Duration) -> Self {
         Self {
             zone,
             interval,
@@ -117,7 +116,7 @@ impl RaplSampler {
 // Manage a collection of `RaplSampler`s.
 #[derive(Clone, Debug)]
 pub(crate) struct RaplSamplers {
-    samplers: HashMap<sysfs::intel_rapl::ZoneId, RaplSampler>,
+    samplers: HashMap<zysfs::intel_rapl::ZoneId, RaplSampler>,
 }
 
 impl RaplSamplers {
@@ -135,7 +134,7 @@ impl RaplSamplers {
         }
     }
 
-    pub(crate) async fn watt_seconds(&self, zone: sysfs::intel_rapl::ZoneId) -> Option<Power> {
+    pub(crate) async fn watt_seconds(&self, zone: zysfs::intel_rapl::ZoneId) -> Option<Power> {
         self.samplers.get(&zone)?.watt_seconds().await
     }
 }

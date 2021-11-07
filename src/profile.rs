@@ -24,6 +24,9 @@ pub enum Error {
     #[error("Previous profile state not found at {path}")]
     NoState { path: String },
 
+    #[error("{action}: unable to determine xdg user state directory")]
+    NoStatePath { action: String },
+
     #[error("{message}")]
     Se { message: String },
 }
@@ -59,6 +62,11 @@ impl Error {
         Self::NoState { path }
     }
 
+    fn no_state_path<S: Display>(action: S) -> Self {
+        let action = action.to_string();
+        Self::NoStatePath { action }
+    }
+
     fn se<S: Display>(message: S) -> Self {
         let message = message.to_string();
         Self::Se { message }
@@ -86,7 +94,7 @@ impl Profile {
         let p = if let Some(p) = path::state_path().await {
             p
         } else {
-            return Ok(None);
+            return Err(Error::no_state_path("Read recent profile"));
         };
         let s = match read_to_string(&p).await {
             Ok(s) => s,
@@ -143,7 +151,7 @@ impl Profile {
         let p = if let Some(p) = path::state_path().await {
             p
         } else {
-            return Ok(());
+            return Err(Error::no_state_path("Write recent profile"));
         };
         if let Some(parent) = p.parent() {
             if !parent.is_dir() {
