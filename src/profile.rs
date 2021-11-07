@@ -108,7 +108,7 @@ impl Profile {
         let s = match read_to_string(&p).await {
             Ok(s) => s,
             Err(e) => match e.kind() {
-                IoErrorKind::NotFound => return Err(Error::state_missing(&p)),
+                crate::IoErrorKind::NotFound => return Err(Error::state_missing(&p)),
                 _ => return Err(Error::io(&p, e)),
             },
         };
@@ -134,8 +134,8 @@ impl Profile {
         log::debug!("Reading profiles from {}", self.path.display());
         match tokio::fs::read_to_string(&self.path).await {
             Ok(s) => match serde_yaml::from_str::<HashMap<String, Chain>>(&s) {
-                Ok(p) => match p.get(&self.name) {
-                    Some(c) => Ok(c),
+                Ok(p) => match p.into_iter().find(|(n, _)| n == &self.name) {
+                    Some((_, c)) => Ok(c),
                     None => Err(Error::profile_missing(&self.path, &self.name)),
                 },
                 Err(e) => Err(Error::de(&self.path, e)),
