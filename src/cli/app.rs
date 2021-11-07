@@ -1,6 +1,73 @@
 use clap::{crate_version, App, AppSettings, Arg};
 
-use crate::cli::*;
+use crate::NAME;
+
+pub(super) const ARG_QUIET: &str = "quiet";
+
+pub(super) const ARG_SHOW_CPU: &str = "show-cpu";
+pub(super) const ARG_SHOW_DRM: &str = "show-drm";
+#[cfg(feature = "nvml")]
+pub(super) const ARG_SHOW_NVML: &str = "show-nvml";
+pub(super) const ARG_SHOW_PSTATE: &str = "show-pstate";
+pub(super) const ARG_SHOW_RAPL: &str = "show-rapl";
+
+pub(super) const ARG_CPU: &str = "cpu";
+pub(super) const ARG_CPU_ON: &str = "cpu-on";
+pub(super) const ARG_CPU_ON_EACH: &str = "cpu-on-each";
+
+pub(super) const ARG_CPUFREQ_GOV: &str = "cpufreq-gov";
+pub(super) const ARG_CPUFREQ_MIN: &str = "cpufreq-min";
+pub(super) const ARG_CPUFREQ_MAX: &str = "cpufreq-max";
+
+pub(super) const ARG_DRM_I915: &str = "drm-i915";
+pub(super) const ARG_DRM_I915_MIN: &str = "drm-i915-min";
+pub(super) const ARG_DRM_I915_MAX: &str = "drm-i915-max";
+pub(super) const ARG_DRM_I915_BOOST: &str = "drm-i915-boost";
+
+#[cfg(feature = "nvml")]
+pub(super) const ARG_NVML: &str = "nvml";
+#[cfg(feature = "nvml")]
+pub(super) const ARG_NVML_GPU_MIN: &str = "nvml-gpu-min";
+#[cfg(feature = "nvml")]
+pub(super) const ARG_NVML_GPU_MAX: &str = "nvml-gpu-max";
+#[cfg(feature = "nvml")]
+pub(super) const ARG_NVML_GPU_RESET: &str = "nvml-gpu-reset";
+#[cfg(feature = "nvml")]
+pub(super) const ARG_NVML_POWER_LIMIT: &str = "nvml-power-limit";
+
+pub(super) const ARG_PSTATE_EPB: &str = "pstate-epb";
+pub(super) const ARG_PSTATE_EPP: &str = "pstate-epp";
+
+pub(super) const ARG_RAPL_PACKAGE: &str = "rapl-package";
+pub(super) const ARG_RAPL_ZONE: &str = "rapl-zone";
+pub(super) const ARG_RAPL_LONG_LIMIT: &str = "rapl-long-limit";
+pub(super) const ARG_RAPL_LONG_WINDOW: &str = "rapl-long-window";
+pub(super) const ARG_RAPL_SHORT_LIMIT: &str = "rapl-short-limit";
+pub(super) const ARG_RAPL_SHORT_WINDOW: &str = "rapl-short-window";
+
+pub(super) const ARG_PROFILE: &str = "PROFILE";
+
+pub(super) const ARG_CHAIN: &str = "CHAIN";
+
+const AFTER_HELP: &str = r#"            BOOL   0, 1, true, false
+             IDS   comma-delimited sequence of integers and/or integer ranges
+           HERTZ*  mhz when unspecified: hz/h - khz/k - mhz/m - ghz/g - thz/t
+            SECS   ms when unspecified: ns/n - us/u - ms/m - s
+         TOGGLES   sequence of 0 (off), 1 (on), or _ (skip), where position denotes id
+           WATTS*  mw when unspecified: uw/u - mw/m - w - kw/k
+
+        * Floating point values may be given for these units.
+
+    All supported values are shown by default unless the --show-* or --quiet flags are used.
+
+    All flags may be expressed as env vars. For example:
+
+        --show-cpu              → KNOBS_SHOW_CPU=1
+        --cpu 1,3-5             → KNOBS_CPU=1,3-5
+        --drm-i915-boost 1.2ghz → KNOBS_DRM_I915_BOOST=1.2ghz
+
+    The KNOBS_LOG env var may be set to trace, debug, info, warn, or error (default).
+"#;
 
 // Build and return a clap app.
 pub(super) fn build<'a, 'b>() -> clap::App<'a, 'b> {
