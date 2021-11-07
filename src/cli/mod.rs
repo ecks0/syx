@@ -3,7 +3,7 @@ mod parse;
 mod sampler;
 
 use tokio::io::{stdout, AsyncWriteExt as _};
-use zysfs::tokio::Read as ZysfsRead;
+use zysfs::tokio::Read as _;
 
 use crate::cli::app::*;
 use crate::profile::{Error as ProfileError, Profile};

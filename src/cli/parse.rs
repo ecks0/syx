@@ -27,11 +27,11 @@ impl<'a> Parser<'a> {
     }
 
     // Return true if the given argument is present in argv. (Env vars not checked).
-    fn arg_present(&self, name: &str) -> bool { self.0.is_present(name) }
+    fn present(&self, name: &str) -> bool { self.0.is_present(name) }
 
     // Return an iterator over the values for an argument from argv. (Env vars not
     // checked).
-    fn arg_values(&self, name: &str) -> Option<clap::Values> { self.0.values_of(name) }
+    fn values(&self, name: &str) -> Option<clap::Values> { self.0.values_of(name) }
 
     // Parse a flag argument from the argv or env vars.
     pub(super) fn flag(&self, name: &str) -> Option<()> {
@@ -142,10 +142,10 @@ impl TryFrom<&Parser<'_>> for Chain {
             if k.has_values() {
                 chain.push(k);
             }
-            if !p.arg_present(ARG_CHAIN) {
+            if !p.present(ARG_CHAIN) {
                 break;
             }
-            match p.arg_values(ARG_CHAIN) {
+            match p.values(ARG_CHAIN) {
                 Some(v) => {
                     let mut v: Vec<String> = v.map(String::from).collect();
                     if v.is_empty() {

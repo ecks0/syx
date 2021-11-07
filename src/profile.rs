@@ -92,10 +92,9 @@ impl Profile {
     // Return the most recently applied profile.
     async fn recent() -> Result<Self> {
         use tokio::fs::read_to_string;
-        let p = if let Some(p) = path::state_path().await {
-            p
-        } else {
-            return Err(Error::state_path_missing("Read recent profile"));
+        let p = match path::state_path().await {
+            Some(p) => p,
+            None => return Err(Error::state_path_missing("Read recent profile")),
         };
         let s = match read_to_string(&p).await {
             Ok(s) => s,
@@ -104,10 +103,7 @@ impl Profile {
                 _ => return Err(Error::io(p, e)),
             },
         };
-        match serde_yaml::from_str(&s) {
-            Ok(r) => Ok(r),
-            Err(_) => Err(Error::state_corrupt(p)),
-        }
+        serde_yaml::from_str(&s).map_err(|_| Error::state_corrupt(p))
     }
 
     pub(crate) async fn new<S: Into<String>>(name: S) -> Result<Self> {
@@ -142,10 +138,9 @@ impl Profile {
 
     pub(crate) async fn set_recent(&self) -> Result<()> {
         use tokio::fs::{create_dir_all, write};
-        let p = if let Some(p) = path::state_path().await {
-            p
-        } else {
-            return Err(Error::state_path_missing("Write recent profile"));
+        let p = match path::state_path().await {
+            Some(p) => p,
+            None => return Err(Error::state_path_missing("Write recent profile")),
         };
         if let Some(parent) = p.parent() {
             if !parent.is_dir() {
@@ -155,7 +150,6 @@ impl Profile {
             }
         }
         let s = serde_yaml::to_string(self).map_err(Error::se)?;
-        write(&p, s.as_bytes()).await.map_err(|e| Error::io(p, e))?;
-        Ok(())
+        write(&p, s.as_bytes()).await.map_err(|e| Error::io(p, e))
     }
 }
