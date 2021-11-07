@@ -205,13 +205,15 @@ impl Knobs {
             self.cpu = policy::cpu_ids().await;
         }
         if self.has_drm_i915_values() && self.drm_i915.is_none() {
-            self.drm_i915 =
-                policy::drm_i915_ids().await.map(|ids| ids.into_iter().map(CardId::Id).collect());
+            self.drm_i915 = policy::drm_i915_ids()
+                .await
+                .map(|ids| ids.into_iter().map(CardId::Id).collect());
         }
         #[cfg(feature = "nvml")]
         if self.has_nvml_values() && self.nvml.is_none() {
-            self.nvml =
-                policy::nvml_ids().await.map(|ids| ids.into_iter().map(CardId::Id).collect());
+            self.nvml = policy::nvml_ids()
+                .await
+                .map(|ids| ids.into_iter().map(CardId::Id).collect());
         }
     }
 

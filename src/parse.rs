@@ -168,7 +168,8 @@ impl FromStr for Indices {
             let s: Vec<&str> = item.split('-').collect();
             match &s[..] {
                 [id] => ids.push(
-                    id.parse::<u64>().map_err(|_| Error::parse_value("Index is not an integer"))?,
+                    id.parse::<u64>()
+                        .map_err(|_| Error::parse_value("Index is not an integer"))?,
                 ),
                 [start, end] => std::ops::Range {
                     start: start

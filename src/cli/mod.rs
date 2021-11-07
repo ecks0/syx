@@ -156,7 +156,9 @@ impl Cli {
         }
         if show_all || self.show_rapl.is_some() {
             if let Some(intel_rapl) = zysfs::intel_rapl::IntelRapl::read(()).await {
-                intel_rapl.format_values(&mut buf, samplers.clone().into_samplers()).await?;
+                intel_rapl
+                    .format_values(&mut buf, samplers.clone().into_samplers())
+                    .await?;
             }
         }
         if show_all || self.show_drm.is_some() {
@@ -230,7 +232,10 @@ impl App {
                 },
                 Error::Profile(ProfileError::StateCorrupt { path }) => {
                     use tokio::fs::remove_file;
-                    log::error!("Error: profile state file corrupted, removing {}", path);
+                    log::error!(
+                        "Error: profile state file corrupted, removing {}",
+                        path.display()
+                    );
                     match remove_file(path).await {
                         Ok(()) => std::process::exit(1),
                         Err(e) => {

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use tokio::io::ErrorKind as IoErrorKind;
@@ -11,22 +11,22 @@ use crate::Chain;
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("{path}: {message}")]
-    De { path: String, message: String },
+    De { path: PathBuf, message: String },
 
     #[error("{path}: {message}")]
-    Io { path: String, message: String },
+    Io { path: PathBuf, message: String },
 
     #[error("No profile config exists in {search_paths:#?}")]
     ConfigMissing { search_paths: Vec<String> },
 
     #[error("Profile '{profile}' not found in {path}")]
-    ProfileMissing { path: String, profile: String },
+    ProfileMissing { path: PathBuf, profile: String },
 
     #[error("Corrupt state file at {path}")]
-    StateCorrupt { path: String },
+    StateCorrupt { path: PathBuf },
 
     #[error("Previous profile state not found at {path}")]
-    StateMissing { path: String },
+    StateMissing { path: PathBuf },
 
     #[error("{activity}: unable to determine xdg user state directory")]
     StatePathMissing { activity: String },
@@ -36,40 +36,32 @@ pub enum Error {
 }
 
 impl Error {
-    fn path_to_str(p: &Path) -> String { p.to_string_lossy().into_owned() }
-
-    fn de<S: Display>(path: &Path, message: S) -> Self {
-        let path = Self::path_to_str(path);
+    fn de<S: Display>(path: PathBuf, message: S) -> Self {
         let message = message.to_string();
         Self::De { path, message }
     }
 
-    fn io<S: Display>(path: &Path, message: S) -> Self {
-        let path = Self::path_to_str(path);
+    fn io<S: Display>(path: PathBuf, message: S) -> Self {
         let message = message.to_string();
         Self::Io { path, message }
     }
 
     fn config_missing(search_paths: Vec<PathBuf>) -> Self {
-        let search_paths = search_paths.into_iter().map(|p| Self::path_to_str(&p)).collect();
+        let search_paths = search_paths
+            .into_iter()
+            .map(|p| p.to_string_lossy().into_owned())
+            .collect();
         Self::ConfigMissing { search_paths }
     }
 
-    fn profile_missing<S: Display>(path: &Path, profile: S) -> Self {
-        let path = Self::path_to_str(path);
+    fn profile_missing<S: Display>(path: PathBuf, profile: S) -> Self {
         let profile = profile.to_string();
         Self::ProfileMissing { path, profile }
     }
 
-    fn state_corrupt(path: &Path) -> Self {
-        let path = Self::path_to_str(path);
-        Self::StateCorrupt { path }
-    }
+    fn state_corrupt(path: PathBuf) -> Self { Self::StateCorrupt { path } }
 
-    fn state_missing(path: &Path) -> Self {
-        let path = Self::path_to_str(path);
-        Self::StateMissing { path }
-    }
+    fn state_missing(path: PathBuf) -> Self { Self::StateMissing { path } }
 
     fn state_path_missing<S: Display>(activity: S) -> Self {
         let action = activity.to_string();
@@ -108,13 +100,13 @@ impl Profile {
         let s = match read_to_string(&p).await {
             Ok(s) => s,
             Err(e) => match e.kind() {
-                crate::IoErrorKind::NotFound => return Err(Error::state_missing(&p)),
-                _ => return Err(Error::io(&p, e)),
+                crate::IoErrorKind::NotFound => return Err(Error::state_missing(p)),
+                _ => return Err(Error::io(p, e)),
             },
         };
         match serde_yaml::from_str(&s) {
             Ok(r) => Ok(r),
-            Err(_) => Err(Error::state_corrupt(&p)),
+            Err(_) => Err(Error::state_corrupt(p)),
         }
     }
 
@@ -132,17 +124,18 @@ impl Profile {
 
     pub(crate) async fn read(&self) -> Result<Chain> {
         log::debug!("Reading profiles from {}", self.path.display());
-        match tokio::fs::read_to_string(&self.path).await {
+        let p = self.path.clone();
+        match tokio::fs::read_to_string(&p).await {
             Ok(s) => match serde_yaml::from_str::<HashMap<String, Chain>>(&s) {
-                Ok(p) => match p.into_iter().find(|(n, _)| n == &self.name) {
+                Ok(cf) => match cf.into_iter().find(|(n, _)| n == &self.name) {
                     Some((_, c)) => Ok(c),
-                    None => Err(Error::profile_missing(&self.path, &self.name)),
+                    None => Err(Error::profile_missing(p, &self.name)),
                 },
-                Err(e) => Err(Error::de(&self.path, e)),
+                Err(e) => Err(Error::de(p, e)),
             },
             Err(e) => match e.kind() {
                 IoErrorKind::NotFound => Err(Error::config_missing(Self::paths().await)),
-                _ => Err(Error::io(&self.path, e)),
+                _ => Err(Error::io(p, e)),
             },
         }
     }
@@ -156,11 +149,13 @@ impl Profile {
         };
         if let Some(parent) = p.parent() {
             if !parent.is_dir() {
-                create_dir_all(parent).await.map_err(|e| Error::io(parent, e))?;
+                create_dir_all(parent)
+                    .await
+                    .map_err(|e| Error::io(parent.to_path_buf(), e))?;
             }
         }
         let s = serde_yaml::to_string(self).map_err(Error::se)?;
-        write(&p, s.as_bytes()).await.map_err(|e| Error::io(&p, e))?;
+        write(&p, s.as_bytes()).await.map_err(|e| Error::io(p, e))?;
         Ok(())
     }
 }

@@ -11,7 +11,9 @@ pub(crate) async fn configure() {
         let env = Env::default()
             .filter_or(var_name("LOG"), "error")
             .write_style_or(var_name("LOG_STYLE"), "never");
-        Builder::from_env(env).format(|buf, record| writeln!(buf, "{}", record.args())).init()
+        Builder::from_env(env)
+            .format(|buf, record| writeln!(buf, "{}", record.args()))
+            .init()
     }
     LOGGING.get_or_init(init).await;
 }

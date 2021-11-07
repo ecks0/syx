@@ -73,7 +73,12 @@ impl Table {
         let mut tab = ct::Table::new();
         tab.load_preset(ct::presets::NOTHING);
         tab.set_header(header);
-        tab.add_row(header.iter().map(|h| "-".repeat(h.len())).collect::<Vec<String>>());
+        tab.add_row(
+            header
+                .iter()
+                .map(|h| "-".repeat(h.len()))
+                .collect::<Vec<String>>(),
+        );
         Self(tab)
     }
 
@@ -383,7 +388,9 @@ impl FormatValues for zysfs::intel_pstate::IntelPstate {
                 .iter()
                 .filter_map(|p| {
                     p.energy_perf_bias.and_then(|epb| {
-                        p.energy_performance_preference.as_ref().map(|epp| (epb, epp.to_string()))
+                        p.energy_performance_preference
+                            .as_ref()
+                            .map(|epp| (epb, epp.to_string()))
                     })
                 })
                 .collect();
@@ -400,7 +407,10 @@ impl FormatValues for zysfs::intel_pstate::IntelPstate {
                 for policy in policies {
                     tab.row(&[
                         policy.id.map(|v| v.to_string()).unwrap_or_else(dot),
-                        policy.energy_perf_bias.map(|v| v.to_string()).unwrap_or_else(dot),
+                        policy
+                            .energy_perf_bias
+                            .map(|v| v.to_string())
+                            .unwrap_or_else(dot),
                         policy.energy_performance_preference.clone().unwrap_or_else(dot),
                     ]);
                 }
@@ -412,7 +422,9 @@ impl FormatValues for zysfs::intel_pstate::IntelPstate {
             let mut prefs: Vec<String> = policies
                 .iter()
                 .filter_map(|p| {
-                    p.energy_performance_available_preferences.clone().map(|p| p.join(" "))
+                    p.energy_performance_available_preferences
+                        .clone()
+                        .map(|p| p.join(" "))
                 })
                 .collect();
             prefs.sort_unstable();
@@ -441,7 +453,9 @@ impl FormatValues for zysfs::intel_pstate::IntelPstate {
         if let Some(p) = &self.policies {
             if !p.is_empty() {
                 if let Ok(status) = zysfs::intel_pstate::tokio::status().await {
-                    w.write_all(system_status(&status).as_bytes()).await.map_err(Error::Format)?;
+                    w.write_all(system_status(&status).as_bytes())
+                        .await
+                        .map_err(Error::Format)?;
                     if status == "active" {
                         if let Some(s) = epb_epp(p) {
                             w.write_all(s.as_bytes()).await.map_err(Error::Format)?;
@@ -489,10 +503,12 @@ impl FormatValues for zysfs::intel_rapl::IntelRapl {
                 continue;
             };
             let long = policy.constraints.as_deref().and_then(|v| {
-                v.iter().find(|p| p.name.as_ref().map(|s| s == "long_term").unwrap_or(false))
+                v.iter()
+                    .find(|p| p.name.as_ref().map(|s| s == "long_term").unwrap_or(false))
             });
             let short = policy.constraints.as_deref().and_then(|v| {
-                v.iter().find(|p| p.name.as_ref().map(|s| s == "short_term").unwrap_or(false))
+                v.iter()
+                    .find(|p| p.name.as_ref().map(|s| s == "short_term").unwrap_or(false))
             });
             let watt_seconds =
                 if let Some(s) = &samplers { s.watt_seconds(zone).await } else { None };
@@ -501,7 +517,9 @@ impl FormatValues for zysfs::intel_rapl::IntelRapl {
                 format!(
                     "{}{}",
                     zone.zone,
-                    zone.subzone.map(|v| format!(":{}", v)).unwrap_or_else(String::new)
+                    zone.subzone
+                        .map(|v| format!(":{}", v))
+                        .unwrap_or_else(String::new)
                 ),
                 long.and_then(|v| v.power_limit_uw).map(uw).unwrap_or_else(dot),
                 short.and_then(|v| v.power_limit_uw).map(uw).unwrap_or_else(dot),
@@ -523,7 +541,9 @@ impl FormatValues for zysfs::intel_rapl::IntelRapl {
                     .unwrap_or_else(dot),
             ]);
         }
-        w.write_all(nl(tab.to_string()).as_bytes()).await.map_err(Error::Format)?;
+        w.write_all(nl(tab.to_string()).as_bytes())
+            .await
+            .map_err(Error::Format)?;
         Ok(())
     }
 }
