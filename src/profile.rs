@@ -3,6 +3,7 @@ use std::fmt::Display;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use tokio::io::ErrorKind as IoErrorKind;
 
 use crate::path::profile as path;
 use crate::Chain;
@@ -107,7 +108,7 @@ impl Profile {
         let s = match read_to_string(&p).await {
             Ok(s) => s,
             Err(e) => match e.kind() {
-                crate::IoErrorKind::NotFound => return Err(Error::state_missing(&p)),
+                IoErrorKind::NotFound => return Err(Error::state_missing(&p)),
                 _ => return Err(Error::io(&p, e)),
             },
         };
@@ -133,14 +134,14 @@ impl Profile {
         log::debug!("Reading profiles from {}", self.path.display());
         match tokio::fs::read_to_string(&self.path).await {
             Ok(s) => match serde_yaml::from_str::<HashMap<String, Chain>>(&s) {
-                Ok(p) => match p.into_iter().find(|(n, _)| n == &self.name) {
-                    Some((_, c)) => Ok(c),
+                Ok(p) => match p.get(&self.name) {
+                    Some(c) => Ok(c),
                     None => Err(Error::profile_missing(&self.path, &self.name)),
                 },
                 Err(e) => Err(Error::de(&self.path, e)),
             },
             Err(e) => match e.kind() {
-                crate::IoErrorKind::NotFound => Err(Error::config_missing(Self::paths().await)),
+                IoErrorKind::NotFound => Err(Error::config_missing(Self::paths().await)),
                 _ => Err(Error::io(&self.path, e)),
             },
         }
