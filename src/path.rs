@@ -5,6 +5,7 @@ use tokio::sync::OnceCell;
 
 use crate::{env, NAME};
 
+// Build config paths, e.g. in ~/.config or /etc
 mod config {
     use super::*;
 
@@ -13,7 +14,7 @@ mod config {
     const DIR: Option<&'static str> = option_env!("KNOBS_SYS_CONFIG_DIR");
 
     // e.g. ~/.config/knobs
-    pub(crate) fn home() -> Option<PathBuf> {
+    pub(super) fn home() -> Option<PathBuf> {
         dirs::config_dir().map(|mut p| {
             p.push(NAME);
             p
@@ -21,7 +22,7 @@ mod config {
     }
 
     // e.g. /etc/knobs
-    pub(crate) fn sys() -> PathBuf {
+    pub(super) fn sys() -> PathBuf {
         let dir = DIR.unwrap_or(DIR_DEFAULT);
         let mut p = PathBuf::new();
         p.push(dir);
@@ -29,20 +30,21 @@ mod config {
         p
     }
 
-    pub(crate) fn home_with(file_name: &str) -> Option<PathBuf> {
+    pub(super) fn home_with(file_name: &str) -> Option<PathBuf> {
         home().map(|mut p| {
             p.push(file_name);
             p
         })
     }
 
-    pub(crate) fn sys_with(file_name: &str) -> PathBuf {
+    pub(super) fn sys_with(file_name: &str) -> PathBuf {
         let mut p = sys();
         p.push(file_name);
         p
     }
 }
 
+// Build state paths, e.g. in ~/.local/state or /var/lib
 mod state {
     use super::*;
 
@@ -51,7 +53,7 @@ mod state {
     const DIR: Option<&'static str> = option_env!("KNOBS_SYS_STATE_DIR");
 
     // e.g. ~/.local/state/knobs
-    pub(crate) fn home() -> Option<PathBuf> {
+    pub(super) fn home() -> Option<PathBuf> {
         dirs::state_dir().map(|mut p| {
             p.push(NAME);
             p
@@ -59,7 +61,7 @@ mod state {
     }
 
     // e.g. /var/lib/knobs
-    pub(crate) fn sys() -> PathBuf {
+    pub(super) fn sys() -> PathBuf {
         let dir = DIR.unwrap_or(DIR_DEFAULT);
         let mut p = PathBuf::new();
         p.push(dir);
@@ -67,20 +69,21 @@ mod state {
         p
     }
 
-    pub(crate) fn home_with(file_name: &str) -> Option<PathBuf> {
+    pub(super) fn home_with(file_name: &str) -> Option<PathBuf> {
         home().map(|mut p| {
             p.push(file_name);
             p
         })
     }
 
-    pub(crate) fn sys_with(file_name: &str) -> PathBuf {
+    pub(super) fn sys_with(file_name: &str) -> PathBuf {
         let mut p = sys();
         p.push(file_name);
         p
     }
 }
 
+// Build profile config and state paths.
 pub(crate) mod profile {
     use super::*;
 

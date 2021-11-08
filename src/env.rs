@@ -1,6 +1,6 @@
 use crate::NAME;
 
-pub(crate) fn var_name(n: &str) -> String { format!("{}_{}", NAME, n) }
+pub(crate) fn var_name(n: &str) -> String { format!("{}_{}", NAME.to_uppercase(), n) }
 
 pub(crate) fn var(n: &str) -> Option<String> { std::env::var(&var_name(n)).ok() } // FIXME handle result
 

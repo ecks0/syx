@@ -64,8 +64,8 @@ impl Error {
     fn state_missing(path: PathBuf) -> Self { Self::StateMissing { path } }
 
     fn state_path_missing<S: Display>(activity: S) -> Self {
-        let action = activity.to_string();
-        Self::StatePathMissing { activity: action }
+        let activity = activity.to_string();
+        Self::StatePathMissing { activity }
     }
 
     fn se<S: Display>(message: S) -> Self {
@@ -92,18 +92,16 @@ impl Profile {
     // Return the most recently applied profile.
     async fn recent() -> Result<Self> {
         use tokio::fs::read_to_string;
-        let p = match path::state_path().await {
-            Some(p) => p,
-            None => return Err(Error::state_path_missing("Read recent profile")),
-        };
-        let s = match read_to_string(&p).await {
-            Ok(s) => s,
-            Err(e) => match e.kind() {
-                crate::IoErrorKind::NotFound => return Err(Error::state_missing(p)),
-                _ => return Err(Error::io(p, e)),
+        match path::state_path().await {
+            Some(p) => match read_to_string(&p).await {
+                Ok(s) => serde_yaml::from_str(&s).map_err(|_| Error::state_corrupt(p)),
+                Err(e) => match e.kind() {
+                    crate::IoErrorKind::NotFound => Err(Error::state_missing(p)),
+                    _ => Err(Error::io(p, e)),
+                },
             },
-        };
-        serde_yaml::from_str(&s).map_err(|_| Error::state_corrupt(p))
+            None => Err(Error::state_path_missing("Read recent profile")),
+        }
     }
 
     pub(crate) async fn new<S: Into<String>>(name: S) -> Result<Self> {
