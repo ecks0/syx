@@ -1,8 +1,8 @@
 use tokio::sync::OnceCell;
 
-use crate::env::var_name;
+use crate::cli::env::var_name;
 
-pub(crate) async fn configure() {
+pub(in crate::cli) async fn configure() {
     static LOGGING: OnceCell<()> = OnceCell::const_new();
     async fn init() {
         use std::io::Write;

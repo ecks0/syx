@@ -5,8 +5,8 @@ use measurements::{Frequency, Power};
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer};
 
-use crate::parse::{BoolStr, CardIds, DurationStr, FrequencyStr, Indices, PowerStr, Toggles};
-use crate::{CardId, Chain, Knobs};
+use crate::cli::group::{CardId, Group, Groups};
+use crate::cli::parse::{BoolStr, CardIds, DurationStr, FrequencyStr, Indices, PowerStr, Toggles};
 
 // Custom deserializers for parsed types.
 
@@ -40,12 +40,12 @@ impl<'de> Deserialize<'de> for CardIds {
     }
 }
 
-impl<'de> Deserialize<'de> for Chain {
+impl<'de> Deserialize<'de> for Groups {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let s: Vec<Knobs> = Deserialize::deserialize(deserializer)?;
+        let s: Vec<Group> = Deserialize::deserialize(deserializer)?;
         Ok(s.into())
     }
 }

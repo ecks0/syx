@@ -6,8 +6,9 @@ use std::time::{Duration, Instant};
 use measurements::Power;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
-use zysfs::intel_rapl::tokio::energy_uj;
-use zysfs::tokio::Read as _;
+
+use crate::sysfs::intel_rapl::{energy_uj, Device, ZoneId};
+use crate::Resource as _;
 
 fn mean(n: Vec<u64>) -> f64 {
     let sum: u64 = n.iter().sum();
@@ -26,23 +27,26 @@ fn mean(n: Vec<u64>) -> f64 {
 
 // Sample rapl energy usage at a regular interval.
 #[derive(Clone, Debug)]
-pub(crate) struct RaplSampler {
-    zone: zysfs::intel_rapl::ZoneId,
+pub struct Sampler {
+    zone: ZoneId,
     interval: Duration,
     values: Arc<Mutex<VecDeque<u64>>>,
     working: Arc<AtomicBool>,
 }
 
-impl RaplSampler {
+impl Sampler {
     const COUNT: usize = 11;
 
-    pub(crate) async fn all(interval: Duration) -> Option<Vec<RaplSampler>> {
-        zysfs::intel_rapl::Policy::ids()
+    pub async fn all(interval: Duration) -> Samplers {
+        Device::ids()
             .await
-            .map(|zones| zones.into_iter().map(|zone| Self::new(zone, interval)).collect())
+            .into_iter()
+            .map(|zone| Self::new(zone, interval))
+            .collect::<Vec<_>>()
+            .into()
     }
 
-    pub(crate) fn new(zone: zysfs::intel_rapl::ZoneId, interval: Duration) -> Self {
+    pub fn new(zone: ZoneId, interval: Duration) -> Self {
         Self {
             zone,
             interval,
@@ -51,11 +55,17 @@ impl RaplSampler {
         }
     }
 
-    pub(crate) fn working(&self) -> bool { self.working.load(Ordering::Acquire) }
+    pub fn working(&self) -> bool {
+        self.working.load(Ordering::Acquire)
+    }
 
-    fn swap_working(&mut self, v: bool) -> bool { self.working.swap(v, Ordering::Acquire) }
+    fn swap_working(&mut self, v: bool) -> bool {
+        self.working.swap(v, Ordering::Acquire)
+    }
 
-    async fn poll(&self) -> Option<u64> { energy_uj(self.zone.zone, self.zone.subzone).await.ok() }
+    async fn poll(&self) -> Option<u64> {
+        energy_uj(self.zone.zone, self.zone.subzone).await.ok()
+    }
 
     async fn work(&mut self) {
         let mut begin = Instant::now();
@@ -80,7 +90,7 @@ impl RaplSampler {
         }
     }
 
-    pub(crate) async fn start(&mut self) {
+    pub async fn start(&mut self) {
         if self.swap_working(true) {
             return;
         }
@@ -90,11 +100,15 @@ impl RaplSampler {
         });
     }
 
-    pub(crate) async fn stop(&mut self) { self.swap_working(false); }
+    pub async fn stop(&mut self) {
+        self.swap_working(false);
+    }
 
-    async fn values(&self) -> Vec<u64> { { self.values.lock().await.clone() }.into() }
+    async fn values(&self) -> Vec<u64> {
+        { self.values.lock().await.clone() }.into()
+    }
 
-    pub(crate) async fn watt_seconds(&self) -> Option<Power> {
+    pub async fn watt_seconds(&self) -> Option<Power> {
         let samples = self.values().await;
         if samples.len() < 2 {
             return None;
@@ -115,32 +129,38 @@ impl RaplSampler {
 
 // Manage a collection of `RaplSampler`s.
 #[derive(Clone, Debug)]
-pub(crate) struct RaplSamplers {
-    samplers: HashMap<zysfs::intel_rapl::ZoneId, RaplSampler>,
+pub struct Samplers {
+    samplers: HashMap<ZoneId, Sampler>,
 }
 
-impl RaplSamplers {
-    pub(crate) async fn working(&self) -> bool { self.samplers.values().any(|s| s.working()) }
+impl Samplers {
+    pub async fn working(&self) -> bool {
+        self.samplers.values().any(|s| s.working())
+    }
 
-    pub(crate) async fn start(&mut self) {
+    pub fn count(&self) -> usize {
+        self.samplers.len()
+    }
+
+    pub async fn start(&mut self) {
         for s in self.samplers.values_mut() {
             s.start().await;
         }
     }
 
-    pub(crate) async fn stop(&mut self) {
+    pub async fn stop(&mut self) {
         for s in self.samplers.values_mut() {
             s.stop().await;
         }
     }
 
-    pub(crate) async fn watt_seconds(&self, zone: zysfs::intel_rapl::ZoneId) -> Option<Power> {
+    pub async fn watt_seconds(&self, zone: ZoneId) -> Option<Power> {
         self.samplers.get(&zone)?.watt_seconds().await
     }
 }
 
-impl From<Vec<RaplSampler>> for RaplSamplers {
-    fn from(v: Vec<RaplSampler>) -> Self {
+impl From<Vec<Sampler>> for Samplers {
+    fn from(v: Vec<Sampler>) -> Self {
         let samplers = v.into_iter().map(|c| (c.zone, c)).collect();
         Self { samplers }
     }

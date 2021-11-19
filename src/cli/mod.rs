@@ -1,69 +1,133 @@
-mod app;
+mod de;
+mod env;
+mod format;
+mod group;
+mod logging;
 mod parse;
+mod parser;
+mod path;
+mod profile;
+mod resource;
 mod sampler;
 
+use std::fmt::Display;
+
+pub use clap::{Error as ClapError, ErrorKind as ClapErrorKind};
+pub use profile::Error as ProfileError;
 use tokio::io::{stdout, AsyncWriteExt as _};
-use zysfs::tokio::Read as _;
+pub use tokio::io::{Error as IoError, ErrorKind as IoErrorKind};
 
-use crate::cli::app::*;
-use crate::profile::{Error as ProfileError, Profile};
-use crate::{logging, Chain, Error, Result};
+use crate::cli::group::Groups;
+#[cfg(feature = "nvml")]
+use crate::cli::parser::ARG_SHOW_NV;
+use crate::cli::parser::{
+    Parser,
+    ARG_PROFILE,
+    ARG_QUIET,
+    ARG_SHOW_CPU,
+    ARG_SHOW_I915,
+    ARG_SHOW_PSTATE,
+    ARG_SHOW_RAPL,
+};
+use crate::cli::profile::path::config_paths;
+use crate::cli::profile::Profile;
+use crate::cli::sampler::Samplers;
+use crate::{Resource as _, System};
 
-// Command-line interface.
+const NAME: &str = "knobs";
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error(transparent)]
+    Clap(#[from] ClapError),
+
+    #[error(transparent)]
+    Format(IoError),
+
+    #[error("--{flag}: {message}")]
+    ParseFlag { flag: String, message: String },
+
+    #[error("{0}")]
+    ParseValue(String),
+
+    #[error(transparent)]
+    Profile(#[from] ProfileError),
+}
+
+impl Error {
+    fn parse_flag<S: Display>(flag: &str, message: S) -> Self {
+        let flag = flag.to_string();
+        let message = message.to_string();
+        Self::ParseFlag { flag, message }
+    }
+
+    fn parse_value<S: Display>(message: S) -> Self {
+        let message = message.to_string();
+        Self::ParseValue(message)
+    }
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
+
 #[derive(Clone, Debug)]
 pub struct Cli {
-    quiet: Option<()>,
-    show_cpu: Option<()>,
-    show_drm: Option<()>,
+    pub(in crate::cli) quiet: Option<()>,
+    pub(in crate::cli) show_cpu: Option<()>,
+    pub(in crate::cli) show_i915: Option<()>,
     #[cfg(feature = "nvml")]
-    show_nvml: Option<()>,
-    show_pstate: Option<()>,
-    show_rapl: Option<()>,
-    profile: Option<Profile>,
-    chains: Vec<Chain>,
+    pub(in crate::cli) show_nvml: Option<()>,
+    pub(in crate::cli) show_pstate: Option<()>,
+    pub(in crate::cli) show_rapl: Option<()>,
+    pub(in crate::cli) profile: Option<Profile>,
+    pub(in crate::cli) groups: Vec<Groups>,
 }
 
 impl Cli {
-    // Create a new instance for the given argv.
     pub async fn new(argv: &[String]) -> Result<Self> {
-        log::debug!("Profile config paths: {:#?}", Profile::paths().await);
-        let p = parse::Parser::new(argv)?;
-        let mut chains = vec![];
+        log::debug!("Profile config paths: {:#?}", config_paths().await);
+        let p = Parser::new(argv)?;
+        let mut groups = vec![];
         let profile = if let Some(pr) = p.str(ARG_PROFILE) {
             let pr = Profile::new(pr).await?;
-            let mut c = pr.read().await?;
-            if c.has_values() {
-                c.resolve().await;
-                chains.push(c);
+            let mut g = pr.groups().await?;
+            if g.has_values() {
+                g.resolve().await;
+                groups.push(g);
             }
             Some(pr)
         } else {
             None
         };
-        let mut c = Chain::try_from(&p)?;
-        if c.has_values() {
-            c.resolve().await;
-            chains.push(c);
+        let mut g = Groups::try_from(&p)?;
+        if g.has_values() {
+            g.resolve().await;
+            groups.push(g);
         }
+        let quiet = p.flag(ARG_QUIET);
+        let show_cpu = p.flag(ARG_SHOW_CPU);
+        let show_i915 = p.flag(ARG_SHOW_I915);
+        #[cfg(feature = "nvml")]
+        let show_nvml = p.flag(ARG_SHOW_NV);
+        let show_pstate = p.flag(ARG_SHOW_PSTATE);
+        let show_rapl = p.flag(ARG_SHOW_RAPL);
         let s = Self {
-            quiet: p.flag(ARG_QUIET),
-            show_cpu: p.flag(ARG_SHOW_CPU),
-            show_drm: p.flag(ARG_SHOW_DRM),
+            quiet,
+            show_cpu,
+            show_i915,
             #[cfg(feature = "nvml")]
-            show_nvml: p.flag(ARG_SHOW_NVML),
-            show_pstate: p.flag(ARG_SHOW_PSTATE),
-            show_rapl: p.flag(ARG_SHOW_RAPL),
+            show_nvml,
+            show_pstate,
+            show_rapl,
             profile,
-            chains,
+            groups,
         };
         Ok(s)
     }
 
-    // Return true if --show-* args are present.
     #[allow(clippy::let_and_return)]
-    fn has_show_args(&self) -> bool {
+    pub(in crate::cli) fn has_show_args(&self) -> bool {
         let b = self.show_cpu.is_some()
-            || self.show_drm.is_some()
+            || self.show_i915.is_some()
             || self.show_pstate.is_some()
             || self.show_rapl.is_some();
         #[cfg(feature = "nvml")]
@@ -71,38 +135,29 @@ impl Cli {
         b
     }
 
-    // Print values tables.
-    async fn print_values(&self, samplers: &sampler::Samplers) -> Result<()> {
-        use crate::format::FormatValues as _;
+    async fn print_values(&self, samplers: &Samplers) -> Result<()> {
+        let system = if let Some(s) = System::read(()).await {
+            s
+        } else {
+            return Ok(());
+        };
         let mut buf = Vec::with_capacity(3000);
         let show_all = !self.has_show_args();
         if show_all || self.show_cpu.is_some() {
-            if let Some(cpu) = zysfs::cpu::Cpu::read(()).await {
-                if let Some(cpufreq) = zysfs::cpufreq::Cpufreq::read(()).await {
-                    (cpu, cpufreq).format_values(&mut buf, ()).await?;
-                }
-            }
+            let _ = format::cpu(&mut buf, &system).await;
         }
         if show_all || self.show_pstate.is_some() {
-            if let Some(intel_pstate) = zysfs::intel_pstate::IntelPstate::read(()).await {
-                intel_pstate.format_values(&mut buf, ()).await?;
-            }
+            let _ = format::intel_pstate(&mut buf, &system).await;
         }
         if show_all || self.show_rapl.is_some() {
-            if let Some(intel_rapl) = zysfs::intel_rapl::IntelRapl::read(()).await {
-                intel_rapl
-                    .format_values(&mut buf, samplers.clone().into_samplers())
-                    .await?;
-            }
+            let _ = format::intel_rapl(&mut buf, &system, samplers.clone().into_samplers()).await;
         }
-        if show_all || self.show_drm.is_some() {
-            if let Some(drm) = zysfs::drm::Drm::read(()).await {
-                drm.format_values(&mut buf, ()).await?;
-            }
+        if show_all || self.show_i915.is_some() {
+            let _ = format::i915(&mut buf, &system).await;
         }
         #[cfg(feature = "nvml")]
         if show_all || self.show_nvml.is_some() {
-            nvml_facade::Nvml.format_values(&mut buf, ()).await?;
+            let _ = format::nvml(&mut buf, &system).await;
         }
         let s = String::from_utf8_lossy(&buf);
         let mut stdout = stdout();
@@ -111,11 +166,10 @@ impl Cli {
         Ok(())
     }
 
-    // Command-line interface app logic.
     pub async fn run(&self) -> Result<()> {
-        let mut samplers = sampler::Samplers::start(self).await;
-        for chain in &self.chains {
-            chain.apply().await;
+        let mut samplers = Samplers::start(self).await;
+        for g in &self.groups {
+            g.apply().await;
         }
         if let Some(p) = self.profile.as_ref() {
             let r = p.set_recent().await;
@@ -135,12 +189,10 @@ impl Cli {
     }
 }
 
-// Cli application.
 #[derive(Clone, Debug)]
 pub struct App;
 
 impl App {
-    // Run app with args.
     pub async fn run_with_args(args: &[String]) {
         logging::configure().await;
         match Cli::new(args).await {
@@ -186,7 +238,6 @@ impl App {
         }
     }
 
-    // Run app.
     pub async fn run() {
         let args: Vec<String> = std::env::args().collect();
         Self::run_with_args(&args).await

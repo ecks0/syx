@@ -3,12 +3,12 @@ use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
 use crate::cli::Cli;
-use crate::data::{RaplSampler, RaplSamplers};
+use crate::sysfs::intel_rapl as rapl;
 
 #[derive(Clone, Debug)]
-pub(super) struct Samplers {
+pub(in crate::cli) struct Samplers {
     begin: Instant,
-    samplers: Option<RaplSamplers>,
+    samplers: Option<rapl::Samplers>,
 }
 
 impl Samplers {
@@ -17,11 +17,12 @@ impl Samplers {
     // Minimum run time required to get give useful data.
     const RUNTIME: Duration = Duration::from_millis(400);
 
-    pub(super) async fn start(cli: &Cli) -> Self {
-        let samplers = if cli.quiet.is_none() && (!cli.has_show_args() || cli.show_rapl.is_some()) {
-            if let Some(s) = RaplSampler::all(Self::INTERVAL).await {
+    pub(in crate::cli) async fn start(cli: &Cli) -> Self {
+        let sample = cli.quiet.is_some() && (!cli.has_show_args() || cli.show_rapl.is_some());
+        let samplers = if sample {
+            let mut s = rapl::Sampler::all(Self::INTERVAL).await;
+            if s.count() > 0 {
                 log::debug!("Starting rapl samplers");
-                let mut s = RaplSamplers::from(s);
                 s.start().await;
                 Some(s)
             } else {
@@ -34,13 +35,13 @@ impl Samplers {
         Self { begin, samplers }
     }
 
-    pub(super) async fn stop(&mut self) {
+    pub(in crate::cli) async fn stop(&mut self) {
         if let Some(s) = self.samplers.as_mut() {
             s.stop().await;
         }
     }
 
-    pub(super) async fn wait(&self) {
+    pub(in crate::cli) async fn wait(&self) {
         if let Some(s) = self.samplers.as_ref() {
             if s.working().await {
                 let runtime = Instant::now() - self.begin;
@@ -51,5 +52,7 @@ impl Samplers {
         }
     }
 
-    pub(super) fn into_samplers(self) -> Option<RaplSamplers> { self.samplers }
+    pub(in crate::cli) fn into_samplers(self) -> Option<rapl::Samplers> {
+        self.samplers
+    }
 }

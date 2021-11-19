@@ -1,11 +1,14 @@
-use crate::NAME;
+use crate::cli::NAME;
 
-pub(crate) fn var_name(n: &str) -> String { format!("{}_{}", NAME.to_uppercase(), n) }
+pub(super) fn var_name(n: &str) -> String {
+    format!("{}_{}", NAME.to_uppercase(), n)
+}
 
-pub(crate) fn var(n: &str) -> Option<String> { std::env::var(&var_name(n)).ok() } // FIXME handle result
+pub(super) fn var(n: &str) -> Option<String> {
+    std::env::var(&var_name(n)).ok()
+} // FIXME handle result
 
-// Return the system's hostname.
-pub(crate) fn hostname() -> Option<String> {
+pub(super) fn hostname() -> Option<String> {
     let mut buf = [0u8; 64];
     match nix::unistd::gethostname(&mut buf) {
         Ok(h) => match h.to_str() {
