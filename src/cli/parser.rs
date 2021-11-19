@@ -51,24 +51,24 @@ pub(super) const ARG_NV_POWER_LIMIT: &str = "nv-power-limit";
 
 pub(super) const ARG_PROFILE: &str = "PROFILE";
 
-pub(super) const ARG_ARGS: &str = "ARGS";
+pub(super) const ARG_OPTIONS: &str = "OPTIONS";
 
-const AFTER_HELP: &str = r#"            BOOL   0, 1, true, false
-             IDS   comma-delimited sequence of integers and/or integer ranges
-           HERTZ*  mhz when unspecified: hz/h - khz/k - mhz/m - ghz/g - thz/t
-            SECS   ms when unspecified: ns/n - us/u - ms/m - s
-         TOGGLES   sequence of 0 (off), 1 (on), or _ (skip), where position denotes id
-           WATTS*  mw when unspecified: uw/u - mw/m - w - kw/k
+const AFTER_HELP: &str = r#"           BOOL   0, 1, true, false
+            IDS   comma-delimited sequence of integers and/or integer ranges
+          HERTZ*  mhz when unspecified: hz/h - khz/k - mhz/m - ghz/g - thz/t
+           SECS   s when unspecified: ns/n - us/u - ms/m - s
+        TOGGLES   sequence of 0 (off), 1 (on), or _ (skip), where position denotes id
+          WATTS*  w when unspecified: uw/u - mw/m - w - kw/k
 
         * Floating point values may be given for these units.
 
-    All supported values are shown by default unless the --show-* or --quiet flags are used.
+    All supported values are shown unless the --show-* or --quiet flags are used.
 
     All flags may be expressed as env vars. For example:
 
-        --show-cpu              → KNOBS_SHOW_CPU=1
-        --cpu 1,3-5             → KNOBS_CPU=1,3-5
-        --i915-boost 1.2ghz     → KNOBS_I915_BOOST=1.2ghz
+        --show-cpu        → KNOBS_SHOW_CPU=1
+        --cpu 1,3-5       → KNOBS_CPU=1,3-5
+        --i915-boost 1200 → KNOBS_I915_BOOST=1200
 
     The KNOBS_LOG env var may be set to trace, debug, info, warn, or error (default).
 "#;
@@ -306,7 +306,7 @@ fn app<'a, 'b>() -> clap::App<'a, 'b> {
 
     let a = a
         .arg(Arg::with_name(ARG_PROFILE))
-        .arg(Arg::with_name(ARG_ARGS).raw(true));
+        .arg(Arg::with_name(ARG_OPTIONS).raw(true));
 
     a
 }
@@ -463,10 +463,10 @@ impl TryFrom<&Parser<'_>> for Groups {
             if g.has_values() {
                 groups.push(g);
             }
-            if !p.present(ARG_ARGS) {
+            if !p.present(ARG_OPTIONS) {
                 break;
             }
-            match p.values(ARG_ARGS) {
+            match p.values(ARG_OPTIONS) {
                 Some(v) => {
                     let mut v: Vec<String> = v.map(String::from).collect();
                     if v.is_empty() {

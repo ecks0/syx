@@ -13,10 +13,11 @@ A command-line utility for controlling Linux performance settings.
 
 ## Feature flags
 
-| Feature | Description                               |
-| ------- | ----------------------------------------- |
-| `cli`   | Enable the cli.                           |
-| `nvml`  | Enable nvidia management library support. |
+| Feature | Description                                     |
+| ------- | ----------------------------------------------- |
+| `cli`   | Enable the cli.                                 |
+| `nvml`  | Enable nvidia management library support.       |
+| `serde` | Enable serde support for sysfs and nvml  types. |
 
 _Note: `nvml` requires the nvidia management library at runtime, usually installed with
 the proprietary driver. If the nvml library is missing, nvml arguments will be no-ops._
@@ -66,7 +67,6 @@ knobs max
 # apply max again
 knobs _
 ```
-Knobs will exit with error if no profile has been previously applied.
 
 ### Profile keys and values
 
@@ -105,7 +105,7 @@ A path may be specified explicitly by setting the env var `KNOBS_PROFILE_CONFIG`
 knobs 0.4.0
 
 USAGE:
-    knobs [OPTIONS] [PROFILE] [-- <ARGS>...]
+    knobs [OPTIONS] [PROFILE] [-- <OPTIONS>...]
 
 OPTIONS:
     -q, --quiet                       Do not print values
@@ -141,24 +141,24 @@ OPTIONS:
 
 ARGS:
     <PROFILE>
-    <ARGS>...
+    <OPTIONS>...
 
-            BOOL   0, 1, true, false
-             IDS   comma-delimited sequence of integers and/or integer ranges
-           HERTZ*  mhz when unspecified: hz/h - khz/k - mhz/m - ghz/g - thz/t
-            SECS   ms when unspecified: ns/n - us/u - ms/m - s
-         TOGGLES   sequence of 0 (off), 1 (on), or _ (skip), where position denotes id
-           WATTS*  mw when unspecified: uw/u - mw/m - w - kw/k
+           BOOL   0, 1, true, false
+            IDS   comma-delimited sequence of integers and/or integer ranges
+          HERTZ*  mhz when unspecified: hz/h - khz/k - mhz/m - ghz/g - thz/t
+           SECS   ms when unspecified: ns/n - us/u - ms/m - s
+        TOGGLES   sequence of 0 (off), 1 (on), or _ (skip), where position denotes id
+          WATTS*  mw when unspecified: uw/u - mw/m - w - kw/k
 
         * Floating point values may be given for these units.
 
-    All supported values are shown by default unless the --show-* or --quiet flags are used.
+    All supported values are shown unless the --show-* or --quiet flags are used.
 
     All flags may be expressed as env vars. For example:
 
-        --show-cpu              → KNOBS_SHOW_CPU=1
-        --cpu 1,3-5             → KNOBS_CPU=1,3-5
-        --i915-boost 1.2ghz     → KNOBS_I915_BOOST=1.2ghz
+        --show-cpu        → KNOBS_SHOW_CPU=1
+        --cpu 1,3-5       → KNOBS_CPU=1,3-5
+        --i915-boost 1200 → KNOBS_I915_BOOST=1200
 
     The KNOBS_LOG env var may be set to trace, debug, info, warn, or error (default).
 ```
