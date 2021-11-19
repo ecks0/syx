@@ -45,13 +45,16 @@ const W: char = 'w';
 
 async fn with_nvml<T, F>(op: char, method: &str, f: F) -> Result<T>
 where
-    T: Send + 'static,
+    T: std::fmt::Debug + Send + 'static,
     F: FnOnce(&'static NVML) -> StdResult<T, NvmlError> + Send + 'static,
 {
     let nvml = nvml().await?;
     let res = spawn_blocking(|| f(nvml)).await.unwrap();
     match res {
-        Ok(v) => Ok(v),
+        Ok(v) => {
+            log::debug!("OK nvml {} NVML::{}() {:?}", op, method, v);
+            Ok(v)
+        },
         Err(e) => {
             let msg = format!("ERR nvml {} NVML::{}() {}", op, method, e);
             match e {
@@ -65,7 +68,7 @@ where
 
 async fn with_dev<T, F>(id: u32, op: char, method: &str, f: F) -> Result<T>
 where
-    T: Send + 'static,
+    T: std::fmt::Debug + Send + 'static,
     F: FnOnce(&mut nvml_wrapper::Device) -> StdResult<T, NvmlError> + Send + 'static,
 {
     let mut device = {
@@ -74,7 +77,10 @@ where
     };
     let res = spawn_blocking(move || f(&mut device)).await.unwrap();
     match res {
-        Ok(v) => Ok(v),
+        Ok(v) => {
+            log::debug!("OK nvml {} NVML::{}() {} {:?}", op, method, id, v);
+            Ok(v)
+        },
         Err(e) => {
             let msg = format!("ERR nvml {} Device::{}() {} {}", op, method, id, e);
             if op == W {

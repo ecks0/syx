@@ -7,7 +7,7 @@ license = "MIT"
 authors = ["eckso <eckso@eckso.io>"]
 
 [features]
-default = ["nvml", "cli"]
+default = []
 nvml = ["nvml-wrapper"]
 cli = ["clap", "comfy-table", "env_logger", "measurements", "regex", "serde_yaml"]
 

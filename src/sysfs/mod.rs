@@ -93,8 +93,14 @@ async fn read_link_name(path: &Path) -> Result<String> {
     Ok(val)
 }
 
+async fn read_to_trimmed_string(path: &Path) -> std::result::Result<String, IoError> {
+    tokio::fs::read_to_string(path)
+        .await
+        .map(|s| s.trim_end_matches('\n').to_string())
+}
+
 async fn read_str(path: &Path) -> Result<String> {
-    log::read(path, tokio::fs::read_to_string(path).await)
+    log::read(path, read_to_trimmed_string(path).await)
         .map(|s| s.trim_end_matches('\n').to_string())
 }
 

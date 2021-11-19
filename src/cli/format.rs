@@ -364,7 +364,9 @@ where
             .iter()
             .find(|p| p.name.as_ref().map(|s| s == "short_term").unwrap_or(false));
         let watt_seconds = if let Some(s) = &samplers {
-            s.watt_seconds(device.id).await
+            s.watt_seconds(device.id)
+                .await
+                .map(|w| Power::from_watts(w))
         } else {
             None
         };

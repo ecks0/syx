@@ -1,3 +1,4 @@
+#[cfg(feature = "cli")]
 pub mod cli;
 #[cfg(feature = "nvml")]
 pub mod nvml;

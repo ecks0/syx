@@ -3,16 +3,27 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use measurements::Power;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 
 use crate::sysfs::intel_rapl::{energy_uj, Device, ZoneId};
 use crate::Resource as _;
 
-fn mean(n: Vec<u64>) -> f64 {
+fn umean(n: &[u64]) -> f64 {
     let sum: u64 = n.iter().sum();
-    sum as f64 / n.len() as f64
+    let sum = sum as f64;
+    let len = n.len() as f64;
+    sum / len
+}
+
+fn umedian(n: &[u64]) -> f64 {
+    let len = n.len();
+    let mid = len / 2;
+    if len % 2 == 0 {
+        umean(&n[(mid - 1)..(mid + 1)])
+    } else {
+        n[mid] as f64
+    }
 }
 
 // Sample rapl energy usage at a regular interval.
@@ -98,22 +109,21 @@ impl Sampler {
         { self.values.lock().await.clone() }.into()
     }
 
-    pub async fn watt_seconds(&self) -> Option<Power> {
+    pub async fn watt_seconds(&self) -> Option<f64> {
         let samples = self.values().await;
         if samples.len() < 2 {
             return None;
         }
-        let deltas = (1..samples.len()).map(|i| samples[i] - samples[i - 1]);
-        if samples.len() < Self::COUNT / 2 - 1 {
-            deltas.max()
-        } else {
-            Some(mean(deltas.collect()).round() as u64)
-        }
-        .map(|uw| {
-            Power::from_microwatts(
-                (uw as f64 * f64::powf(10., 6.) / self.interval.as_micros() as f64).round(),
-            )
-        })
+        let mut deltas: Vec<u64> = (1..samples.len())
+            .map(|i| samples[i] - samples[i - 1])
+            .collect();
+        deltas.sort_unstable();
+        let uw = umedian(&deltas);
+        let w = uw / 10f64.powf(6.);
+        let ivl_us = self.interval.as_micros() as f64;
+        let sec_us = 10f64.powf(6.);
+        let w_per_sec = w * sec_us / ivl_us;
+        Some(w_per_sec)
     }
 }
 
@@ -144,7 +154,7 @@ impl Samplers {
         }
     }
 
-    pub async fn watt_seconds(&self, zone: ZoneId) -> Option<Power> {
+    pub async fn watt_seconds(&self, zone: ZoneId) -> Option<f64> {
         self.samplers.get(&zone)?.watt_seconds().await
     }
 }

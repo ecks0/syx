@@ -109,7 +109,11 @@ impl Profile {
     }
 
     pub(in crate::cli) async fn groups(&self) -> Result<Groups> {
-        log::debug!("Loading profile '{}' from {}", self.name, self.path.display());
+        log::debug!(
+            "Loading profile '{}' from {}",
+            self.name,
+            self.path.display()
+        );
         let groups = match read_to_string(&self.path).await {
             Ok(s) => match serde_yaml::from_str::<HashMap<String, Vec<Group>>>(&s) {
                 Ok(cf) => match cf.into_iter().find(|(n, _)| n == &self.name) {
@@ -151,9 +155,7 @@ impl Profile {
                     }
                 }
                 let s = serde_yaml::to_string(self).map_err(Error::se)?;
-                write(&p, s.as_bytes())
-                    .await
-                    .map_err(|e| Error::io(p, e))
+                write(&p, s.as_bytes()).await.map_err(|e| Error::io(p, e))
             },
             None => Err(Error::state_path_missing("Write recent profile")),
         }
