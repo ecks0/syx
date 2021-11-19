@@ -29,22 +29,22 @@ nvml = [
 ]
 
 [dependencies]
-async-trait = "0.1"
-clap = { version = "2.33", optional = true }
-comfy-table = { version = "4.1", optional = true }
-dirs = { version = "4.0", optional = true }
-env_logger = { version = "0.9", optional = true }
-log = "0.4"
-measurements = { version = "0.10", optional = true }
-nix = "0.23"
-nvml-wrapper = { version = "0.7", optional = true }
-regex = { version = "1.5", optional = true }
-serde = { version = "1.0", features = ["derive"], optional = true }
-serde_yaml = { version = "0.8", optional = true }
-thiserror = "1"
+async-trait = "~0.1"
+clap = { version = "~2.33", optional = true }
+comfy-table = { version = "~5.0", optional = true }
+dirs = { version = "~4.0", optional = true }
+env_logger = { version = "~0.9", optional = true }
+log = "~0.4"
+measurements = { version = "~0.10", optional = true }
+nix = "~0.23"
+nvml-wrapper = { version = "~0.7", optional = true }
+regex = { version = "~1.5", optional = true }
+serde = { version = "~1.0", features = ["derive"], optional = true }
+serde_yaml = { version = "~0.8", optional = true }
+thiserror = "~1.0"
 
 [dependencies.tokio]
-version = "1.12"
+version = "1.14.0"
 default-features = false
 features = [
   "fs",
