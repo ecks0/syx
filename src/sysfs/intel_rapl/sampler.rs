@@ -15,16 +15,6 @@ fn mean(n: Vec<u64>) -> f64 {
     sum as f64 / n.len() as f64
 }
 
-// fn median(mut n: Vec<u64>) -> u64 {
-//     n.sort_unstable();
-//     let mid = n.len() / 2;
-//     if n.len() % 2 == 0 {
-//         mean(n[mid - 1..mid].into()).round() as u64
-//     } else {
-//         n[mid]
-//     }
-// }
-
 // Sample rapl energy usage at a regular interval.
 #[derive(Clone, Debug)]
 pub struct Sampler {

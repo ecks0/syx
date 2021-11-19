@@ -414,7 +414,7 @@ pub(in crate::cli) async fn nvml<W>(w: &mut W, system: &System) -> Result<()>
 where
     W: AsyncWrite + Send + Unpin,
 {
-    const WIDTH: i64 = 22; // width of the widest label we expect to display
+    const WIDTH: i64 = 19; // width of the widest label we expect to display
 
     fn mhz(mhz: u32) -> String {
         hz(mhz as u64 * 10u64.pow(6))
@@ -538,14 +538,14 @@ where
                 d.mem_total.map(bytes).unwrap_or_else(dot),
             )
         });
-        tab.row("Power cur/max", |d| {
+        tab.row("Power cur/limit", |d| {
             format!(
                 "{} / {}",
                 d.power_cur.map(mw).unwrap_or_else(dot),
                 d.power_limit.map(mw).unwrap_or_else(dot),
             )
         });
-        tab.row("Power enforced min/max", |d| {
+        tab.row("Power limit min/max", |d| {
             format!(
                 "{} / {}",
                 d.power_min.map(mw).unwrap_or_else(dot),

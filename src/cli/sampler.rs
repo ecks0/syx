@@ -18,7 +18,7 @@ impl Samplers {
     const RUNTIME: Duration = Duration::from_millis(400);
 
     pub(in crate::cli) async fn start(cli: &Cli) -> Self {
-        let sample = cli.quiet.is_some() && (!cli.has_show_args() || cli.show_rapl.is_some());
+        let sample = cli.quiet.is_none() && (!cli.has_show_args() || cli.show_rapl.is_some());
         let samplers = if sample {
             let mut s = rapl::Sampler::all(Self::INTERVAL).await;
             if s.count() > 0 {
