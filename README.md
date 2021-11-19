@@ -6,15 +6,16 @@ A command-line utility for controlling Linux performance settings.
 | ------------ | ---------------------------------------------------- |
 | cpu          | online/offline                                       |
 | cpufreq      | governor, min/max frequencies                        |
-| drm-i915     | min/max/boost frequencies                            |
 | intel-pstate | epb, epp                                             |
 | intel-rapl   | power limit, time window per zone/subzone/constraint |
+| i915         | min/max/boost frequencies                            |
 | nvml         | nvidia gpu clock min/max frequency, power limit      |
 
 ## Feature flags
 
 | Feature | Description                               |
 | ------- | ----------------------------------------- |
+| `cli`   | Enable the cli.                           |
 | `nvml`  | Enable nvidia management library support. |
 
 _Note: `nvml` requires the nvidia management library at runtime, usually installed with
@@ -69,13 +70,13 @@ Knobs will exit with error if no profile has been previously applied.
 
 ### Profile keys and values
 
-Profile keys and values are analogous to long command-line argument names and values, but with
-no dashes, and `_` in place of `-`.
+Profile keys and values are analogous to long command-line argument names and values, where
+keys have no prefix dashes, and use `_` in place of `-`.
 
 The following command-line arguments may be used in a profile:
 - `--cpu-*`
 - `--cpufreq-*`
-- `--drm-*`
+- `--i915-*`
 - `--nvml-*`
 - `--pstate-*`
 - `--rapl-*`
@@ -101,46 +102,46 @@ A path may be specified explicitly by setting the env var `KNOBS_PROFILE_CONFIG`
 ### Help
 
 ```
-knobs 0.3.2
+knobs 0.4.0
 
 USAGE:
-    knobs [OPTIONS] [PROFILE] [-- <CHAIN>...]
+    knobs [OPTIONS] [PROFILE] [-- <ARGS>...]
 
 OPTIONS:
     -q, --quiet                       Do not print values
         --show-cpu                    Print cpu and cpufreq values
-        --show-drm                    Print drm values
-        --show-nvml                   Print nvidia management values
-        --show-pstate                 Print intel-pstate values
-        --show-rapl                   Print intel-rapl values
+        --show-pstate                 Print pstate values
+        --show-rapl                   Print rapl values
+        --show-i915                   Print drm values
+        --show-nv                     Print nvidia values
     -c, --cpu <IDS>                   Target cpu ids, default all, ex. 0,1,3-5
     -o, --cpu-on <BOOL>               Set cpu online status per --cpu
     -O, --cpu-on-each <TOGGLES>       Set cpu online status, ex. 10_1 → 0:ON 1:OFF 2:SKIP 3:ON
     -g, --cpufreq-gov <STR>           Set cpufreq governor per --cpu
     -n, --cpufreq-min <HERTZ>         Set cpufreq min freq per --cpu, ex. 1200 or 1.2ghz
     -x, --cpufreq-max <HERTZ>         Set cpufreq max freq per --cpu, ex. 1200 or 1.2ghz
-        --drm-i915 <IDS>              Target i915 card ids or pci ids, default all, ex. 0,1,3-5
-        --drm-i915-min <HERTZ>        Set i915 min frequency per --drm-i915, ex. 1200 or 1.2ghz
-        --drm-i915-max <HERTZ>        Set i915 max frequency per --drm-i915, ex. 1200 or 1.2ghz
-        --drm-i915-boost <HERTZ>      Set i915 boost frequency per --drm-i915, ex. 1200 or 1.2ghz
-        --nvml <IDS>                  Target nvidia card ids or pci ids, default all, ex. 0,1,3-5
-        --nvml-gpu-min <HERTZ>        Set nvidia gpu min frequency per --nvml, ex. 1200 or 1.2ghz
-        --nvml-gpu-max <HERTZ>        Set nvidia gpu max frequency per --nvml, ex. 1200 or 1.2ghz
-        --nvml-gpu-reset              Reset nvidia gpu frequency to default per --nvml
-        --nvml-power-limit <WATTS>    Set nvidia card power limit per --nvml
-        --pstate-epb <0-15>           Set intel-pstate energy/performance bias per --cpu
-        --pstate-epp <STR>            Set intel-pstate energy/performance pref per --cpu
-    -P, --rapl-package <INT>          Target intel-rapl package
-    -Z, --rapl-zone <INT>             Target intel-rapl sub-zone
-    -L, --rapl-long-limit <WATTS>     Set intel-rapl long term power limit per --rapl-package/zone
-        --rapl-long-window <SECS>     Set intel-rapl long term time window per --rapl-package/zone
-    -S, --rapl-short-limit <WATTS>    Set intel-rapl short term power limit per --rapl-package/zone
-        --rapl-short-window <SECS>    Set intel-rapl short term time window per --rapl-package/zone
+        --pstate-epb <0-15>           Set pstate energy/performance bias per --cpu
+        --pstate-epp <STR>            Set pstate energy/performance pref per --cpu
+    -P, --rapl-package <INT>          Target rapl package
+    -Z, --rapl-zone <INT>             Target rapl sub-zone
+    -L, --rapl-long-limit <WATTS>     Set rapl long term power limit per --rapl-package/zone
+        --rapl-long-window <SECS>     Set rapl long term time window per --rapl-package/zone
+    -S, --rapl-short-limit <WATTS>    Set rapl short term power limit per --rapl-package/zone
+        --rapl-short-window <SECS>    Set rapl short term time window per --rapl-package/zone
+        --i915 <IDS>                  Target i915 card ids or pci ids, default all, ex. 0,1,3-5
+        --i915-min <HERTZ>            Set i915 min freq per --drm-i915, ex. 1200 or 1.2ghz
+        --i915-max <HERTZ>            Set i915 max freq per --drm-i915, ex. 1200 or 1.2ghz
+        --i915-boost <HERTZ>          Set i915 boost freq per --drm-i915, ex. 1200 or 1.2ghz
+        --nv <IDS>                    Target nvidia card ids or pci ids, default all, ex. 0,1,3-5
+        --nv-gpu-min <HERTZ>          Set nvidia gpu min freq per --nvml, ex. 1200 or 1.2ghz
+        --nv-gpu-max <HERTZ>          Set nvidia gpu max freq per --nvml, ex. 1200 or 1.2ghz
+        --nv-gpu-reset                Reset nvidia gpu freq to default per --nvml
+        --nv-power-limit <WATTS>      Set nvidia card power limit per --nvml
     -h, --help                        Prints help information
 
 ARGS:
     <PROFILE>
-    <CHAIN>...
+    <ARGS>...
 
             BOOL   0, 1, true, false
              IDS   comma-delimited sequence of integers and/or integer ranges
@@ -157,7 +158,7 @@ ARGS:
 
         --show-cpu              → KNOBS_SHOW_CPU=1
         --cpu 1,3-5             → KNOBS_CPU=1,3-5
-        --drm-i915-boost 1.2ghz → KNOBS_DRM_I915_BOOST=1.2ghz
+        --i915-boost 1.2ghz     → KNOBS_I915_BOOST=1.2ghz
 
     The KNOBS_LOG env var may be set to trace, debug, info, warn, or error (default).
 ```

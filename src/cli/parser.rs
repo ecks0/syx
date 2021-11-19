@@ -9,11 +9,11 @@ use crate::cli::{env, Error, Result, NAME};
 pub(super) const ARG_QUIET: &str = "quiet";
 
 pub(super) const ARG_SHOW_CPU: &str = "show-cpu";
+pub(super) const ARG_SHOW_PSTATE: &str = "show-pstate";
+pub(super) const ARG_SHOW_RAPL: &str = "show-rapl";
 pub(super) const ARG_SHOW_I915: &str = "show-i915";
 #[cfg(feature = "nvml")]
 pub(super) const ARG_SHOW_NV: &str = "show-nv";
-pub(super) const ARG_SHOW_PSTATE: &str = "show-pstate";
-pub(super) const ARG_SHOW_RAPL: &str = "show-rapl";
 
 pub(super) const ARG_CPU: &str = "cpu";
 pub(super) const ARG_CPU_ON: &str = "cpu-on";
@@ -22,6 +22,16 @@ pub(super) const ARG_CPU_ON_EACH: &str = "cpu-on-each";
 pub(super) const ARG_CPUFREQ_GOV: &str = "cpufreq-gov";
 pub(super) const ARG_CPUFREQ_MIN: &str = "cpufreq-min";
 pub(super) const ARG_CPUFREQ_MAX: &str = "cpufreq-max";
+
+pub(super) const ARG_PSTATE_EPB: &str = "pstate-epb";
+pub(super) const ARG_PSTATE_EPP: &str = "pstate-epp";
+
+pub(super) const ARG_RAPL_PACKAGE: &str = "rapl-package";
+pub(super) const ARG_RAPL_ZONE: &str = "rapl-zone";
+pub(super) const ARG_RAPL_LONG_LIMIT: &str = "rapl-long-limit";
+pub(super) const ARG_RAPL_LONG_WINDOW: &str = "rapl-long-window";
+pub(super) const ARG_RAPL_SHORT_LIMIT: &str = "rapl-short-limit";
+pub(super) const ARG_RAPL_SHORT_WINDOW: &str = "rapl-short-window";
 
 pub(super) const ARG_I915: &str = "i915";
 pub(super) const ARG_I915_MIN: &str = "i915-min";
@@ -39,19 +49,9 @@ pub(super) const ARG_NV_GPU_RESET: &str = "nv-gpu-reset";
 #[cfg(feature = "nvml")]
 pub(super) const ARG_NV_POWER_LIMIT: &str = "nv-power-limit";
 
-pub(super) const ARG_PSTATE_EPB: &str = "pstate-epb";
-pub(super) const ARG_PSTATE_EPP: &str = "pstate-epp";
-
-pub(super) const ARG_RAPL_PACKAGE: &str = "rapl-package";
-pub(super) const ARG_RAPL_ZONE: &str = "rapl-zone";
-pub(super) const ARG_RAPL_LONG_LIMIT: &str = "rapl-long-limit";
-pub(super) const ARG_RAPL_LONG_WINDOW: &str = "rapl-long-window";
-pub(super) const ARG_RAPL_SHORT_LIMIT: &str = "rapl-short-limit";
-pub(super) const ARG_RAPL_SHORT_WINDOW: &str = "rapl-short-window";
-
 pub(super) const ARG_PROFILE: &str = "PROFILE";
 
-pub(super) const ARG_CHAIN: &str = "CHAIN";
+pub(super) const ARG_ARGS: &str = "ARGS";
 
 const AFTER_HELP: &str = r#"            BOOL   0, 1, true, false
              IDS   comma-delimited sequence of integers and/or integer ranges
@@ -96,6 +96,18 @@ fn app<'a, 'b>() -> clap::App<'a, 'b> {
                 .help("Print cpu and cpufreq values"),
         )
         .arg(
+            Arg::with_name(ARG_SHOW_PSTATE)
+                .long(ARG_SHOW_PSTATE)
+                .takes_value(false)
+                .help("Print pstate values"),
+        )
+        .arg(
+            Arg::with_name(ARG_SHOW_RAPL)
+                .long(ARG_SHOW_RAPL)
+                .takes_value(false)
+                .help("Print rapl values"),
+        )
+        .arg(
             Arg::with_name(ARG_SHOW_I915)
                 .long(ARG_SHOW_I915)
                 .takes_value(false)
@@ -107,22 +119,10 @@ fn app<'a, 'b>() -> clap::App<'a, 'b> {
         Arg::with_name(ARG_SHOW_NV)
             .long(ARG_SHOW_NV)
             .takes_value(false)
-            .help("Print nvidia management values"),
+            .help("Print nvidia values"),
     );
 
     let a = a
-        .arg(
-            Arg::with_name(ARG_SHOW_PSTATE)
-                .long(ARG_SHOW_PSTATE)
-                .takes_value(false)
-                .help("Print intel-pstate values"),
-        )
-        .arg(
-            Arg::with_name(ARG_SHOW_RAPL)
-                .long(ARG_SHOW_RAPL)
-                .takes_value(false)
-                .help("Print intel-rapl values"),
-        )
         .arg(
             Arg::with_name(ARG_CPU)
                 .short("c")
@@ -172,6 +172,70 @@ fn app<'a, 'b>() -> clap::App<'a, 'b> {
                 .help("Set cpufreq max freq per --cpu, ex. 1200 or 1.2ghz"),
         )
         .arg(
+            Arg::with_name(ARG_PSTATE_EPB)
+                .long(ARG_PSTATE_EPB)
+                .takes_value(true)
+                .value_name("0-15")
+                .help("Set pstate energy/performance bias per --cpu"),
+        )
+        .arg(
+            Arg::with_name(ARG_PSTATE_EPP)
+                .long(ARG_PSTATE_EPP)
+                .takes_value(true)
+                .value_name("STR")
+                .help("Set pstate energy/performance pref per --cpu"),
+        )
+        .arg(
+            Arg::with_name(ARG_RAPL_PACKAGE)
+                .short("P")
+                .long(ARG_RAPL_PACKAGE)
+                .takes_value(true)
+                .value_name("INT")
+                .help("Target rapl package"),
+        )
+        .arg(
+            Arg::with_name(ARG_RAPL_ZONE)
+                .short("Z")
+                .long(ARG_RAPL_ZONE)
+                .takes_value(true)
+                .value_name("INT")
+                .help("Target rapl sub-zone"),
+        )
+        .arg(
+            Arg::with_name(ARG_RAPL_LONG_LIMIT)
+                .short("L")
+                .long(ARG_RAPL_LONG_LIMIT)
+                .takes_value(true)
+                .value_name("WATTS")
+                .help("Set rapl long term power limit per --rapl-package/zone")
+                .requires(ARG_RAPL_PACKAGE),
+        )
+        .arg(
+            Arg::with_name(ARG_RAPL_LONG_WINDOW)
+                .long(ARG_RAPL_LONG_WINDOW)
+                .takes_value(true)
+                .value_name("SECS")
+                .help("Set rapl long term time window per --rapl-package/zone")
+                .requires(ARG_RAPL_PACKAGE),
+        )
+        .arg(
+            Arg::with_name(ARG_RAPL_SHORT_LIMIT)
+                .short("S")
+                .long(ARG_RAPL_SHORT_LIMIT)
+                .takes_value(true)
+                .value_name("WATTS")
+                .help("Set rapl short term power limit per --rapl-package/zone")
+                .requires(ARG_RAPL_PACKAGE),
+        )
+        .arg(
+            Arg::with_name(ARG_RAPL_SHORT_WINDOW)
+                .long(ARG_RAPL_SHORT_WINDOW)
+                .takes_value(true)
+                .value_name("SECS")
+                .help("Set rapl short term time window per --rapl-package/zone")
+                .requires(ARG_RAPL_PACKAGE),
+        )
+        .arg(
             Arg::with_name(ARG_I915)
                 .long(ARG_I915)
                 .takes_value(true)
@@ -183,21 +247,21 @@ fn app<'a, 'b>() -> clap::App<'a, 'b> {
                 .long(ARG_I915_MIN)
                 .takes_value(true)
                 .value_name("HERTZ")
-                .help("Set i915 min frequency per --drm-i915, ex. 1200 or 1.2ghz"),
+                .help("Set i915 min freq per --drm-i915, ex. 1200 or 1.2ghz"),
         )
         .arg(
             Arg::with_name(ARG_I915_MAX)
                 .long(ARG_I915_MAX)
                 .takes_value(true)
                 .value_name("HERTZ")
-                .help("Set i915 max frequency per --drm-i915, ex. 1200 or 1.2ghz"),
+                .help("Set i915 max freq per --drm-i915, ex. 1200 or 1.2ghz"),
         )
         .arg(
             Arg::with_name(ARG_I915_BOOST)
                 .long(ARG_I915_BOOST)
                 .takes_value(true)
                 .value_name("HERTZ")
-                .help("Set i915 boost frequency per --drm-i915, ex. 1200 or 1.2ghz"),
+                .help("Set i915 boost freq per --drm-i915, ex. 1200 or 1.2ghz"),
         );
 
     #[cfg(feature = "nvml")]
@@ -214,7 +278,7 @@ fn app<'a, 'b>() -> clap::App<'a, 'b> {
                 .long(ARG_NV_GPU_MIN)
                 .takes_value(true)
                 .value_name("HERTZ")
-                .help("Set nvidia gpu min frequency per --nvml, ex. 1200 or 1.2ghz")
+                .help("Set nvidia gpu min freq per --nvml, ex. 1200 or 1.2ghz")
                 .requires(ARG_NV_GPU_MAX),
         )
         .arg(
@@ -222,7 +286,7 @@ fn app<'a, 'b>() -> clap::App<'a, 'b> {
                 .long(ARG_NV_GPU_MAX)
                 .takes_value(true)
                 .value_name("HERTZ")
-                .help("Set nvidia gpu max frequency per --nvml, ex. 1200 or 1.2ghz")
+                .help("Set nvidia gpu max freq per --nvml, ex. 1200 or 1.2ghz")
                 .requires(ARG_NV_GPU_MIN),
         )
         .arg(
@@ -230,7 +294,7 @@ fn app<'a, 'b>() -> clap::App<'a, 'b> {
                 .long(ARG_NV_GPU_RESET)
                 .takes_value(false)
                 .conflicts_with("nvml-gpu-freq")
-                .help("Reset nvidia gpu frequency to default per --nvml"),
+                .help("Reset nvidia gpu freq to default per --nvml"),
         )
         .arg(
             Arg::with_name(ARG_NV_POWER_LIMIT)
@@ -241,72 +305,8 @@ fn app<'a, 'b>() -> clap::App<'a, 'b> {
         );
 
     let a = a
-        .arg(
-            Arg::with_name(ARG_PSTATE_EPB)
-                .long(ARG_PSTATE_EPB)
-                .takes_value(true)
-                .value_name("0-15")
-                .help("Set intel-pstate energy/performance bias per --cpu"),
-        )
-        .arg(
-            Arg::with_name(ARG_PSTATE_EPP)
-                .long(ARG_PSTATE_EPP)
-                .takes_value(true)
-                .value_name("STR")
-                .help("Set intel-pstate energy/performance pref per --cpu"),
-        )
-        .arg(
-            Arg::with_name(ARG_RAPL_PACKAGE)
-                .short("P")
-                .long(ARG_RAPL_PACKAGE)
-                .takes_value(true)
-                .value_name("INT")
-                .help("Target intel-rapl package"),
-        )
-        .arg(
-            Arg::with_name(ARG_RAPL_ZONE)
-                .short("Z")
-                .long(ARG_RAPL_ZONE)
-                .takes_value(true)
-                .value_name("INT")
-                .help("Target intel-rapl sub-zone"),
-        )
-        .arg(
-            Arg::with_name(ARG_RAPL_LONG_LIMIT)
-                .short("L")
-                .long(ARG_RAPL_LONG_LIMIT)
-                .takes_value(true)
-                .value_name("WATTS")
-                .help("Set intel-rapl long term power limit per --rapl-package/zone")
-                .requires(ARG_RAPL_PACKAGE),
-        )
-        .arg(
-            Arg::with_name(ARG_RAPL_LONG_WINDOW)
-                .long(ARG_RAPL_LONG_WINDOW)
-                .takes_value(true)
-                .value_name("SECS")
-                .help("Set intel-rapl long term time window per --rapl-package/zone")
-                .requires(ARG_RAPL_PACKAGE),
-        )
-        .arg(
-            Arg::with_name(ARG_RAPL_SHORT_LIMIT)
-                .short("S")
-                .long(ARG_RAPL_SHORT_LIMIT)
-                .takes_value(true)
-                .value_name("WATTS")
-                .help("Set intel-rapl short term power limit per --rapl-package/zone")
-                .requires(ARG_RAPL_PACKAGE),
-        )
-        .arg(
-            Arg::with_name(ARG_RAPL_SHORT_WINDOW)
-                .long(ARG_RAPL_SHORT_WINDOW)
-                .takes_value(true)
-                .value_name("SECS")
-                .help("Set intel-rapl short term time window per --rapl-package/zone")
-                .requires(ARG_RAPL_PACKAGE),
-        )
         .arg(Arg::with_name(ARG_PROFILE))
-        .arg(Arg::with_name(ARG_CHAIN).raw(true));
+        .arg(Arg::with_name(ARG_ARGS).raw(true));
 
     a
 }
@@ -463,10 +463,10 @@ impl TryFrom<&Parser<'_>> for Groups {
             if g.has_values() {
                 groups.push(g);
             }
-            if !p.present(ARG_CHAIN) {
+            if !p.present(ARG_ARGS) {
                 break;
             }
-            match p.values(ARG_CHAIN) {
+            match p.values(ARG_ARGS) {
                 Some(v) => {
                     let mut v: Vec<String> = v.map(String::from).collect();
                     if v.is_empty() {
