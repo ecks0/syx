@@ -217,12 +217,14 @@ pub async fn set_constraint_time_window_us(
     .await
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ZoneId {
     pub zone: u64,
     pub subzone: Option<u64>,
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Constraint {
     pub id: u64,
@@ -232,6 +234,7 @@ pub struct Constraint {
     pub time_window_us: Option<u64>,
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Device {
     pub id: ZoneId,
@@ -323,6 +326,7 @@ impl Resource for Device {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct IntelRapl {
     pub devices: Vec<Device>,

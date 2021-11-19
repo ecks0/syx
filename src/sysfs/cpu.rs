@@ -39,6 +39,7 @@ pub async fn set_online(id: u64, val: bool) -> Result<()> {
     sysfs::write_bool(&path::online(id), val).await
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Device {
     pub id: u64,
@@ -67,6 +68,7 @@ impl Resource for Device {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Cpu {
     pub devices: Vec<Device>,

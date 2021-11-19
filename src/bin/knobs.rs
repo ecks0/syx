@@ -5,5 +5,4 @@ async fn main() {
 }
 
 #[cfg(not(feature = "cli"))]
-#[tokio::main]
-async fn main() {}
+fn main() {}
