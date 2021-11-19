@@ -74,7 +74,7 @@ impl Resource for System {
             #[cfg(feature = "nvml")]
             nvml,
         };
-        if s == Self::default() { None } else { Some(s) }
+        Some(s)
     }
 
     async fn write(&self) {
