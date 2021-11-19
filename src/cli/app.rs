@@ -93,20 +93,20 @@ impl Cli {
         let mut buf = Vec::with_capacity(3000);
         let show_all = !self.has_show_args();
         if show_all || self.show_cpu.is_some() {
-            let _ = format::cpu(&mut buf, &system).await;
+            format::cpu(&mut buf, &system).await.unwrap();
         }
         if show_all || self.show_pstate.is_some() {
-            let _ = format::intel_pstate(&mut buf, &system).await;
+            format::intel_pstate(&mut buf, &system).await.unwrap();
         }
         if show_all || self.show_rapl.is_some() {
-            let _ = format::intel_rapl(&mut buf, &system, samplers.clone().into_samplers()).await;
+            format::intel_rapl(&mut buf, &system, samplers.clone().into_samplers()).await.unwrap();
         }
         if show_all || self.show_i915.is_some() {
-            let _ = format::i915(&mut buf, &system).await;
+            format::i915(&mut buf, &system).await.unwrap();
         }
         #[cfg(feature = "nvml")]
         if show_all || self.show_nvml.is_some() {
-            let _ = format::nvml(&mut buf, &system).await;
+            format::nvml(&mut buf, &system).await.unwrap();
         }
         let s = String::from_utf8_lossy(&buf);
         let mut stdout = stdout();
