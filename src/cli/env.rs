@@ -1,14 +1,14 @@
 use crate::cli::NAME;
 
-pub(super) fn var_name(n: &str) -> String {
+pub(in crate::cli) fn var_name(n: &str) -> String {
     format!("{}_{}", NAME.to_uppercase(), n)
 }
 
-pub(super) fn var(n: &str) -> Option<String> {
+pub(in crate::cli) fn var(n: &str) -> Option<String> {
     std::env::var(&var_name(n)).ok()
 } // FIXME handle result
 
-pub(super) fn hostname() -> Option<String> {
+pub(in crate::cli) fn hostname() -> Option<String> {
     let mut buf = [0u8; 64];
     match nix::unistd::gethostname(&mut buf) {
         Ok(h) => match h.to_str() {

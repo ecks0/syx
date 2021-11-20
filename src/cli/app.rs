@@ -99,7 +99,9 @@ impl Cli {
             format::intel_pstate(&mut buf, &system).await.unwrap();
         }
         if show_all || self.show_rapl.is_some() {
-            format::intel_rapl(&mut buf, &system, samplers.clone().into_samplers()).await.unwrap();
+            format::intel_rapl(&mut buf, &system, samplers.clone().into_samplers())
+                .await
+                .unwrap();
         }
         if show_all || self.show_i915.is_some() {
             format::i915(&mut buf, &system).await.unwrap();

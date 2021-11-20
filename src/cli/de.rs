@@ -101,7 +101,7 @@ impl<'de> Deserialize<'de> for Toggles {
 }
 
 // Helper functions which map parsed types to the types expected by `struct
-// Knobs` fields.
+// Group` fields.
 
 pub(super) fn bool<'de, D>(deserializer: D) -> std::result::Result<Option<bool>, D::Error>
 where

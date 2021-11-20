@@ -13,7 +13,7 @@ A command-line utility for controlling Linux performance settings.
 
 ## Feature flags
 
-| Feature | Description                                     |
+| Flag    | Description                                     |
 | ------- | ----------------------------------------------- |
 | `cli`   | Enable the cli.                                 |
 | `nvml`  | Enable nvidia management library support.       |
@@ -59,7 +59,7 @@ knobs min
 knobs max
 ```
 
-The underscore `_` is an alias for the name of the most recently applied profile.
+The underscore `_` is an alias for the most recently applied profile.
 ```
 # apply max
 knobs max

@@ -425,6 +425,14 @@ impl TryFrom<&Parser<'_>> for Group {
             cpufreq_gov: p.str(ARG_CPUFREQ_GOV),
             cpufreq_min: p.from_str_as::<FrequencyStr, _>(ARG_CPUFREQ_MIN)?,
             cpufreq_max: p.from_str_as::<FrequencyStr, _>(ARG_CPUFREQ_MAX)?,
+            pstate_epb: p.int::<u64>(ARG_PSTATE_EPB)?,
+            pstate_epp: p.str(ARG_PSTATE_EPP),
+            rapl_package: p.int::<u64>(ARG_RAPL_PACKAGE)?,
+            rapl_zone: p.int::<u64>(ARG_RAPL_ZONE)?,
+            rapl_long_limit: p.from_str_as::<PowerStr, _>(ARG_RAPL_LONG_LIMIT)?,
+            rapl_long_window: p.from_str_as::<DurationStr, _>(ARG_RAPL_LONG_WINDOW)?,
+            rapl_short_limit: p.from_str_as::<PowerStr, _>(ARG_RAPL_SHORT_LIMIT)?,
+            rapl_short_window: p.from_str_as::<DurationStr, _>(ARG_RAPL_SHORT_WINDOW)?,
             i915: p.from_str_as::<CardIds, _>(ARG_I915)?,
             i915_min: p.from_str_as::<FrequencyStr, _>(ARG_I915_MIN)?,
             i915_max: p.from_str_as::<FrequencyStr, _>(ARG_I915_MAX)?,
@@ -439,14 +447,6 @@ impl TryFrom<&Parser<'_>> for Group {
             nv_gpu_reset: p.flag(ARG_NV_GPU_RESET).map(|_| true),
             #[cfg(feature = "nvml")]
             nv_power_limit: p.from_str_as::<PowerStr, _>(ARG_NV_POWER_LIMIT)?,
-            pstate_epb: p.int::<u64>(ARG_PSTATE_EPB)?,
-            pstate_epp: p.str(ARG_PSTATE_EPP),
-            rapl_package: p.int::<u64>(ARG_RAPL_PACKAGE)?,
-            rapl_zone: p.int::<u64>(ARG_RAPL_ZONE)?,
-            rapl_long_limit: p.from_str_as::<PowerStr, _>(ARG_RAPL_LONG_LIMIT)?,
-            rapl_long_window: p.from_str_as::<DurationStr, _>(ARG_RAPL_LONG_WINDOW)?,
-            rapl_short_limit: p.from_str_as::<PowerStr, _>(ARG_RAPL_SHORT_LIMIT)?,
-            rapl_short_window: p.from_str_as::<DurationStr, _>(ARG_RAPL_SHORT_WINDOW)?,
         };
         Ok(s)
     }

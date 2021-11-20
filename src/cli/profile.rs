@@ -112,7 +112,7 @@ impl Profile {
         log::debug!(
             "Loading profile '{}' from {}",
             self.name,
-            self.path.display()
+            self.path.display(),
         );
         let groups = match read_to_string(&self.path).await {
             Ok(s) => match serde_yaml::from_str::<HashMap<String, Vec<Group>>>(&s) {
