@@ -7,7 +7,7 @@ use tokio::io::{AsyncWrite, AsyncWriteExt, Error as IoError};
 #[cfg(feature = "nvml")]
 use crate::nvml;
 use crate::sysfs::intel_rapl::Samplers;
-use crate::{sysfs, System};
+use crate::{sysfs, Machine};
 
 type Result<T> = std::result::Result<T, IoError>;
 
@@ -101,7 +101,7 @@ impl std::fmt::Display for Table {
     }
 }
 
-pub(in crate::cli) async fn cpu<W>(w: &mut W, system: &System) -> Result<()>
+pub(in crate::cli) async fn cpu<W>(w: &mut W, machine: &Machine) -> Result<()>
 where
     W: AsyncWrite + Send + Unpin,
 {
@@ -109,40 +109,40 @@ where
         hz(khz * 10u64.pow(3))
     }
 
-    fn cpu_cpufreq(system: &System) -> Option<String> {
-        let cpu_devs = &system.cpu.as_ref()?.devices;
+    fn cpu_cpufreq(machine: &Machine) -> Option<String> {
+        let cpu_devs = &machine.cpu.as_ref()?.devices;
         if cpu_devs.is_empty() {
             return None;
         }
-        let cpufreq_pols = system.cpufreq.as_ref().map(|c| &c.policies);
-        let cpufreq_pol_default = sysfs::cpufreq::Policy::default();
+        let cpufreq_devs = machine.cpufreq.as_ref().map(|c| &c.devices);
+        let cpufreq_dev_default = sysfs::cpufreq::Device::default();
         let mut tab = Table::new(&[
             "CPU", "Online", "Governor", "Cur", "Min", "Max", "CPU min", "CPU max",
         ]);
         for cpu_dev in cpu_devs {
-            let cpufreq_pol = cpufreq_pols
+            let cpufreq_dev = cpufreq_devs
                 .and_then(|p| p.iter().find(|p| cpu_dev.id == p.id))
-                .unwrap_or(&cpufreq_pol_default);
+                .unwrap_or(&cpufreq_dev_default);
             tab.row(&[
                 cpu_dev.id.to_string(),
                 cpu_dev.online.map(|v| v.to_string()).unwrap_or_else(dot),
-                cpufreq_pol.scaling_governor.clone().unwrap_or_else(dot),
-                cpufreq_pol.scaling_cur_freq.map(khz).unwrap_or_else(dot),
-                cpufreq_pol.scaling_min_freq.map(khz).unwrap_or_else(dot),
-                cpufreq_pol.scaling_max_freq.map(khz).unwrap_or_else(dot),
-                cpufreq_pol.cpuinfo_min_freq.map(khz).unwrap_or_else(dot),
-                cpufreq_pol.cpuinfo_max_freq.map(khz).unwrap_or_else(dot),
+                cpufreq_dev.scaling_governor.clone().unwrap_or_else(dot),
+                cpufreq_dev.scaling_cur_freq.map(khz).unwrap_or_else(dot),
+                cpufreq_dev.scaling_min_freq.map(khz).unwrap_or_else(dot),
+                cpufreq_dev.scaling_max_freq.map(khz).unwrap_or_else(dot),
+                cpufreq_dev.cpuinfo_min_freq.map(khz).unwrap_or_else(dot),
+                cpufreq_dev.cpuinfo_max_freq.map(khz).unwrap_or_else(dot),
             ]);
         }
         Some(nl(tab.to_string()))
     }
 
-    fn governors(system: &System) -> Option<String> {
-        let policies = &system.cpufreq.as_ref()?.policies;
-        let mut govs: Vec<String> = policies
+    fn governors(machine: &Machine) -> Option<String> {
+        let devices = &machine.cpufreq.as_ref()?.devices;
+        let mut govs: Vec<String> = devices
             .iter()
-            .filter_map(|p| {
-                p.scaling_available_governors
+            .filter_map(|d| {
+                d.scaling_available_governors
                     .as_deref()
                     .map(|g| g.join(" "))
             })
@@ -156,10 +156,10 @@ where
         if govs.len() == 1 {
             tab.row(&["all", &govs[0]]);
         } else {
-            for p in policies {
+            for d in devices {
                 tab.row(&[
-                    p.id.to_string(),
-                    p.scaling_available_governors
+                    d.id.to_string(),
+                    d.scaling_available_governors
                         .as_ref()
                         .map(|v| v.join(" "))
                         .unwrap_or_else(dot),
@@ -169,16 +169,16 @@ where
         Some(nl(tab.to_string()))
     }
 
-    if let Some(s) = cpu_cpufreq(system) {
+    if let Some(s) = cpu_cpufreq(machine) {
         w.write_all(s.as_bytes()).await?;
     }
-    if let Some(s) = governors(system) {
+    if let Some(s) = governors(machine) {
         w.write_all(s.as_bytes()).await?;
     }
     Ok(())
 }
 
-pub(in crate::cli) async fn i915<W>(w: &mut W, system: &System) -> Result<()>
+pub(in crate::cli) async fn i915<W>(w: &mut W, machine: &Machine) -> Result<()>
 where
     W: AsyncWrite + Send + Unpin,
 {
@@ -186,7 +186,7 @@ where
         hz(mhz * 10u64.pow(6))
     }
 
-    let devices = match system.i915.as_ref().map(|i| &i.devices) {
+    let devices = match machine.i915.as_ref().map(|i| &i.devices) {
         Some(d) => {
             if d.is_empty() {
                 return Ok(());
@@ -217,27 +217,27 @@ where
     Ok(())
 }
 
-pub(in crate::cli) async fn intel_pstate<W>(w: &mut W, system: &System) -> Result<()>
+pub(in crate::cli) async fn intel_pstate<W>(w: &mut W, machine: &Machine) -> Result<()>
 where
     W: AsyncWrite + Send + Unpin,
 {
-    fn status(system: &System) -> Option<String> {
-        let status = system
+    fn status(machine: &Machine) -> Option<String> {
+        let status = machine
             .intel_pstate
             .as_ref()?
-            .device
+            .system
             .as_ref()?
             .status
             .as_ref()?;
         Some(format!(" intel_pstate: {}\n\n", status))
     }
 
-    fn epb_epp(policies: &[sysfs::intel_pstate::Policy]) -> String {
-        let mut values: Vec<(u64, String)> = policies
+    fn epb_epp(devices: &[sysfs::intel_pstate::Device]) -> String {
+        let mut values: Vec<(u64, String)> = devices
             .iter()
-            .filter_map(|p| {
-                p.energy_perf_bias.and_then(|epb| {
-                    p.energy_performance_preference
+            .filter_map(|d| {
+                d.energy_perf_bias.and_then(|epb| {
+                    d.energy_performance_preference
                         .as_ref()
                         .map(|epp| (epb, epp.to_string()))
                 })
@@ -250,14 +250,14 @@ where
             let values = values.into_iter().next().unwrap();
             tab.row(&["all".to_string(), values.0.to_string(), values.1]);
         } else {
-            for policy in policies {
+            for device in devices {
                 tab.row(&[
-                    policy.id.to_string(),
-                    policy
+                    device.id.to_string(),
+                    device
                         .energy_perf_bias
                         .map(|v| v.to_string())
                         .unwrap_or_else(dot),
-                    policy
+                    device
                         .energy_performance_preference
                         .clone()
                         .unwrap_or_else(dot),
@@ -267,11 +267,11 @@ where
         nl(tab.to_string())
     }
 
-    fn epps(policies: &[sysfs::intel_pstate::Policy]) -> String {
-        let mut prefs: Vec<String> = policies
+    fn epps(devices: &[sysfs::intel_pstate::Device]) -> String {
+        let mut prefs: Vec<String> = devices
             .iter()
-            .filter_map(|p| {
-                p.energy_performance_available_preferences
+            .filter_map(|d| {
+                d.energy_performance_available_preferences
                     .clone()
                     .map(|p| p.join(" "))
             })
@@ -282,10 +282,10 @@ where
         if prefs.len() == 1 {
             tab.row(&["all", &prefs[0]]);
         } else {
-            for policy in policies {
+            for device in devices {
                 tab.row(&[
-                    policy.id.to_string(),
-                    policy
+                    device.id.to_string(),
+                    device
                         .energy_performance_available_preferences
                         .clone()
                         .map(|v| v.join(" "))
@@ -296,32 +296,32 @@ where
         nl(tab.to_string())
     }
 
-    if let Some(s) = status(system) {
+    if let Some(s) = status(machine) {
         w.write_all(s.as_bytes()).await?;
     }
-    let policies = match system.intel_pstate.as_ref().map(|i| &i.policies) {
-        Some(p) => {
-            if p.is_empty() {
-                return Ok(());
-            } else {
-                p
-            }
-        },
-        None => return Ok(()),
-    };
-    let active = system
+    let active = machine
         .intel_pstate
         .as_ref()
         .and_then(|i| {
-            i.device
+            i.system
                 .as_ref()
-                .and_then(|d| d.status.as_ref().map(|s| "active" == s.as_str()))
+                .and_then(|s| s.status.as_ref().map(|s| "active" == s.as_str()))
         })
         .unwrap_or(false);
     if active {
-        let s = epb_epp(policies);
+        let devices = match machine.intel_pstate.as_ref().map(|i| &i.devices) {
+            Some(p) => {
+                if p.is_empty() {
+                    return Ok(());
+                } else {
+                    p
+                }
+            },
+            None => return Ok(()),
+        };
+        let s = epb_epp(devices);
         w.write_all(s.as_bytes()).await?;
-        let s = epps(policies);
+        let s = epps(devices);
         w.write_all(s.as_bytes()).await?;
     }
     Ok(())
@@ -329,13 +329,13 @@ where
 
 pub(in crate::cli) async fn intel_rapl<W>(
     w: &mut W,
-    system: &System,
+    machine: &Machine,
     samplers: Option<Samplers>,
 ) -> Result<()>
 where
     W: AsyncWrite + Send + Unpin,
 {
-    let devices = match system.intel_rapl.as_ref().map(|i| &i.devices) {
+    let devices = match machine.intel_rapl.as_ref().map(|i| &i.devices) {
         Some(d) => {
             if d.is_empty() {
                 return Ok(());
@@ -412,7 +412,7 @@ where
 }
 
 #[cfg(feature = "nvml")]
-pub(in crate::cli) async fn nvml<W>(w: &mut W, system: &System) -> Result<()>
+pub(in crate::cli) async fn nvml<W>(w: &mut W, machine: &Machine) -> Result<()>
 where
     W: AsyncWrite + Send + Unpin,
 {
@@ -481,7 +481,7 @@ where
     }
 
     const DEVICES_PER_TABLE: usize = 2;
-    let devices = match system.nvml.as_ref().map(|n| &n.devices) {
+    let devices = match machine.nvml.as_ref().map(|n| &n.devices) {
         Some(d) => {
             if d.is_empty() {
                 return Ok(());

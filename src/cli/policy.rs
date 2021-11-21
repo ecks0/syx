@@ -1,17 +1,17 @@
 use crate::cli::group::{CardId, Group};
 #[cfg(feature = "nvml")]
 use crate::nvml;
-use crate::{sysfs, Resource};
+use crate::{sysfs, Policy};
 
-pub trait ToResource<R>
+pub trait ToPolicy<R>
 where
-    R: Resource,
+    R: Policy,
 {
-    fn to_resource(&self) -> Option<R>;
+    fn to_policy(&self) -> Option<R>;
 }
 
-impl ToResource<sysfs::Cpu> for Group {
-    fn to_resource(&self) -> Option<sysfs::Cpu> {
+impl ToPolicy<sysfs::Cpu> for Group {
+    fn to_policy(&self) -> Option<sysfs::Cpu> {
         if !self.has_cpu_values() {
             return None;
         }
@@ -48,21 +48,21 @@ impl ToResource<sysfs::Cpu> for Group {
     }
 }
 
-impl ToResource<sysfs::Cpufreq> for Group {
-    fn to_resource(&self) -> Option<sysfs::Cpufreq> {
+impl ToPolicy<sysfs::Cpufreq> for Group {
+    fn to_policy(&self) -> Option<sysfs::Cpufreq> {
         if !self.has_cpufreq_values() {
             return None;
         }
         let scaling_min_freq = self.cpufreq_min.map(|f| f.as_kilohertz().round() as u64);
         let scaling_max_freq = self.cpufreq_max.map(|f| f.as_kilohertz().round() as u64);
-        let policies: Vec<sysfs::cpufreq::Policy> = self
+        let devices: Vec<sysfs::cpufreq::Device> = self
             .cpu
             .clone()
             .map(|ids| {
                 ids.into_iter()
                     .map(|id| {
                         let scaling_governor = self.cpufreq_gov.clone();
-                        sysfs::cpufreq::Policy {
+                        sysfs::cpufreq::Device {
                             id,
                             scaling_governor,
                             scaling_min_freq,
@@ -73,17 +73,17 @@ impl ToResource<sysfs::Cpufreq> for Group {
                     .collect()
             })
             .unwrap_or_default();
-        if policies.is_empty() {
+        if devices.is_empty() {
             None
         } else {
-            let r = sysfs::Cpufreq { policies };
+            let r = sysfs::Cpufreq { devices };
             Some(r)
         }
     }
 }
 
-impl ToResource<sysfs::I915> for Group {
-    fn to_resource(&self) -> Option<sysfs::I915> {
+impl ToPolicy<sysfs::I915> for Group {
+    fn to_policy(&self) -> Option<sysfs::I915> {
         if !self.has_i915_values() {
             return None;
         }
@@ -122,20 +122,20 @@ impl ToResource<sysfs::I915> for Group {
     }
 }
 
-impl ToResource<sysfs::IntelPstate> for Group {
-    fn to_resource(&self) -> Option<sysfs::IntelPstate> {
+impl ToPolicy<sysfs::IntelPstate> for Group {
+    fn to_policy(&self) -> Option<sysfs::IntelPstate> {
         if !self.has_pstate_values() {
             return None;
         }
         let energy_perf_bias = self.pstate_epb;
-        let policies: Vec<sysfs::intel_pstate::Policy> = self
+        let devices: Vec<sysfs::intel_pstate::Device> = self
             .cpu
             .clone()
             .map(|ids| {
                 ids.into_iter()
                     .map(|id| {
                         let energy_performance_preference = self.pstate_epp.clone();
-                        sysfs::intel_pstate::Policy {
+                        sysfs::intel_pstate::Device {
                             id,
                             energy_perf_bias,
                             energy_performance_preference,
@@ -145,11 +145,11 @@ impl ToResource<sysfs::IntelPstate> for Group {
                     .collect()
             })
             .unwrap_or_default();
-        if policies.is_empty() {
+        if devices.is_empty() {
             None
         } else {
             let s = sysfs::intel_pstate::IntelPstate {
-                policies,
+                devices,
                 ..Default::default()
             };
             Some(s)
@@ -157,8 +157,8 @@ impl ToResource<sysfs::IntelPstate> for Group {
     }
 }
 
-impl ToResource<sysfs::IntelRapl> for Group {
-    fn to_resource(&self) -> Option<sysfs::IntelRapl> {
+impl ToPolicy<sysfs::IntelRapl> for Group {
+    fn to_policy(&self) -> Option<sysfs::IntelRapl> {
         if !self.has_rapl_values() {
             return None;
         }
@@ -166,11 +166,11 @@ impl ToResource<sysfs::IntelRapl> for Group {
             zone: self.rapl_package?,
             subzone: self.rapl_zone,
         };
-        let constraints: Vec<sysfs::intel_rapl::Constraint> = [
+        let constraints = [
             ("long_term", self.rapl_long_limit, self.rapl_long_window),
             ("short_term", self.rapl_short_limit, self.rapl_short_window),
         ]
-        .iter()
+        .into_iter()
         .filter_map(|(name, limit, window)| {
             if limit.is_some() || window.is_some() {
                 let name = Some(name.to_string());
@@ -199,8 +199,8 @@ impl ToResource<sysfs::IntelRapl> for Group {
 }
 
 #[cfg(feature = "nvml")]
-impl ToResource<nvml::Nvml> for Group {
-    fn to_resource(&self) -> Option<nvml::Nvml> {
+impl ToPolicy<nvml::Nvml> for Group {
+    fn to_policy(&self) -> Option<nvml::Nvml> {
         if !self.has_nvml_values() {
             return None;
         }

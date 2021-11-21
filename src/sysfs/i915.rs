@@ -5,61 +5,61 @@ pub mod path {
         PathBuf::from("/sys/class/drm")
     }
 
-    pub fn policy(id: u64) -> PathBuf {
+    pub fn device(id: u64) -> PathBuf {
         let mut p = root();
         p.push(format!("card{}", id));
         p
     }
 
-    pub fn policy_attr(id: u64, s: &str) -> PathBuf {
-        let mut p = policy(id);
+    pub fn device_attr(id: u64, s: &str) -> PathBuf {
+        let mut p = device(id);
         p.push(s);
         p
     }
 
     pub fn driver(id: u64) -> PathBuf {
-        let mut p = policy_attr(id, "device");
+        let mut p = device_attr(id, "device");
         p.push("driver");
         p
     }
 
     pub fn act_freq_mhz(id: u64) -> PathBuf {
-        policy_attr(id, "gt_act_freq_mhz")
+        device_attr(id, "gt_act_freq_mhz")
     }
 
     pub fn boost_freq_mhz(id: u64) -> PathBuf {
-        policy_attr(id, "gt_boost_freq_mhz")
+        device_attr(id, "gt_boost_freq_mhz")
     }
 
     pub fn cur_freq_mhz(id: u64) -> PathBuf {
-        policy_attr(id, "gt_cur_freq_mhz")
+        device_attr(id, "gt_cur_freq_mhz")
     }
 
     pub fn max_freq_mhz(id: u64) -> PathBuf {
-        policy_attr(id, "gt_max_freq_mhz")
+        device_attr(id, "gt_max_freq_mhz")
     }
 
     pub fn min_freq_mhz(id: u64) -> PathBuf {
-        policy_attr(id, "gt_min_freq_mhz")
+        device_attr(id, "gt_min_freq_mhz")
     }
 
     pub fn rp0_freq_mhz(id: u64) -> PathBuf {
-        policy_attr(id, "gt_RP0_freq_mhz")
+        device_attr(id, "gt_RP0_freq_mhz")
     }
 
     pub fn rp1_freq_mhz(id: u64) -> PathBuf {
-        policy_attr(id, "gt_RP1_freq_mhz")
+        device_attr(id, "gt_RP1_freq_mhz")
     }
 
     pub fn rpn_freq_mhz(id: u64) -> PathBuf {
-        policy_attr(id, "gt_RPn_freq_mhz")
+        device_attr(id, "gt_RPn_freq_mhz")
     }
 }
 
 use async_trait::async_trait;
 
 use crate::sysfs::{self, Result};
-use crate::{Feature, Resource};
+use crate::{Feature, Policy};
 
 pub async fn policies() -> Result<Vec<u64>> {
     let mut ids = vec![];
@@ -148,7 +148,7 @@ pub struct Device {
 }
 
 #[async_trait]
-impl Resource for Device {
+impl Policy for Device {
     type Id = u64;
     type Output = Self;
 
@@ -215,7 +215,7 @@ impl Feature for I915 {
 }
 
 #[async_trait]
-impl Resource for I915 {
+impl Policy for I915 {
     type Id = ();
     type Output = Self;
 

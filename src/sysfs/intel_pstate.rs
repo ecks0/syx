@@ -2,7 +2,7 @@ pub mod path {
     use std::path::PathBuf;
 
     use crate::sysfs::cpu::path::device_attr as cpu_device_attr;
-    use crate::sysfs::cpufreq::path::policy_attr as cpufreq_policy_attr;
+    use crate::sysfs::cpufreq::path::device_attr as cpufreq_device_attr;
 
     pub fn energy_perf_bias(id: u64) -> PathBuf {
         let mut p = cpu_device_attr(id, "power");
@@ -11,49 +11,49 @@ pub mod path {
     }
 
     pub fn energy_performance_preference(id: u64) -> PathBuf {
-        cpufreq_policy_attr(id, "energy_performance_preference")
+        cpufreq_device_attr(id, "energy_performance_preference")
     }
 
     pub fn energy_performance_available_preferences(id: u64) -> PathBuf {
-        cpufreq_policy_attr(id, "energy_performance_available_preferences")
+        cpufreq_device_attr(id, "energy_performance_available_preferences")
     }
 
-    pub fn device() -> PathBuf {
+    pub fn root() -> PathBuf {
         PathBuf::from("/sys/devices/system/cpu/intel_pstate")
     }
 
-    pub fn device_attr(a: &str) -> PathBuf {
-        let mut p = device();
+    pub fn system_attr(a: &str) -> PathBuf {
+        let mut p = root();
         p.push(a);
         p
     }
 
     pub fn max_perf_pct() -> PathBuf {
-        device_attr("max_perf_pct")
+        system_attr("max_perf_pct")
     }
 
     pub fn min_perf_pct() -> PathBuf {
-        device_attr("min_perf_pct")
+        system_attr("min_perf_pct")
     }
 
     pub fn no_turbo() -> PathBuf {
-        device_attr("no_turbo")
+        system_attr("no_turbo")
     }
 
     pub fn status() -> PathBuf {
-        device_attr("status")
+        system_attr("status")
     }
 
     pub fn turbo_pct() -> PathBuf {
-        device_attr("turbo_pct")
+        system_attr("turbo_pct")
     }
 }
 
 use async_trait::async_trait;
 
-pub use crate::sysfs::cpufreq::policies;
+pub use crate::sysfs::cpufreq::devices;
 use crate::sysfs::{self, Result};
-use crate::{Feature, Resource};
+use crate::{Feature, Policy};
 
 pub async fn energy_perf_bias(id: u64) -> Result<u64> {
     sysfs::read_u64(&path::energy_perf_bias(id)).await
@@ -109,7 +109,7 @@ pub async fn set_no_turbo(v: bool) -> Result<()> {
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Device {
+pub struct System {
     pub max_perf_pct: Option<u64>,
     pub min_perf_pct: Option<u64>,
     pub no_turbo: Option<bool>,
@@ -118,7 +118,7 @@ pub struct Device {
 }
 
 #[async_trait]
-impl Resource for Device {
+impl Policy for System {
     type Id = ();
     type Output = Self;
 
@@ -157,7 +157,7 @@ impl Resource for Device {
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Policy {
+pub struct Device {
     pub id: u64,
     pub energy_perf_bias: Option<u64>,
     pub energy_performance_preference: Option<String>,
@@ -165,12 +165,12 @@ pub struct Policy {
 }
 
 #[async_trait]
-impl Resource for Policy {
+impl Policy for Device {
     type Id = u64;
     type Output = Self;
 
     async fn ids() -> Vec<u64> {
-        policies().await.ok().unwrap_or_default()
+        devices().await.ok().unwrap_or_default()
     }
 
     async fn read(id: u64) -> Option<Self> {
@@ -204,8 +204,8 @@ impl Resource for Policy {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct IntelPstate {
-    pub device: Option<Device>,
-    pub policies: Vec<Policy>,
+    pub system: Option<System>,
+    pub devices: Vec<Device>,
 }
 
 #[async_trait]
@@ -216,7 +216,7 @@ impl Feature for IntelPstate {
 }
 
 #[async_trait]
-impl Resource for IntelPstate {
+impl Policy for IntelPstate {
     type Id = ();
     type Output = Self;
 
@@ -225,18 +225,18 @@ impl Resource for IntelPstate {
     }
 
     async fn read(_: ()) -> Option<Self> {
-        let device = Device::read(()).await;
-        let policies = Policy::all().await;
-        let s = Self { device, policies };
+        let system = System::read(()).await;
+        let devices = Device::all().await;
+        let s = Self { system, devices };
         Some(s)
     }
 
     async fn write(&self) {
-        if let Some(device) = &self.device {
-            device.write().await;
+        if let Some(system) = &self.system {
+            system.write().await;
         }
-        for policy in &self.policies {
-            policy.write().await;
+        for device in &self.devices {
+            device.write().await;
         }
     }
 }

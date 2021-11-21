@@ -7,10 +7,10 @@ use tokio::sync::OnceCell;
 use tokio::time::sleep;
 
 use crate::cli::de;
-use crate::cli::resource::ToResource;
+use crate::cli::policy::ToPolicy;
 #[cfg(feature = "nvml")]
 use crate::nvml;
-use crate::{sysfs, Resource as _};
+use crate::{sysfs, Policy as _};
 
 async fn cpu_ids() -> Vec<u64> {
     static CPU_IDS: OnceCell<Vec<u64>> = OnceCell::const_new();
@@ -237,38 +237,38 @@ impl Group {
     }
 
     pub(in crate::cli) async fn apply_cpu(&self) {
-        if let Some(r) = ToResource::<sysfs::Cpu>::to_resource(self) {
+        if let Some(r) = ToPolicy::<sysfs::Cpu>::to_policy(self) {
             r.write().await;
         }
     }
 
     pub(in crate::cli) async fn apply_cpufreq(&self) {
-        if let Some(r) = ToResource::<sysfs::Cpufreq>::to_resource(self) {
+        if let Some(r) = ToPolicy::<sysfs::Cpufreq>::to_policy(self) {
             r.write().await;
         }
     }
 
     pub(in crate::cli) async fn apply_drm(&self) {
-        if let Some(r) = ToResource::<sysfs::I915>::to_resource(self) {
+        if let Some(r) = ToPolicy::<sysfs::I915>::to_policy(self) {
             r.write().await;
         }
     }
 
     #[cfg(feature = "nvml")]
     pub(in crate::cli) async fn apply_nvml(&self) {
-        if let Some(r) = ToResource::<nvml::Nvml>::to_resource(self) {
+        if let Some(r) = ToPolicy::<nvml::Nvml>::to_policy(self) {
             r.write().await;
         }
     }
 
     pub(in crate::cli) async fn apply_pstate(&self) {
-        if let Some(r) = ToResource::<sysfs::IntelPstate>::to_resource(self) {
+        if let Some(r) = ToPolicy::<sysfs::IntelPstate>::to_policy(self) {
             r.write().await;
         }
     }
 
     pub(in crate::cli) async fn apply_rapl(&self) {
-        if let Some(r) = ToResource::<sysfs::IntelRapl>::to_resource(self) {
+        if let Some(r) = ToPolicy::<sysfs::IntelRapl>::to_policy(self) {
             r.write().await;
         }
     }

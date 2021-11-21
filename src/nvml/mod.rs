@@ -8,7 +8,7 @@ use nvml_wrapper::NVML;
 use tokio::sync::{Mutex, OnceCell};
 use tokio::task::spawn_blocking;
 
-use crate::{Feature, Resource};
+use crate::{Feature, Policy};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -71,10 +71,7 @@ where
     T: std::fmt::Debug + Send + 'static,
     F: FnOnce(&mut nvml_wrapper::Device) -> StdResult<T, NvmlError> + Send + 'static,
 {
-    let mut device = {
-        let id = id;
-        with_nvml('r', "device_by_index", move |n| n.device_by_index(id)).await?
-    };
+    let mut device = { with_nvml('r', "device_by_index", move |n| n.device_by_index(id)).await? };
     let res = spawn_blocking(move || f(&mut device)).await.unwrap();
     match res {
         Ok(v) => {
@@ -118,7 +115,7 @@ pub struct Device {
 }
 
 #[async_trait]
-impl Resource for Device {
+impl Policy for Device {
     type Id = u32;
     type Output = Self;
 
@@ -258,7 +255,7 @@ impl Feature for Nvml {
 }
 
 #[async_trait]
-impl Resource for Nvml {
+impl Policy for Nvml {
     type Id = ();
     type Output = Self;
 

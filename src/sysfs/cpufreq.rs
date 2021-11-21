@@ -5,57 +5,57 @@ pub mod path {
         PathBuf::from("/sys/devices/system/cpu/cpufreq")
     }
 
-    pub fn policy(id: u64) -> PathBuf {
+    pub fn device(id: u64) -> PathBuf {
         let mut p = root();
         p.push(&format!("policy{}", id));
         p
     }
 
-    pub fn policy_attr(id: u64, a: &str) -> PathBuf {
-        let mut p = policy(id);
+    pub fn device_attr(id: u64, a: &str) -> PathBuf {
+        let mut p = device(id);
         p.push(a);
         p
     }
 
     pub fn cpuinfo_max_freq(id: u64) -> PathBuf {
-        policy_attr(id, "cpuinfo_max_freq")
+        device_attr(id, "cpuinfo_max_freq")
     }
 
     pub fn cpuinfo_min_freq(id: u64) -> PathBuf {
-        policy_attr(id, "cpuinfo_min_freq")
+        device_attr(id, "cpuinfo_min_freq")
     }
 
     pub fn scaling_cur_freq(id: u64) -> PathBuf {
-        policy_attr(id, "scaling_cur_freq")
+        device_attr(id, "scaling_cur_freq")
     }
 
     pub fn scaling_driver(id: u64) -> PathBuf {
-        policy_attr(id, "scaling_driver")
+        device_attr(id, "scaling_driver")
     }
 
     pub fn scaling_governor(id: u64) -> PathBuf {
-        policy_attr(id, "scaling_governor")
+        device_attr(id, "scaling_governor")
     }
 
     pub fn scaling_available_governors(id: u64) -> PathBuf {
-        policy_attr(id, "scaling_available_governors")
+        device_attr(id, "scaling_available_governors")
     }
 
     pub fn scaling_max_freq(id: u64) -> PathBuf {
-        policy_attr(id, "scaling_max_freq")
+        device_attr(id, "scaling_max_freq")
     }
 
     pub fn scaling_min_freq(id: u64) -> PathBuf {
-        policy_attr(id, "scaling_min_freq")
+        device_attr(id, "scaling_min_freq")
     }
 }
 
 use async_trait::async_trait;
 
 use crate::sysfs::{self, Result};
-use crate::{Feature, Resource};
+use crate::{Feature, Policy};
 
-pub async fn policies() -> Result<Vec<u64>> {
+pub async fn devices() -> Result<Vec<u64>> {
     sysfs::read_ids(&path::root(), "policy").await
 }
 
@@ -105,7 +105,7 @@ pub async fn set_scaling_min_freq(id: u64, val: u64) -> Result<()> {
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Policy {
+pub struct Device {
     pub id: u64,
     pub cpuinfo_max_freq: Option<u64>,
     pub cpuinfo_min_freq: Option<u64>,
@@ -118,12 +118,12 @@ pub struct Policy {
 }
 
 #[async_trait]
-impl Resource for Policy {
+impl Policy for Device {
     type Id = u64;
     type Output = Self;
 
     async fn ids() -> Vec<u64> {
-        policies().await.ok().unwrap_or_default()
+        devices().await.ok().unwrap_or_default()
     }
 
     async fn read(id: u64) -> Option<Self> {
@@ -165,7 +165,7 @@ impl Resource for Policy {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Cpufreq {
-    pub policies: Vec<Policy>,
+    pub devices: Vec<Device>,
 }
 
 #[async_trait]
@@ -176,7 +176,7 @@ impl Feature for Cpufreq {
 }
 
 #[async_trait]
-impl Resource for Cpufreq {
+impl Policy for Cpufreq {
     type Id = ();
     type Output = Self;
 
@@ -185,14 +185,14 @@ impl Resource for Cpufreq {
     }
 
     async fn read(_: ()) -> Option<Self> {
-        let policies = Policy::all().await;
-        let s = Self { policies };
+        let devices = Device::all().await;
+        let s = Self { devices };
         Some(s)
     }
 
     async fn write(&self) {
-        for policy in &self.policies {
-            policy.write().await;
+        for device in &self.devices {
+            device.write().await;
         }
     }
 }

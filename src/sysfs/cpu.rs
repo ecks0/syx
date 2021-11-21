@@ -25,9 +25,9 @@ pub mod path {
 use async_trait::async_trait;
 
 use crate::sysfs::{self, Result};
-use crate::{Feature, Resource};
+use crate::{Feature, Policy};
 
-pub async fn policies() -> Result<Vec<u64>> {
+pub async fn devices() -> Result<Vec<u64>> {
     sysfs::read_ids(&path::root(), "cpu").await
 }
 
@@ -47,12 +47,12 @@ pub struct Device {
 }
 
 #[async_trait]
-impl Resource for Device {
+impl Policy for Device {
     type Id = u64;
     type Output = Self;
 
     async fn ids() -> Vec<u64> {
-        policies().await.ok().unwrap_or_default()
+        devices().await.ok().unwrap_or_default()
     }
 
     async fn read(id: u64) -> Option<Self> {
@@ -82,7 +82,7 @@ impl Feature for Cpu {
 }
 
 #[async_trait]
-impl Resource for Cpu {
+impl Policy for Cpu {
     type Id = ();
     type Output = Self;
 

@@ -7,8 +7,8 @@ mod logging;
 mod parse;
 mod parser;
 mod path;
+mod policy;
 mod profile;
-mod resource;
 mod sampler;
 
 use std::fmt::Display;

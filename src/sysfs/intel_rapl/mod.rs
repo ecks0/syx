@@ -21,49 +21,41 @@ pub mod path {
         p
     }
 
-    pub fn enabled(zone_id: u64, subzone_id: Option<u64>) -> PathBuf {
-        let mut p = match subzone_id {
+    pub fn device(zone_id: u64, subzone_id: Option<u64>) -> PathBuf {
+        match subzone_id {
             Some(subzone_id) => subzone(zone_id, subzone_id),
             None => zone(zone_id),
-        };
-        p.push("enabled");
+        }
+    }
+
+    pub fn device_attr(zone_id: u64, subzone_id: Option<u64>, a: &str) -> PathBuf {
+        let mut p = device(zone_id, subzone_id);
+        p.push(a);
         p
+    }
+
+    pub fn enabled(zone_id: u64, subzone_id: Option<u64>) -> PathBuf {
+        device_attr(zone_id, subzone_id, "enabled")
     }
 
     pub fn energy_uj(zone_id: u64, subzone_id: Option<u64>) -> PathBuf {
-        let mut p = match subzone_id {
-            Some(subzone_id) => subzone(zone_id, subzone_id),
-            None => zone(zone_id),
-        };
-        p.push("energy_uj");
-        p
+        device_attr(zone_id, subzone_id, "energy_uj")
     }
 
     pub fn max_energy_range_uj(zone_id: u64, subzone_id: Option<u64>) -> PathBuf {
-        let mut p = match subzone_id {
-            Some(subzone_id) => subzone(zone_id, subzone_id),
-            None => zone(zone_id),
-        };
-        p.push("max_energy_range_uj");
-        p
+        device_attr(zone_id, subzone_id, "max_energy_range_uj")
     }
 
     pub fn name(zone_id: u64, subzone_id: Option<u64>) -> PathBuf {
-        let mut p = match subzone_id {
-            Some(subzone_id) => subzone(zone_id, subzone_id),
-            None => zone(zone_id),
-        };
-        p.push("name");
-        p
+        device_attr(zone_id, subzone_id, "name")
     }
 
     pub fn constraint_name(zone_id: u64, subzone_id: Option<u64>, constraint: u64) -> PathBuf {
-        let mut p = match subzone_id {
-            Some(subzone_id) => subzone(zone_id, subzone_id),
-            None => zone(zone_id),
-        };
-        p.push(&format!("constraint_{}_name", constraint));
-        p
+        device_attr(
+            zone_id,
+            subzone_id,
+            &format!("constraint_{}_name", constraint),
+        )
     }
 
     pub fn constraint_max_power_uw(
@@ -71,12 +63,11 @@ pub mod path {
         subzone_id: Option<u64>,
         constraint: u64,
     ) -> PathBuf {
-        let mut p = match subzone_id {
-            Some(subzone_id) => subzone(zone_id, subzone_id),
-            None => zone(zone_id),
-        };
-        p.push(&format!("constraint_{}_max_power_uw", constraint));
-        p
+        device_attr(
+            zone_id,
+            subzone_id,
+            &format!("constraint_{}_max_power_uw", constraint),
+        )
     }
 
     pub fn constraint_power_limit_uw(
@@ -84,12 +75,11 @@ pub mod path {
         subzone_id: Option<u64>,
         constraint: u64,
     ) -> PathBuf {
-        let mut p = match subzone_id {
-            Some(subzone_id) => subzone(zone_id, subzone_id),
-            None => zone(zone_id),
-        };
-        p.push(&format!("constraint_{}_power_limit_uw", constraint));
-        p
+        device_attr(
+            zone_id,
+            subzone_id,
+            &format!("constraint_{}_power_limit_uw", constraint),
+        )
     }
 
     pub fn constraint_time_window_us(
@@ -97,19 +87,18 @@ pub mod path {
         subzone_id: Option<u64>,
         constraint: u64,
     ) -> PathBuf {
-        let mut p = match subzone_id {
-            Some(subzone_id) => subzone(zone_id, subzone_id),
-            None => zone(zone_id),
-        };
-        p.push(&format!("constraint_{}_time_window_us", constraint));
-        p
+        device_attr(
+            zone_id,
+            subzone_id,
+            &format!("constraint_{}_time_window_us", constraint),
+        )
     }
 }
 
 use async_trait::async_trait;
 
 use crate::sysfs::{self, Result};
-use crate::{Feature, Resource};
+use crate::{Feature, Policy};
 
 pub async fn zones() -> Result<Vec<u64>> {
     sysfs::read_ids(&path::root(), "intel-rapl:").await
@@ -117,6 +106,19 @@ pub async fn zones() -> Result<Vec<u64>> {
 
 pub async fn subzones(zone_id: u64) -> Result<Vec<u64>> {
     sysfs::read_ids(&path::zone(zone_id), &format!("intel-rapl:{}:", zone_id)).await
+}
+
+pub async fn devices() -> Result<Vec<(u64, Option<u64>)>> {
+    let mut devices = vec![];
+    for zone in zones().await.unwrap_or_default() {
+        devices.push((zone, None));
+        if let Ok(subzones) = subzones(zone).await {
+            for subzone in subzones {
+                devices.push((zone, Some(subzone)));
+            }
+        };
+    }
+    Ok(devices)
 }
 
 pub async fn enabled(zone_id: u64, subzone_id: Option<u64>) -> Result<bool> {
@@ -246,28 +248,17 @@ pub struct Device {
 }
 
 #[async_trait]
-impl Resource for Device {
+impl Policy for Device {
     type Id = ZoneId;
     type Output = Self;
 
     async fn ids() -> Vec<ZoneId> {
-        let mut ids = vec![];
-        for zone in zones().await.unwrap_or_default() {
-            ids.push(ZoneId {
-                zone,
-                subzone: None,
-            });
-            let subzones = if let Ok(v) = subzones(zone).await {
-                v
-            } else {
-                continue;
-            };
-            for subzone in subzones {
-                let subzone = Some(subzone);
-                ids.push(ZoneId { zone, subzone });
-            }
-        }
-        ids
+        devices()
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(zone, subzone)| ZoneId { zone, subzone })
+            .collect()
     }
 
     async fn read(id: ZoneId) -> Option<Self> {
@@ -290,13 +281,14 @@ impl Resource for Device {
                             .await
                             .ok();
                         let id = cid;
-                        constraints.push(Constraint {
+                        let c = Constraint {
                             id,
                             name,
                             max_power_uw,
                             power_limit_uw,
                             time_window_us,
-                        });
+                        };
+                        constraints.push(c);
                     },
                     Err(_) => break, // FIXME
                 }
@@ -340,7 +332,7 @@ impl Feature for IntelRapl {
 }
 
 #[async_trait]
-impl Resource for IntelRapl {
+impl Policy for IntelRapl {
     type Id = ();
     type Output = Self;
 

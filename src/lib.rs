@@ -12,7 +12,7 @@ pub trait Feature {
 }
 
 #[async_trait]
-pub trait Resource: Sized + Send + Sync {
+pub trait Policy: Sized + Send + Sync {
     type Id: Sized + Send + Sync;
     type Output: Sized + Send + Sync;
 
@@ -38,7 +38,7 @@ use nvml::Nvml;
 use sysfs::{Cpu, Cpufreq, IntelPstate, IntelRapl, I915};
 
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct System {
+pub struct Machine {
     pub cpu: Option<Cpu>,
     pub cpufreq: Option<Cpufreq>,
     pub i915: Option<I915>,
@@ -49,7 +49,7 @@ pub struct System {
 }
 
 #[async_trait]
-impl Resource for System {
+impl Policy for Machine {
     type Id = ();
     type Output = Self;
 

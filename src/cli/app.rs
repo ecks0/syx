@@ -16,7 +16,7 @@ use crate::cli::profile::path::config_paths;
 use crate::cli::profile::{Error as ProfileError, Profile};
 use crate::cli::sampler::Samplers;
 use crate::cli::{format, logging, Error, Result};
-use crate::{Resource as _, System};
+use crate::{Machine, Policy as _};
 
 #[derive(Clone, Debug)]
 pub struct Cli {
@@ -85,7 +85,7 @@ impl Cli {
     }
 
     async fn print(&self, samplers: &Samplers) -> Result<()> {
-        let system = if let Some(s) = System::read(()).await {
+        let machine = if let Some(s) = Machine::read(()).await {
             s
         } else {
             return Ok(());
@@ -93,22 +93,22 @@ impl Cli {
         let mut buf = Vec::with_capacity(3000);
         let show_all = !self.has_show_args();
         if show_all || self.show_cpu.is_some() {
-            format::cpu(&mut buf, &system).await.unwrap();
+            format::cpu(&mut buf, &machine).await.unwrap();
         }
         if show_all || self.show_pstate.is_some() {
-            format::intel_pstate(&mut buf, &system).await.unwrap();
+            format::intel_pstate(&mut buf, &machine).await.unwrap();
         }
         if show_all || self.show_rapl.is_some() {
-            format::intel_rapl(&mut buf, &system, samplers.clone().into_samplers())
+            format::intel_rapl(&mut buf, &machine, samplers.clone().into_samplers())
                 .await
                 .unwrap();
         }
         if show_all || self.show_i915.is_some() {
-            format::i915(&mut buf, &system).await.unwrap();
+            format::i915(&mut buf, &machine).await.unwrap();
         }
         #[cfg(feature = "nvml")]
         if show_all || self.show_nvml.is_some() {
-            format::nvml(&mut buf, &system).await.unwrap();
+            format::nvml(&mut buf, &machine).await.unwrap();
         }
         let s = String::from_utf8_lossy(&buf);
         let mut stdout = stdout();
