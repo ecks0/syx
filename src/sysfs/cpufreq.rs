@@ -180,7 +180,7 @@ impl Policy for Cpufreq {
     type Id = ();
     type Output = Self;
 
-    async fn ids() -> Vec<Self::Id> {
+    async fn ids() -> Vec<()> {
         vec![()]
     }
 

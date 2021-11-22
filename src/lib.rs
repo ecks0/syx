@@ -12,9 +12,9 @@ pub trait Feature {
 }
 
 #[async_trait]
-pub trait Policy: Sized + Send + Sync {
-    type Id: Sized + Send + Sync;
-    type Output: Sized + Send + Sync;
+pub trait Policy {
+    type Id: Sized + Send;
+    type Output: Sized + Send;
 
     async fn ids() -> Vec<Self::Id>;
 
