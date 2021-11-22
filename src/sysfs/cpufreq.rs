@@ -1,10 +1,6 @@
 pub mod path {
     use std::path::PathBuf;
 
-    pub fn module() -> PathBuf {
-        PathBuf::from("/sys/module/cpufreq")
-    }
-
     pub fn root() -> PathBuf {
         PathBuf::from("/sys/devices/system/cpu/cpufreq")
     }
@@ -178,7 +174,7 @@ impl Feature for Cpufreq {
     async fn present() -> bool {
         static PRESENT: OnceCell<bool> = OnceCell::const_new();
         async fn present() -> bool {
-            path::module().is_dir()
+            path::root().is_dir()
         }
         *PRESENT.get_or_init(present).await
     }

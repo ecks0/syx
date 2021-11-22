@@ -1,10 +1,6 @@
 pub mod path {
     use std::path::PathBuf;
 
-    pub fn module() -> PathBuf {
-        PathBuf::from("/sys/module/i915")
-    }
-
     pub fn root() -> PathBuf {
         PathBuf::from("/sys/class/drm")
     }
@@ -61,12 +57,11 @@ pub mod path {
 }
 
 use async_trait::async_trait;
-use tokio::sync::OnceCell;
 
 use crate::sysfs::{self, Result};
 use crate::{Feature, Values};
 
-pub async fn policies() -> Result<Vec<u64>> {
+pub async fn devices() -> Result<Vec<u64>> {
     let mut ids = vec![];
     for id in sysfs::read_ids(&path::root(), "card").await? {
         if let Ok(driver) = driver(id).await {
@@ -158,7 +153,7 @@ impl Values for Device {
     type Output = Self;
 
     async fn ids() -> Vec<u64> {
-        policies().await.ok().unwrap_or_default()
+        devices().await.ok().unwrap_or_default()
     }
 
     async fn read(id: u64) -> Option<Self> {
@@ -215,11 +210,7 @@ pub struct I915 {
 #[async_trait]
 impl Feature for I915 {
     async fn present() -> bool {
-        static PRESENT: OnceCell<bool> = OnceCell::const_new();
-        async fn present() -> bool {
-            path::module().is_dir()
-        }
-        *PRESENT.get_or_init(present).await
+        !Self::ids().await.is_empty()
     }
 }
 
