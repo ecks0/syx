@@ -54,7 +54,7 @@ use tokio::sync::OnceCell;
 
 pub use crate::sysfs::cpufreq::devices;
 use crate::sysfs::{self, Result};
-use crate::{Feature, Policy};
+use crate::{Feature, Values};
 
 pub async fn energy_perf_bias(id: u64) -> Result<u64> {
     sysfs::read_u64(&path::energy_perf_bias(id)).await
@@ -119,7 +119,7 @@ pub struct System {
 }
 
 #[async_trait]
-impl Policy for System {
+impl Values for System {
     type Id = ();
     type Output = Self;
 
@@ -166,7 +166,7 @@ pub struct Device {
 }
 
 #[async_trait]
-impl Policy for Device {
+impl Values for Device {
     type Id = u64;
     type Output = Self;
 
@@ -221,7 +221,7 @@ impl Feature for IntelPstate {
 }
 
 #[async_trait]
-impl Policy for IntelPstate {
+impl Values for IntelPstate {
     type Id = ();
     type Output = Self;
 
@@ -243,8 +243,11 @@ impl Policy for IntelPstate {
         if let Some(system) = &self.system {
             system.write().await;
         }
+        let onlined = self.devices.iter().map(|d| d.id).collect();
+        let onlined = crate::set_cpus_online(onlined).await;
         for device in &self.devices {
             device.write().await;
         }
+        crate::set_cpus_offline(onlined).await;
     }
 }

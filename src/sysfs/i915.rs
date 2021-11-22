@@ -64,7 +64,7 @@ use async_trait::async_trait;
 use tokio::sync::OnceCell;
 
 use crate::sysfs::{self, Result};
-use crate::{Feature, Policy};
+use crate::{Feature, Values};
 
 pub async fn policies() -> Result<Vec<u64>> {
     let mut ids = vec![];
@@ -153,7 +153,7 @@ pub struct Device {
 }
 
 #[async_trait]
-impl Policy for Device {
+impl Values for Device {
     type Id = u64;
     type Output = Self;
 
@@ -224,7 +224,7 @@ impl Feature for I915 {
 }
 
 #[async_trait]
-impl Policy for I915 {
+impl Values for I915 {
     type Id = ();
     type Output = Self;
 

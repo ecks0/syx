@@ -5,6 +5,28 @@ pub mod path {
         PathBuf::from("/sys/devices/system/cpu")
     }
 
+    pub fn root_attr(a: &str) -> PathBuf {
+        let mut p = root();
+        p.push(a);
+        p
+    }
+
+    pub fn devices_online() -> PathBuf {
+        root_attr("online")
+    }
+
+    pub fn devices_offline() -> PathBuf {
+        root_attr("offline")
+    }
+
+    pub fn devices_present() -> PathBuf {
+        root_attr("present")
+    }
+
+    pub fn devices_possible() -> PathBuf {
+        root_attr("possible")
+    }
+
     pub fn device(id: u64) -> PathBuf {
         let mut p = root();
         p.push(format!("cpu{}", id));
@@ -26,10 +48,26 @@ use async_trait::async_trait;
 use tokio::sync::OnceCell;
 
 use crate::sysfs::{self, Result};
-use crate::{Feature, Policy};
+use crate::{Feature, Values};
 
 pub async fn devices() -> Result<Vec<u64>> {
     sysfs::read_ids(&path::root(), "cpu").await
+}
+
+pub async fn devices_online() -> Result<Vec<u64>> {
+    sysfs::read_indices(&path::devices_online()).await
+}
+
+pub async fn devices_offline() -> Result<Vec<u64>> {
+    sysfs::read_indices(&path::devices_offline()).await
+}
+
+pub async fn devices_present() -> Result<Vec<u64>> {
+    sysfs::read_indices(&path::devices_present()).await
+}
+
+pub async fn devices_possible() -> Result<Vec<u64>> {
+    sysfs::read_indices(&path::devices_possible()).await
 }
 
 pub async fn online(id: u64) -> Result<bool> {
@@ -48,12 +86,12 @@ pub struct Device {
 }
 
 #[async_trait]
-impl Policy for Device {
+impl Values for Device {
     type Id = u64;
     type Output = Self;
 
     async fn ids() -> Vec<u64> {
-        devices().await.ok().unwrap_or_default()
+        devices().await.unwrap_or_default()
     }
 
     async fn read(id: u64) -> Option<Self> {
@@ -64,7 +102,7 @@ impl Policy for Device {
 
     async fn write(&self) {
         if let Some(v) = self.online {
-            let _ = set_online(self.id, v);
+            let _ = set_online(self.id, v).await;
         }
     }
 }
@@ -87,7 +125,7 @@ impl Feature for Cpu {
 }
 
 #[async_trait]
-impl Policy for Cpu {
+impl Values for Cpu {
     type Id = ();
     type Output = Self;
 
@@ -107,6 +145,9 @@ impl Policy for Cpu {
     async fn write(&self) {
         for device in &self.devices {
             device.write().await;
+        }
+        if self.devices.iter().any(|d| d.online.is_some()) {
+            crate::wait_for_cpu_onoff().await;
         }
     }
 }

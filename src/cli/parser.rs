@@ -2,8 +2,8 @@ use std::str::FromStr;
 
 use clap::{crate_version, App, AppSettings, Arg};
 
-use crate::cli::group::{Group, Groups};
 use crate::cli::parse::{BoolStr, CardIds, DurationStr, FrequencyStr, Indices, PowerStr, Toggles};
+use crate::cli::values::Values;
 use crate::cli::{env, Error, Result, NAME};
 
 pub(super) const ARG_QUIET: &str = "quiet";
@@ -414,7 +414,7 @@ impl<'a> Parser<'a> {
     }
 }
 
-impl TryFrom<&Parser<'_>> for Group {
+impl TryFrom<&Parser<'_>> for Values {
     type Error = Error;
 
     fn try_from(p: &Parser<'_>) -> Result<Self> {
@@ -452,32 +452,32 @@ impl TryFrom<&Parser<'_>> for Group {
     }
 }
 
-impl TryFrom<&Parser<'_>> for Groups {
+impl TryFrom<&Parser<'_>> for Vec<Values> {
     type Error = Error;
 
     fn try_from(p: &Parser<'_>) -> Result<Self> {
-        let mut groups: Vec<Group> = vec![];
-        let mut p = p.clone();
+        let mut values: Vec<Values> = vec![];
+        let mut parser = p.clone();
         loop {
-            let g = Group::try_from(&p)?;
-            if g.has_values() {
-                groups.push(g);
+            let v = Values::try_from(&parser)?;
+            if v.has_values() {
+                values.push(v);
             }
-            if !p.present(ARG_OPTIONS) {
+            if !parser.present(ARG_OPTIONS) {
                 break;
             }
-            match p.values(ARG_OPTIONS) {
-                Some(v) => {
-                    let mut v: Vec<String> = v.map(String::from).collect();
-                    if v.is_empty() {
+            match parser.values(ARG_OPTIONS) {
+                Some(next) => {
+                    let mut next: Vec<String> = next.map(String::from).collect();
+                    if next.is_empty() {
                         break;
                     }
-                    v.insert(0, NAME.to_string());
-                    p = Parser::new(&v)?;
+                    next.insert(0, NAME.to_string());
+                    parser = Parser::new(&next)?;
                 },
                 None => break,
             };
         }
-        Ok(groups.into())
+        Ok(values)
     }
 }

@@ -2,8 +2,10 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use measurements::{Frequency, Power};
+use serde::de::Error as _;
+use serde::{Deserialize, Deserializer};
 
-use crate::cli::group::CardId;
+use crate::cli::values::CardId;
 use crate::cli::{Error, Result};
 
 fn start_of_unit(s: &str) -> Option<usize> {
@@ -37,18 +39,13 @@ impl From<BoolStr> for bool {
     }
 }
 
-impl FromStr for CardId {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        if s.contains(':') {
-            Ok(Self::BusId(s.into()))
-        } else {
-            let id = s
-                .parse::<u64>()
-                .map_err(|_| Error::parse_value("Expected id integer or pci id string"))?;
-            Ok(Self::Index(id))
-        }
+impl<'de> Deserialize<'de> for BoolStr {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: String = Deserialize::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(D::Error::custom)
     }
 }
 
@@ -82,6 +79,16 @@ impl FromStr for CardIds {
 impl From<CardIds> for Vec<CardId> {
     fn from(c: CardIds) -> Self {
         c.0
+    }
+}
+
+impl<'de> Deserialize<'de> for CardIds {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: String = Deserialize::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(D::Error::custom)
     }
 }
 
@@ -119,6 +126,16 @@ impl FromStr for DurationStr {
 impl From<DurationStr> for Duration {
     fn from(d: DurationStr) -> Self {
         d.0
+    }
+}
+
+impl<'de> Deserialize<'de> for DurationStr {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: String = Deserialize::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(D::Error::custom)
     }
 }
 
@@ -161,6 +178,16 @@ impl FromStr for FrequencyStr {
 impl From<FrequencyStr> for Frequency {
     fn from(f: FrequencyStr) -> Self {
         f.0
+    }
+}
+
+impl<'de> Deserialize<'de> for FrequencyStr {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: String = Deserialize::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(D::Error::custom)
     }
 }
 
@@ -208,6 +235,16 @@ impl From<Indices> for Vec<u64> {
     }
 }
 
+impl<'de> Deserialize<'de> for Indices {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: String = Deserialize::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(D::Error::custom)
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub(crate) struct PowerStr(Power);
 
@@ -241,6 +278,16 @@ impl From<PowerStr> for Power {
     }
 }
 
+impl<'de> Deserialize<'de> for PowerStr {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: String = Deserialize::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(D::Error::custom)
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub(crate) struct Toggles(Vec<(u64, bool)>);
 
@@ -264,5 +311,15 @@ impl FromStr for Toggles {
 impl From<Toggles> for Vec<(u64, bool)> {
     fn from(t: Toggles) -> Self {
         t.0
+    }
+}
+
+impl<'de> Deserialize<'de> for Toggles {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: String = Deserialize::deserialize(deserializer)?;
+        Self::from_str(&s).map_err(D::Error::custom)
     }
 }

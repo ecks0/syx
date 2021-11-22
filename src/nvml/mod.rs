@@ -8,7 +8,7 @@ use nvml_wrapper::NVML;
 use tokio::sync::{Mutex, OnceCell};
 use tokio::task::spawn_blocking;
 
-use crate::{Feature, Policy};
+use crate::{Feature, Values};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -115,7 +115,7 @@ pub struct Device {
 }
 
 #[async_trait]
-impl Policy for Device {
+impl Values for Device {
     type Id = u32;
     type Output = Self;
 
@@ -255,7 +255,7 @@ impl Feature for Nvml {
 }
 
 #[async_trait]
-impl Policy for Nvml {
+impl Values for Nvml {
     type Id = ();
     type Output = Self;
 

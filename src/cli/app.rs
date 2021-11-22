@@ -1,6 +1,5 @@
 use tokio::io::{stdout, AsyncWriteExt as _};
 
-use crate::cli::group::Groups;
 #[cfg(feature = "nvml")]
 use crate::cli::parser::ARG_SHOW_NV;
 use crate::cli::parser::{
@@ -15,8 +14,9 @@ use crate::cli::parser::{
 use crate::cli::profile::path::config_paths;
 use crate::cli::profile::{Error as ProfileError, Profile};
 use crate::cli::sampler::Samplers;
+use crate::cli::values::Values;
 use crate::cli::{format, logging, Error, Result};
-use crate::{Machine, Policy as _};
+use crate::{Machine, Values as _};
 
 #[derive(Clone, Debug)]
 pub struct Cli {
@@ -28,29 +28,31 @@ pub struct Cli {
     pub(in crate::cli) show_pstate: Option<()>,
     pub(in crate::cli) show_rapl: Option<()>,
     pub(in crate::cli) profile: Option<Profile>,
-    pub(in crate::cli) groups: Vec<Groups>,
+    pub(in crate::cli) values: Vec<Values>,
 }
 
 impl Cli {
     pub async fn new(argv: &[String]) -> Result<Self> {
         log::debug!("Profile config paths: {:#?}", config_paths().await);
         let p = Parser::new(argv)?;
-        let mut groups = vec![];
+        let mut values = vec![];
         let profile = if let Some(pr) = p.str(ARG_PROFILE) {
             let pr = Profile::new(pr).await?;
-            let mut g = pr.groups().await?;
-            if g.has_values() {
-                g.resolve().await;
-                groups.push(g);
+            for mut v in pr.values().await? {
+                if v.has_values() {
+                    v.resolve().await;
+                    values.push(v);
+                }
             }
             Some(pr)
         } else {
             None
         };
-        let mut g = Groups::try_from(&p)?;
-        if g.has_values() {
-            g.resolve().await;
-            groups.push(g);
+        for mut v in Vec::try_from(&p)? {
+            if v.has_values() {
+                v.resolve().await;
+                values.push(v);
+            }
         }
         let quiet = p.flag(ARG_QUIET);
         let show_cpu = p.flag(ARG_SHOW_CPU);
@@ -68,7 +70,7 @@ impl Cli {
             show_pstate,
             show_rapl,
             profile,
-            groups,
+            values,
         };
         Ok(s)
     }
@@ -119,8 +121,9 @@ impl Cli {
 
     pub async fn run(&self) -> Result<()> {
         let mut samplers = Samplers::start(self).await;
-        for g in &self.groups {
-            g.apply().await;
+        for v in &self.values {
+            let m = Machine::from(v);
+            m.write().await;
         }
         if let Some(p) = self.profile.as_ref() {
             let r = p.set_recent().await;
@@ -129,13 +132,12 @@ impl Cli {
                 r?;
             }
         }
-        if self.quiet.is_some() {
-            return Ok(());
-        } // samplers do not start when quiet
-        samplers.wait().await;
-        let r = self.print(&samplers).await;
-        samplers.stop().await;
-        r?;
+        if self.quiet.is_none() {
+            samplers.wait().await;
+            let r = self.print(&samplers).await;
+            samplers.stop().await;
+            r?;
+        }
         Ok(())
     }
 }

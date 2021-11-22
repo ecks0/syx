@@ -58,7 +58,7 @@ use async_trait::async_trait;
 use tokio::sync::OnceCell;
 
 use crate::sysfs::{self, Result};
-use crate::{Feature, Policy};
+use crate::{Feature, Values};
 
 pub async fn devices() -> Result<Vec<u64>> {
     sysfs::read_ids(&path::root(), "policy").await
@@ -123,7 +123,7 @@ pub struct Device {
 }
 
 #[async_trait]
-impl Policy for Device {
+impl Values for Device {
     type Id = u64;
     type Output = Self;
 
@@ -185,7 +185,7 @@ impl Feature for Cpufreq {
 }
 
 #[async_trait]
-impl Policy for Cpufreq {
+impl Values for Cpufreq {
     type Id = ();
     type Output = Self;
 
@@ -203,8 +203,14 @@ impl Policy for Cpufreq {
     }
 
     async fn write(&self) {
+        let onlined = self.devices.iter().map(|d| d.id).collect();
+        let onlined = crate::set_cpus_online(onlined).await;
         for device in &self.devices {
             device.write().await;
         }
+        if !self.devices.is_empty() {
+            crate::wait_for_cpu_related().await;
+        }
+        crate::set_cpus_offline(onlined).await;
     }
 }

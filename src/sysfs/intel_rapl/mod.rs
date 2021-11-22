@@ -99,7 +99,7 @@ use async_trait::async_trait;
 use tokio::sync::OnceCell;
 
 use crate::sysfs::{self, Result};
-use crate::{Feature, Policy};
+use crate::{Feature, Values};
 
 pub async fn zones() -> Result<Vec<u64>> {
     sysfs::read_ids(&path::root(), "intel-rapl:").await
@@ -249,7 +249,7 @@ pub struct Device {
 }
 
 #[async_trait]
-impl Policy for Device {
+impl Values for Device {
     type Id = ZoneId;
     type Output = Self;
 
@@ -337,7 +337,7 @@ impl Feature for IntelRapl {
 }
 
 #[async_trait]
-impl Policy for IntelRapl {
+impl Values for IntelRapl {
     type Id = ();
     type Output = Self;
 

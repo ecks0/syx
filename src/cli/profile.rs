@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tokio::fs::{create_dir_all, read_to_string, write};
 use tokio::io::ErrorKind as IoErrorKind;
 
-use crate::cli::group::{Group, Groups};
+use crate::cli::values::Values;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -108,16 +108,16 @@ impl Profile {
         }
     }
 
-    pub(in crate::cli) async fn groups(&self) -> Result<Groups> {
+    pub(in crate::cli) async fn values(&self) -> Result<Vec<Values>> {
         log::debug!(
             "Loading profile '{}' from {}",
             self.name,
             self.path.display(),
         );
-        let groups = match read_to_string(&self.path).await {
-            Ok(s) => match serde_yaml::from_str::<HashMap<String, Vec<Group>>>(&s) {
-                Ok(cf) => match cf.into_iter().find(|(n, _)| n == &self.name) {
-                    Some((_, g)) => Ok(g),
+        match read_to_string(&self.path).await {
+            Ok(s) => match serde_yaml::from_str::<HashMap<String, Vec<Values>>>(&s) {
+                Ok(cf) => match cf.into_iter().find(|(k, _)| k == &self.name) {
+                    Some((_, v)) => Ok(v),
                     None => Err(Error::profile_missing(&self.path, &self.name)),
                 },
                 Err(e) => Err(Error::de(&self.path, e)),
@@ -126,9 +126,7 @@ impl Profile {
                 IoErrorKind::NotFound => Err(Error::config_missing(path::config_paths().await)),
                 _ => Err(Error::io(&self.path, e)),
             },
-        }?;
-        let profile = groups.into();
-        Ok(profile)
+        }
     }
 
     async fn recent() -> Result<Self> {

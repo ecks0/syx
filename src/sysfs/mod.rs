@@ -79,6 +79,33 @@ async fn read_ids(path: &Path, prefix: &str) -> Result<Vec<u64>> {
     log::read(path, read_ids(path, prefix).await)
 }
 
+async fn read_indices(path: &Path) -> Result<Vec<u64>> {
+    let s = read_str(path).await?;
+    let mut ids = vec![];
+    for item in s.split(',') {
+        let parts: Vec<&str> = item.split('-').collect();
+        match &parts[..] {
+            [id] => ids.push(
+                id.parse::<u64>()
+                    .map_err(|_| Error::parse(path, "indices: index", item))?,
+            ),
+            [start, end] => {
+                let start = start
+                    .parse::<u64>()
+                    .map_err(|_| Error::parse(path, "indices: start", item))?;
+                let end = 1 + end
+                    .parse::<u64>()
+                    .map_err(|_| Error::parse(path, "indices: end", item))?;
+                ids.extend(start..end);
+            },
+            _ => return Err(Error::parse(path, "indices", item)),
+        }
+    }
+    ids.sort_unstable();
+    ids.dedup();
+    Ok(ids)
+}
+
 async fn read_link(path: &Path) -> Result<PathBuf> {
     log::read(path, tokio::fs::read_link(path).await)
 }
