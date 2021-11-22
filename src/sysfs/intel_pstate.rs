@@ -50,6 +50,7 @@ pub mod path {
 }
 
 use async_trait::async_trait;
+use tokio::sync::OnceCell;
 
 pub use crate::sysfs::cpufreq::devices;
 use crate::sysfs::{self, Result};
@@ -211,7 +212,11 @@ pub struct IntelPstate {
 #[async_trait]
 impl Feature for IntelPstate {
     async fn present() -> bool {
-        path::status().is_file()
+        static PRESENT: OnceCell<bool> = OnceCell::const_new();
+        async fn present() -> bool {
+            path::status().is_file()
+        }
+        *PRESENT.get_or_init(present).await
     }
 }
 
@@ -225,6 +230,9 @@ impl Policy for IntelPstate {
     }
 
     async fn read(_: ()) -> Option<Self> {
+        if !Self::present().await {
+            return None;
+        }
         let system = System::read(()).await;
         let devices = Device::all().await;
         let s = Self { system, devices };

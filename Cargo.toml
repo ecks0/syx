@@ -20,12 +20,10 @@ cli = [
   "tokio/io-std",
   "tokio/io-util",
   "tokio/macros",
-  "tokio/parking_lot",
   "tokio/rt-multi-thread",
 ]
 nvml = [
   "nvml-wrapper",
-  "tokio/parking_lot",
 ]
 
 [dependencies]
@@ -49,6 +47,7 @@ default-features = false
 features = [
   "fs",
   "rt",
+  "parking_lot",
   "sync",
   "time",
 ]

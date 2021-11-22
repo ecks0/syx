@@ -96,6 +96,7 @@ pub mod path {
 }
 
 use async_trait::async_trait;
+use tokio::sync::OnceCell;
 
 use crate::sysfs::{self, Result};
 use crate::{Feature, Policy};
@@ -327,7 +328,11 @@ pub struct IntelRapl {
 #[async_trait]
 impl Feature for IntelRapl {
     async fn present() -> bool {
-        path::root().is_dir()
+        static PRESENT: OnceCell<bool> = OnceCell::const_new();
+        async fn present() -> bool {
+            path::root().is_dir()
+        }
+        *PRESENT.get_or_init(present).await
     }
 }
 
@@ -341,6 +346,9 @@ impl Policy for IntelRapl {
     }
 
     async fn read(_: ()) -> Option<Self> {
+        if !Self::present().await {
+            return None;
+        }
         let devices = Device::all().await;
         let s = Self { devices };
         Some(s)

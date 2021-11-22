@@ -1,6 +1,10 @@
 pub mod path {
     use std::path::PathBuf;
 
+    pub fn module() -> PathBuf {
+        PathBuf::from("/sys/module/i915")
+    }
+
     pub fn root() -> PathBuf {
         PathBuf::from("/sys/class/drm")
     }
@@ -57,6 +61,7 @@ pub mod path {
 }
 
 use async_trait::async_trait;
+use tokio::sync::OnceCell;
 
 use crate::sysfs::{self, Result};
 use crate::{Feature, Policy};
@@ -210,7 +215,11 @@ pub struct I915 {
 #[async_trait]
 impl Feature for I915 {
     async fn present() -> bool {
-        !Self::ids().await.is_empty()
+        static PRESENT: OnceCell<bool> = OnceCell::const_new();
+        async fn present() -> bool {
+            path::module().is_dir()
+        }
+        *PRESENT.get_or_init(present).await
     }
 }
 
@@ -224,6 +233,9 @@ impl Policy for I915 {
     }
 
     async fn read(_: ()) -> Option<Self> {
+        if !Self::present().await {
+            return None;
+        }
         let devices = Device::all().await;
         let s = Self { devices };
         Some(s)
