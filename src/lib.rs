@@ -159,3 +159,8 @@ impl Values for Machine {
         }
     }
 }
+
+#[derive(Clone, Debug)]
+struct Value<T> {
+    cell: Option<T>,
+}

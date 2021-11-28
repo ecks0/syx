@@ -224,9 +224,6 @@ impl Values for I915 {
     }
 
     async fn read(_: ()) -> Option<Self> {
-        if !Self::present().await {
-            return None;
-        }
         let devices = Device::all().await;
         let s = Self { devices };
         Some(s)

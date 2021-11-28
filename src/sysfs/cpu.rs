@@ -45,7 +45,6 @@ pub mod path {
 }
 
 use async_trait::async_trait;
-use tokio::sync::OnceCell;
 
 use crate::sysfs::{self, Result};
 use crate::{Feature, Values};
@@ -116,11 +115,7 @@ pub struct Cpu {
 #[async_trait]
 impl Feature for Cpu {
     async fn present() -> bool {
-        static PRESENT: OnceCell<bool> = OnceCell::const_new();
-        async fn present() -> bool {
-            path::root().is_dir()
-        }
-        *PRESENT.get_or_init(present).await
+        path::root().is_dir()
     }
 }
 
@@ -134,9 +129,6 @@ impl Values for Cpu {
     }
 
     async fn read(_: ()) -> Option<Self> {
-        if !Self::present().await {
-            return None;
-        }
         let devices = Device::all().await;
         let s = Self { devices };
         Some(s)
