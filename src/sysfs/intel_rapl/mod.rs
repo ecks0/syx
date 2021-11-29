@@ -50,12 +50,21 @@ pub mod path {
         device_attr(zone_id, subzone_id, "name")
     }
 
-    pub fn constraint_name(zone_id: u64, subzone_id: Option<u64>, constraint: u64) -> PathBuf {
+    pub fn constraint_attr(
+        zone_id: u64,
+        subzone_id: Option<u64>,
+        constraint: u64,
+        a: &str,
+    ) -> PathBuf {
         device_attr(
             zone_id,
             subzone_id,
-            &format!("constraint_{}_name", constraint),
+            &format!("constraint_{}_{}", constraint, a),
         )
+    }
+
+    pub fn constraint_name(zone_id: u64, subzone_id: Option<u64>, constraint: u64) -> PathBuf {
+        constraint_attr(zone_id, subzone_id, constraint, "name")
     }
 
     pub fn constraint_max_power_uw(
@@ -63,11 +72,7 @@ pub mod path {
         subzone_id: Option<u64>,
         constraint: u64,
     ) -> PathBuf {
-        device_attr(
-            zone_id,
-            subzone_id,
-            &format!("constraint_{}_max_power_uw", constraint),
-        )
+        constraint_attr(zone_id, subzone_id, constraint, "max_power_uw")
     }
 
     pub fn constraint_power_limit_uw(
@@ -75,11 +80,7 @@ pub mod path {
         subzone_id: Option<u64>,
         constraint: u64,
     ) -> PathBuf {
-        device_attr(
-            zone_id,
-            subzone_id,
-            &format!("constraint_{}_power_limit_uw", constraint),
-        )
+        constraint_attr(zone_id, subzone_id, constraint, "power_limit_uw")
     }
 
     pub fn constraint_time_window_us(
@@ -87,11 +88,7 @@ pub mod path {
         subzone_id: Option<u64>,
         constraint: u64,
     ) -> PathBuf {
-        device_attr(
-            zone_id,
-            subzone_id,
-            &format!("constraint_{}_time_window_us", constraint),
-        )
+        constraint_attr(zone_id, subzone_id, constraint, "time_window_us")
     }
 }
 
@@ -184,10 +181,11 @@ pub async fn constraint_id_for_name(
     name: &str,
 ) -> Option<u64> {
     for id in 0.. {
-        if let Ok(n) = constraint_name(zone_id, subzone_id, id).await {
-            if n == name {
+        match constraint_name(zone_id, subzone_id, id).await {
+            Ok(n) => if n == name {
                 return Some(id);
-            }
+            },
+            _ => break,
         }
     }
     None

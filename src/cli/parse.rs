@@ -25,7 +25,8 @@ impl FromStr for BoolStr {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        match s {
+        let s = s.to_lowercase();
+        match s.as_str() {
             "0" | "false" => Ok(Self(false)),
             "1" | "true" => Ok(Self(true)),
             _ => Err(Error::parse_value("Expected 0, 1, false, or true")),
@@ -70,7 +71,7 @@ impl FromStr for CardIds {
             ids.push(CardId::Index(id));
         }
         for id in pci_ids {
-            ids.push(CardId::BusId(id));
+            ids.push(CardId::PciId(id));
         }
         Ok(Self(ids))
     }
@@ -99,7 +100,8 @@ impl FromStr for DurationStr {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        if let Some(pos) = start_of_unit(s) {
+        let s = s.to_lowercase();
+        if let Some(pos) = start_of_unit(&s) {
             match s[..pos].parse::<u64>() {
                 Ok(v) => match &s[pos..] {
                     "n" | "ns" => Ok(Self(Duration::from_nanos(v))),
@@ -146,9 +148,10 @@ impl FromStr for FrequencyStr {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        let f = match start_of_unit(s) {
+        let s = s.to_lowercase();
+        let f = match start_of_unit(&s) {
             Some(pos) => match s[..pos].parse::<f64>() {
-                Ok(v) => match s[pos..].to_lowercase().as_str() {
+                Ok(v) => match &s[pos..] {
                     "h" | "hz" => Frequency::from_hertz(v),
                     "k" | "khz" => Frequency::from_kilohertz(v),
                     "m" | "mhz" => Frequency::from_megahertz(v),
@@ -252,7 +255,8 @@ impl FromStr for PowerStr {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        if let Some(pos) = start_of_unit(s) {
+        let s = s.to_lowercase();
+        if let Some(pos) = start_of_unit(&s) {
             match s[..pos].parse::<f64>() {
                 Ok(v) => match &s[pos..] {
                     "u" | "uw" => Ok(Self(Power::from_microwatts(v))),

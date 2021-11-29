@@ -28,10 +28,9 @@ pub(super) const ARG_PSTATE_EPP: &str = "pstate-epp";
 
 pub(super) const ARG_RAPL_PACKAGE: &str = "rapl-package";
 pub(super) const ARG_RAPL_ZONE: &str = "rapl-zone";
-pub(super) const ARG_RAPL_LONG_LIMIT: &str = "rapl-long-limit";
-pub(super) const ARG_RAPL_LONG_WINDOW: &str = "rapl-long-window";
-pub(super) const ARG_RAPL_SHORT_LIMIT: &str = "rapl-short-limit";
-pub(super) const ARG_RAPL_SHORT_WINDOW: &str = "rapl-short-window";
+pub(crate) const ARG_RAPL_CONSTRAINT: &str = "rapl-constraint";
+pub(crate) const ARG_RAPL_LIMIT: &str = "rapl-limit";
+pub(crate) const ARG_RAPL_WINDOW: &str = "rapl-window";
 
 pub(super) const ARG_I915: &str = "i915";
 pub(super) const ARG_I915_MIN: &str = "i915-min";
@@ -202,38 +201,32 @@ fn app<'a, 'b>() -> clap::App<'a, 'b> {
                 .help("Target rapl sub-zone"),
         )
         .arg(
-            Arg::with_name(ARG_RAPL_LONG_LIMIT)
+            Arg::with_name(ARG_RAPL_CONSTRAINT)
+                .short("C")
+                .long(ARG_RAPL_CONSTRAINT)
+                .takes_value(true)
+                .value_name("INT")
+                .help("Target rapl constraint")
+        )
+        .arg(
+            Arg::with_name(ARG_RAPL_LIMIT)
                 .short("L")
-                .long(ARG_RAPL_LONG_LIMIT)
+                .long(ARG_RAPL_LIMIT)
                 .takes_value(true)
                 .value_name("WATTS")
-                .help("Set rapl long term power limit per --rapl-package/zone")
-                .requires(ARG_RAPL_PACKAGE),
+                .help("Set rapl power limit per --rapl-package/zone/constraint")
+                .requires(ARG_RAPL_PACKAGE)
+                .requires(ARG_RAPL_CONSTRAINT),
         )
         .arg(
-            Arg::with_name(ARG_RAPL_LONG_WINDOW)
-                .long(ARG_RAPL_LONG_WINDOW)
+            Arg::with_name(ARG_RAPL_WINDOW)
+                .short("W")
+                .long(ARG_RAPL_WINDOW)
                 .takes_value(true)
                 .value_name("SECS")
-                .help("Set rapl long term time window per --rapl-package/zone")
-                .requires(ARG_RAPL_PACKAGE),
-        )
-        .arg(
-            Arg::with_name(ARG_RAPL_SHORT_LIMIT)
-                .short("S")
-                .long(ARG_RAPL_SHORT_LIMIT)
-                .takes_value(true)
-                .value_name("WATTS")
-                .help("Set rapl short term power limit per --rapl-package/zone")
-                .requires(ARG_RAPL_PACKAGE),
-        )
-        .arg(
-            Arg::with_name(ARG_RAPL_SHORT_WINDOW)
-                .long(ARG_RAPL_SHORT_WINDOW)
-                .takes_value(true)
-                .value_name("SECS")
-                .help("Set rapl short term time window per --rapl-package/zone")
-                .requires(ARG_RAPL_PACKAGE),
+                .help("Set rapl power window per --rapl-package/zone/constraint")
+                .requires(ARG_RAPL_PACKAGE)
+                .requires(ARG_RAPL_CONSTRAINT),
         )
         .arg(
             Arg::with_name(ARG_I915)
@@ -410,7 +403,7 @@ impl<'a> Parser<'a> {
         S: FromStr<Err = Error>,
         T: From<S>,
     {
-        Ok(self.from_str::<S>(name)?.map(|v| T::from(v)))
+        Ok(self.from_str::<S>(name)?.map(T::from))
     }
 }
 
@@ -429,10 +422,9 @@ impl TryFrom<&Parser<'_>> for Values {
             pstate_epp: p.str(ARG_PSTATE_EPP),
             rapl_package: p.int::<u64>(ARG_RAPL_PACKAGE)?,
             rapl_zone: p.int::<u64>(ARG_RAPL_ZONE)?,
-            rapl_long_limit: p.from_str_as::<PowerStr, _>(ARG_RAPL_LONG_LIMIT)?,
-            rapl_long_window: p.from_str_as::<DurationStr, _>(ARG_RAPL_LONG_WINDOW)?,
-            rapl_short_limit: p.from_str_as::<PowerStr, _>(ARG_RAPL_SHORT_LIMIT)?,
-            rapl_short_window: p.from_str_as::<DurationStr, _>(ARG_RAPL_SHORT_WINDOW)?,
+            rapl_constraint: p.int::<u64>(ARG_RAPL_CONSTRAINT)?,
+            rapl_limit: p.from_str_as::<PowerStr, _>(ARG_RAPL_LIMIT)?,
+            rapl_window: p.from_str_as::<DurationStr, _>(ARG_RAPL_WINDOW)?,
             i915: p.from_str_as::<CardIds, _>(ARG_I915)?,
             i915_min: p.from_str_as::<FrequencyStr, _>(ARG_I915_MIN)?,
             i915_max: p.from_str_as::<FrequencyStr, _>(ARG_I915_MAX)?,

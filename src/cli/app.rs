@@ -22,25 +22,25 @@ use crate::{Machine, Values as _};
 pub struct Cli {
     pub(in crate::cli) quiet: Option<()>,
     pub(in crate::cli) show_cpu: Option<()>,
+    pub(in crate::cli) show_pstate: Option<()>,
+    pub(in crate::cli) show_rapl: Option<()>,
     pub(in crate::cli) show_i915: Option<()>,
     #[cfg(feature = "nvml")]
     pub(in crate::cli) show_nvml: Option<()>,
-    pub(in crate::cli) show_pstate: Option<()>,
-    pub(in crate::cli) show_rapl: Option<()>,
     pub(in crate::cli) profile: Option<Profile>,
     pub(in crate::cli) values: Vec<Values>,
 }
 
 impl Cli {
     pub async fn new(argv: &[String]) -> Result<Self> {
+        log::debug!("Argv: {:?}", argv);
         log::debug!("Profile config paths: {:#?}", config_paths().await);
         let p = Parser::new(argv)?;
         let mut values = vec![];
         let profile = if let Some(pr) = p.str(ARG_PROFILE) {
             let pr = Profile::new(pr).await?;
-            for mut v in pr.values().await? {
+            for v in pr.values().await? {
                 if v.has_values() {
-                    v.resolve().await;
                     values.push(v);
                 }
             }
@@ -48,27 +48,26 @@ impl Cli {
         } else {
             None
         };
-        for mut v in Vec::try_from(&p)? {
+        for v in Vec::try_from(&p)? {
             if v.has_values() {
-                v.resolve().await;
                 values.push(v);
             }
         }
         let quiet = p.flag(ARG_QUIET);
         let show_cpu = p.flag(ARG_SHOW_CPU);
+        let show_pstate = p.flag(ARG_SHOW_PSTATE);
+        let show_rapl = p.flag(ARG_SHOW_RAPL);
         let show_i915 = p.flag(ARG_SHOW_I915);
         #[cfg(feature = "nvml")]
         let show_nvml = p.flag(ARG_SHOW_NV);
-        let show_pstate = p.flag(ARG_SHOW_PSTATE);
-        let show_rapl = p.flag(ARG_SHOW_RAPL);
         let s = Self {
             quiet,
             show_cpu,
+            show_pstate,
+            show_rapl,
             show_i915,
             #[cfg(feature = "nvml")]
             show_nvml,
-            show_pstate,
-            show_rapl,
             profile,
             values,
         };
@@ -122,7 +121,7 @@ impl Cli {
     pub async fn run(&self) -> Result<()> {
         let mut samplers = Samplers::start(self).await;
         for v in &self.values {
-            let m = Machine::from(v);
+            let m = v.as_machine().await;
             m.write().await;
         }
         if let Some(p) = self.profile.as_ref() {
