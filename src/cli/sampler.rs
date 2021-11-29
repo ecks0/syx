@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
 use crate::cli::Cli;
-use crate::sysfs::intel_rapl as rapl;
+use crate::intel_rapl as rapl;
 
 #[derive(Clone, Debug)]
 pub(in crate::cli) struct Samplers {

@@ -1,15 +1,25 @@
 #[cfg(feature = "cli")]
 pub mod cli;
+pub mod cpu;
+pub mod cpufreq;
+pub mod i915;
+pub mod intel_pstate;
+pub mod intel_rapl;
 #[cfg(feature = "nvml")]
 pub mod nvml;
-pub mod sysfs;
+pub(crate) mod sysfs;
+
+pub use cpu::Cpu;
+pub use cpufreq::Cpufreq;
+pub use i915::I915;
+pub use intel_pstate::IntelPstate;
+pub use intel_rapl::IntelRapl;
+#[cfg(feature = "nvml")]
+pub use nvml::Nvml;
 
 use std::time::Duration;
 
 use async_trait::async_trait;
-#[cfg(feature = "nvml")]
-use nvml::Nvml;
-use sysfs::{Cpu, Cpufreq, IntelPstate, IntelRapl, I915};
 use tokio::time::sleep;
 
 #[async_trait]
@@ -53,10 +63,10 @@ async fn set_cpus_online(cpu_ids: Vec<u64>) -> Vec<u64> {
     if cpu_ids.is_empty() {
         return Default::default();
     }
-    let offline = sysfs::cpu::devices_offline().await.unwrap_or_default();
+    let offline = crate::cpu::devices_offline().await.unwrap_or_default();
     let mut onlined = vec![];
     for cpu_id in cpu_ids {
-        if offline.contains(&cpu_id) && sysfs::cpu::set_online(cpu_id, true).await.is_ok() {
+        if offline.contains(&cpu_id) && crate::cpu::set_online(cpu_id, true).await.is_ok() {
             onlined.push(cpu_id);
         }
     }
@@ -70,10 +80,10 @@ async fn set_cpus_offline(cpu_ids: Vec<u64>) -> Vec<u64> {
     if cpu_ids.is_empty() {
         return Default::default();
     }
-    let online = sysfs::cpu::devices_online().await.unwrap_or_default();
+    let online = crate::cpu::devices_online().await.unwrap_or_default();
     let mut offlined = vec![];
     for cpu_id in cpu_ids {
-        if online.contains(&cpu_id) && sysfs::cpu::set_online(cpu_id, false).await.is_ok() {
+        if online.contains(&cpu_id) && crate::cpu::set_online(cpu_id, false).await.is_ok() {
             offlined.push(cpu_id);
         }
     }

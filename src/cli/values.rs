@@ -9,12 +9,12 @@ use tokio::sync::OnceCell;
 use crate::cli::{Error, Result};
 #[cfg(feature = "nvml")]
 use crate::nvml;
-use crate::{sysfs, Values as _};
+use crate::Values as _;
 
 async fn cpu_ids() -> &'static Vec<u64> {
     static CPU_IDS: OnceCell<Vec<u64>> = OnceCell::const_new();
     async fn cpu_ids() -> Vec<u64> {
-        sysfs::cpu::Device::ids().await
+        crate::cpu::Device::ids().await
     }
     CPU_IDS.get_or_init(cpu_ids).await
 }
@@ -22,7 +22,7 @@ async fn cpu_ids() -> &'static Vec<u64> {
 async fn i915_ids() -> &'static Vec<u64> {
     static I915_IDS: OnceCell<Vec<u64>> = OnceCell::const_new();
     async fn i915_ids() -> Vec<u64> {
-        sysfs::i915::Device::ids().await
+        crate::i915::Device::ids().await
     }
     I915_IDS.get_or_init(i915_ids).await
 }
@@ -192,7 +192,7 @@ impl Values {
         b
     }
 
-    async fn as_cpu(&self) -> Option<sysfs::Cpu> {
+    async fn as_cpu(&self) -> Option<crate::Cpu> {
         if !self.has_cpu_values() {
             return None;
         }
@@ -200,11 +200,11 @@ impl Values {
             Some(v) => v,
             None => cpu_ids().await,
         }.clone();
-        let mut devices: Vec<sysfs::cpu::Device> = cpu
+        let mut devices: Vec<crate::cpu::Device> = cpu
             .into_iter()
             .map(|id| {
                 let online = self.cpu_on;
-                sysfs::cpu::Device { id, online }
+                crate::cpu::Device { id, online }
             })
             .collect();
         if let Some(cpu_on_each) = self.cpu_on_each.clone() {
@@ -213,17 +213,17 @@ impl Values {
                     p.online = Some(online);
                 } else {
                     let online = Some(online);
-                    let d = sysfs::cpu::Device { id, online };
+                    let d = crate::cpu::Device { id, online };
                     devices.push(d);
                 }
             }
         }
         devices.sort_unstable_by(|a, b| a.id.cmp(&b.id));
-        let r = sysfs::Cpu { devices };
+        let r = crate::Cpu { devices };
         Some(r)
     }
 
-    async fn as_cpufreq(&self) -> Option<sysfs::Cpufreq> {
+    async fn as_cpufreq(&self) -> Option<crate::Cpufreq> {
         if !self.has_cpufreq_values() {
             return None;
         }
@@ -233,11 +233,11 @@ impl Values {
         }.clone();
         let scaling_min_freq = self.cpufreq_min.map(|f| f.as_kilohertz().round() as u64);
         let scaling_max_freq = self.cpufreq_max.map(|f| f.as_kilohertz().round() as u64);
-        let devices: Vec<sysfs::cpufreq::Device> = cpu
+        let devices: Vec<crate::cpufreq::Device> = cpu
             .into_iter()
             .map(|id| {
                 let scaling_governor = self.cpufreq_gov.clone();
-                sysfs::cpufreq::Device {
+                crate::cpufreq::Device {
                     id,
                     scaling_governor,
                     scaling_min_freq,
@@ -246,10 +246,10 @@ impl Values {
                 }
             })
             .collect();
-        let r = sysfs::Cpufreq { devices };
+        let r = crate::Cpufreq { devices };
         Some(r)
     }
-    async fn as_intel_pstate(&self) -> Option<sysfs::IntelPstate> {
+    async fn as_intel_pstate(&self) -> Option<crate::IntelPstate> {
         if !self.has_pstate_values() {
             return None;
         }
@@ -258,11 +258,11 @@ impl Values {
             None => cpu_ids().await,
         }.clone();
         let energy_perf_bias = self.pstate_epb;
-        let devices: Vec<sysfs::intel_pstate::Device> = cpu
+        let devices: Vec<crate::intel_pstate::Device> = cpu
             .into_iter()
             .map(|id| {
                 let energy_performance_preference = self.pstate_epp.clone();
-                sysfs::intel_pstate::Device {
+                crate::intel_pstate::Device {
                     id,
                     energy_perf_bias,
                     energy_performance_preference,
@@ -270,38 +270,38 @@ impl Values {
                 }
             })
             .collect();
-        let r = sysfs::intel_pstate::IntelPstate {
+        let r = crate::intel_pstate::IntelPstate {
             devices,
             ..Default::default()
         };
         Some(r)
     }
 
-    async fn as_intel_rapl(&self) -> Option<sysfs::IntelRapl> {
+    async fn as_intel_rapl(&self) -> Option<crate::IntelRapl> {
         let zone = self.rapl_package?;
         let id = self.rapl_constraint?;
         let subzone = self.rapl_zone;
         let power_limit_uw = self.rapl_limit.map(|v| v.as_microwatts().round() as u64);
         let time_window_us = self.rapl_window.map(|v| v.as_micros().try_into().unwrap());
-        let constraint = sysfs::intel_rapl::Constraint {
+        let constraint = crate::intel_rapl::Constraint {
             id,
             power_limit_uw,
             time_window_us,
             ..Default::default()
         };
-        let id = sysfs::intel_rapl::ZoneId { zone, subzone };
+        let id = crate::intel_rapl::ZoneId { zone, subzone };
         let constraints = vec![constraint];
-        let device = sysfs::intel_rapl::Device {
+        let device = crate::intel_rapl::Device {
             id,
             constraints,
             ..Default::default()
         };
         let devices = vec![device];
-        let r = sysfs::IntelRapl { devices };
+        let r = crate::IntelRapl { devices };
         Some(r)
     }
 
-    async fn as_i915(&self) -> Option<sysfs::I915> {
+    async fn as_i915(&self) -> Option<crate::I915> {
         if !self.has_i915_values() {
             return None;
         }
@@ -317,7 +317,7 @@ impl Values {
         let min_freq_mhz = self.i915_min.map(|f| f.as_megahertz().round() as u64);
         let max_freq_mhz = self.i915_max.map(|f| f.as_megahertz().round() as u64);
         let boost_freq_mhz = self.i915_boost.map(|f| f.as_megahertz().round() as u64);
-        let devices: Vec<sysfs::i915::Device> = i915
+        let devices: Vec<crate::i915::Device> = i915
             .into_iter()
             .map(|id| {
                 let id = match id {
@@ -326,7 +326,7 @@ impl Values {
                         panic!("Indexing i915 devices by PCI ID is not yet implemented")
                     },
                 };
-                sysfs::i915::Device {
+                crate::i915::Device {
                     id,
                     min_freq_mhz,
                     max_freq_mhz,
@@ -335,7 +335,7 @@ impl Values {
                 }
             })
             .collect();
-        let r = sysfs::I915 { devices };
+        let r = crate::I915 { devices };
         Some(r)
     }
 

@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 
-use crate::sysfs::intel_rapl::{energy_uj, Device, ZoneId};
+use crate::intel_rapl::{energy_uj, Device, ZoneId};
 use crate::Values as _;
 
 fn umean(n: &[u64]) -> f64 {

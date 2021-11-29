@@ -6,8 +6,8 @@ use tokio::io::{AsyncWrite, AsyncWriteExt, Error as IoError};
 
 #[cfg(feature = "nvml")]
 use crate::nvml;
-use crate::sysfs::intel_rapl::Samplers;
-use crate::{sysfs, Machine};
+use crate::intel_rapl::Samplers;
+use crate::Machine;
 
 type Result<T> = std::result::Result<T, IoError>;
 
@@ -115,7 +115,7 @@ where
             return None;
         }
         let cpufreq_devs = machine.cpufreq.as_ref().map(|c| &c.devices);
-        let cpufreq_dev_default = sysfs::cpufreq::Device::default();
+        let cpufreq_dev_default = crate::cpufreq::Device::default();
         let mut tab = Table::new(&[
             "CPU", "Online", "Governor", "Cur", "Min", "Max", "CPU min", "CPU max",
         ]);
@@ -232,7 +232,7 @@ where
         Some(format!(" intel_pstate: {}\n\n", status))
     }
 
-    fn epb_epp(devices: &[sysfs::intel_pstate::Device]) -> String {
+    fn epb_epp(devices: &[crate::intel_pstate::Device]) -> String {
         let mut values: Vec<(u64, String)> = devices
             .iter()
             .filter_map(|d| {
@@ -267,7 +267,7 @@ where
         nl(tab.to_string())
     }
 
-    fn epps(devices: &[sysfs::intel_pstate::Device]) -> String {
+    fn epps(devices: &[crate::intel_pstate::Device]) -> String {
         let mut prefs: Vec<String> = devices
             .iter()
             .filter_map(|d| {

@@ -1,8 +1,8 @@
 pub mod path {
     use std::path::PathBuf;
 
-    use crate::sysfs::cpu::path::device_attr as cpu_device_attr;
-    use crate::sysfs::cpufreq::path::device_attr as cpufreq_device_attr;
+    use crate::cpu::path::device_attr as cpu_device_attr;
+    use crate::cpufreq::path::device_attr as cpufreq_device_attr;
 
     pub fn energy_perf_bias(id: u64) -> PathBuf {
         let mut p = cpu_device_attr(id, "power");
@@ -51,7 +51,7 @@ pub mod path {
 
 use async_trait::async_trait;
 
-pub use crate::sysfs::cpufreq::devices;
+pub use crate::cpufreq::devices;
 use crate::sysfs::{self, Result};
 use crate::{Feature, Values};
 
