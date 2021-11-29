@@ -4,9 +4,9 @@ use comfy_table as ct;
 use measurements::{Frequency, Power};
 use tokio::io::{AsyncWrite, AsyncWriteExt, Error as IoError};
 
+use crate::intel_rapl::Samplers;
 #[cfg(feature = "nvml")]
 use crate::nvml;
-use crate::intel_rapl::Samplers;
 use crate::Machine;
 
 type Result<T> = std::result::Result<T, IoError>;

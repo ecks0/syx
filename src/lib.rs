@@ -9,6 +9,9 @@ pub mod intel_rapl;
 pub mod nvml;
 pub(crate) mod sysfs;
 
+use std::time::Duration;
+
+use async_trait::async_trait;
 pub use cpu::Cpu;
 pub use cpufreq::Cpufreq;
 pub use i915::I915;
@@ -16,10 +19,6 @@ pub use intel_pstate::IntelPstate;
 pub use intel_rapl::IntelRapl;
 #[cfg(feature = "nvml")]
 pub use nvml::Nvml;
-
-use std::time::Duration;
-
-use async_trait::async_trait;
 use tokio::time::sleep;
 
 #[async_trait]

@@ -206,7 +206,7 @@ fn app<'a, 'b>() -> clap::App<'a, 'b> {
                 .long(ARG_RAPL_CONSTRAINT)
                 .takes_value(true)
                 .value_name("INT")
-                .help("Target rapl constraint")
+                .help("Target rapl constraint"),
         )
         .arg(
             Arg::with_name(ARG_RAPL_LIMIT)

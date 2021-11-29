@@ -182,8 +182,10 @@ pub async fn constraint_id_for_name(
 ) -> Option<u64> {
     for id in 0.. {
         match constraint_name(zone_id, subzone_id, id).await {
-            Ok(n) => if n == name {
-                return Some(id);
+            Ok(n) => {
+                if n == name {
+                    return Some(id);
+                }
             },
             _ => break,
         }

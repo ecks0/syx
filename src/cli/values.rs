@@ -199,7 +199,8 @@ impl Values {
         let cpu = match self.cpu.as_ref() {
             Some(v) => v,
             None => cpu_ids().await,
-        }.clone();
+        }
+        .clone();
         let mut devices: Vec<crate::cpu::Device> = cpu
             .into_iter()
             .map(|id| {
@@ -230,7 +231,8 @@ impl Values {
         let cpu = match self.cpu.as_ref() {
             Some(v) => v,
             None => cpu_ids().await,
-        }.clone();
+        }
+        .clone();
         let scaling_min_freq = self.cpufreq_min.map(|f| f.as_kilohertz().round() as u64);
         let scaling_max_freq = self.cpufreq_max.map(|f| f.as_kilohertz().round() as u64);
         let devices: Vec<crate::cpufreq::Device> = cpu
@@ -249,6 +251,7 @@ impl Values {
         let r = crate::Cpufreq { devices };
         Some(r)
     }
+
     async fn as_intel_pstate(&self) -> Option<crate::IntelPstate> {
         if !self.has_pstate_values() {
             return None;
@@ -256,7 +259,8 @@ impl Values {
         let cpu = match self.cpu.as_ref() {
             Some(v) => v,
             None => cpu_ids().await,
-        }.clone();
+        }
+        .clone();
         let energy_perf_bias = self.pstate_epb;
         let devices: Vec<crate::intel_pstate::Device> = cpu
             .into_iter()
@@ -312,7 +316,7 @@ impl Values {
                 .clone()
                 .into_iter()
                 .map(|id| CardId::Index(id as u64))
-                .collect()
+                .collect(),
         };
         let min_freq_mhz = self.i915_min.map(|f| f.as_megahertz().round() as u64);
         let max_freq_mhz = self.i915_max.map(|f| f.as_megahertz().round() as u64);
