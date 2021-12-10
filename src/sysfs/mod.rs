@@ -2,7 +2,7 @@ mod log;
 
 use std::path::{Path, PathBuf};
 
-use tokio::io::Error as IoError;
+use tokio::io::{AsyncReadExt as _, Error as IoError};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -111,9 +111,13 @@ pub(crate) async fn read_link_name(path: &Path) -> Result<String> {
 }
 
 pub(crate) async fn read_to_trimmed_string(path: &Path) -> std::result::Result<String, IoError> {
-    tokio::fs::read_to_string(path)
-        .await
-        .map(|s| s.trim_end_matches('\n').to_string())
+    let mut f = tokio::fs::File::open(path).await?;
+    let mut buf = [0u8; 256];
+    let n = f.read(&mut buf).await?;
+    let r = String::from_utf8_lossy(&buf[0..n])
+        .trim_end_matches('\n')
+        .to_string();
+    Ok(r)
 }
 
 pub(crate) async fn read_str(path: &Path) -> Result<String> {

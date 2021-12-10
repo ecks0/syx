@@ -1,175 +1,138 @@
-#[cfg(feature = "cli")]
-pub mod cli;
+// #[cfg(feature = "cli")]
+// pub mod cli;
 pub mod cpu;
 pub mod cpufreq;
+pub mod drm;
 pub mod i915;
 pub mod intel_pstate;
 pub mod intel_rapl;
 #[cfg(feature = "nvml")]
-pub mod nvml;
+pub mod nv;
+pub mod prelude;
 pub(crate) mod sysfs;
-
-use std::time::Duration;
+pub(crate) mod util;
 
 use async_trait::async_trait;
-pub use cpu::Cpu;
-pub use cpufreq::Cpufreq;
-pub use i915::I915;
-pub use intel_pstate::IntelPstate;
-pub use intel_rapl::IntelRapl;
-#[cfg(feature = "nvml")]
-pub use nvml::Nvml;
-use tokio::time::sleep;
+
+#[async_trait]
+pub trait Read {
+    async fn read(&mut self);
+}
+
+#[async_trait]
+pub trait Write {
+    async fn write(&self);
+}
+
+pub trait Values {
+    fn is_empty(&self) -> bool;
+
+    fn clear(&mut self);
+}
+
+#[async_trait]
+pub trait Single: Default + Read + Send + Sized + Values {
+    async fn load() -> Self {
+        let mut s = Self::default();
+        s.read().await;
+        s
+    }
+}
+
+#[async_trait]
+pub trait Multi: Default + PartialEq + Read + Send + Sized + Values {
+    type Id: Send + Sized;
+
+    async fn ids() -> Vec<Self::Id>;
+
+    async fn load(id: Self::Id) -> Self {
+        let mut s = Self::new(id);
+        s.read().await;
+        s
+    }
+
+    async fn load_all() -> Vec<Self> {
+        let mut all = vec![];
+        for id in Self::ids().await {
+            let s = Self::load(id).await;
+            all.push(s);
+        }
+        all
+    }
+
+    fn new(id: Self::Id) -> Self {
+        let mut s = Self::default();
+        s.set_id(id);
+        s
+    }
+
+    fn id(&self) -> Self::Id;
+
+    fn set_id(&mut self, v: Self::Id);
+}
 
 #[async_trait]
 pub trait Feature {
     async fn present() -> bool;
 }
 
-#[async_trait]
-pub trait Values {
-    type Id: Sized + Send;
-    type Output: Sized + Send;
-
-    async fn ids() -> Vec<Self::Id>;
-
-    async fn all() -> Vec<Self::Output> {
-        let mut all = vec![];
-        for id in Self::ids().await {
-            if let Some(output) = Self::read(id).await {
-                all.push(output);
-            }
-        }
-        all
-    }
-
-    async fn read(id: Self::Id) -> Option<Self::Output>;
-
-    async fn write(&self);
-}
-
-async fn wait_for_cpu_onoff() {
-    const WAIT_FOR_CPU_ONOFF: Duration = Duration::from_millis(300);
-    sleep(WAIT_FOR_CPU_ONOFF).await
-}
-
-async fn wait_for_cpu_related() {
-    const WAIT_FOR_CPU_RELATED: Duration = Duration::from_millis(100);
-    sleep(WAIT_FOR_CPU_RELATED).await
-}
-
-async fn set_cpus_online(cpu_ids: Vec<u64>) -> Vec<u64> {
-    if cpu_ids.is_empty() {
-        return Default::default();
-    }
-    let offline = crate::cpu::devices_offline().await.unwrap_or_default();
-    let mut onlined = vec![];
-    for cpu_id in cpu_ids {
-        if offline.contains(&cpu_id) && crate::cpu::set_online(cpu_id, true).await.is_ok() {
-            onlined.push(cpu_id);
-        }
-    }
-    if !onlined.is_empty() {
-        wait_for_cpu_onoff().await;
-    }
-    onlined
-}
-
-async fn set_cpus_offline(cpu_ids: Vec<u64>) -> Vec<u64> {
-    if cpu_ids.is_empty() {
-        return Default::default();
-    }
-    let online = crate::cpu::devices_online().await.unwrap_or_default();
-    let mut offlined = vec![];
-    for cpu_id in cpu_ids {
-        if online.contains(&cpu_id) && crate::cpu::set_online(cpu_id, false).await.is_ok() {
-            offlined.push(cpu_id);
-        }
-    }
-    if !offlined.is_empty() {
-        wait_for_cpu_onoff().await;
-    }
-    offlined
-}
-
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Machine {
-    pub cpu: Option<Cpu>,
-    pub cpufreq: Option<Cpufreq>,
-    pub i915: Option<I915>,
-    pub intel_pstate: Option<IntelPstate>,
-    pub intel_rapl: Option<IntelRapl>,
+pub struct System {
+    pub cpu: cpu::System,
+    pub cpufreq: cpufreq::System,
+    pub i915: i915::System,
+    pub intel_pstate: intel_pstate::System,
+    pub intel_rapl: intel_rapl::System,
     #[cfg(feature = "nvml")]
-    pub nvml: Option<Nvml>,
+    pub nv: nv::System,
 }
 
 #[async_trait]
-impl Values for Machine {
-    type Id = ();
-    type Output = Self;
-
-    async fn ids() -> Vec<()> {
-        vec![()]
+impl Read for System {
+    async fn read(&mut self) {
+        self.cpu = cpu::System::load().await;
+        self.cpufreq = cpufreq::System::load().await;
+        self.i915 = i915::System::load().await;
+        self.intel_pstate = intel_pstate::System::load().await;
+        self.intel_rapl = intel_rapl::System::load().await;
+        #[cfg(feature = "nvml")] {
+            self.nv = nv::System::load().await;
+        }
     }
+}
 
-    async fn read(_: ()) -> Option<Self> {
-        let cpu = Cpu::read(()).await;
-        let cpufreq = Cpufreq::read(()).await;
-        let i915 = I915::read(()).await;
-        let intel_pstate = IntelPstate::read(()).await;
-        let intel_rapl = IntelRapl::read(()).await;
-        #[cfg(feature = "nvml")]
-        let nvml = Nvml::read(()).await;
-        let s = Self {
-            cpu,
-            cpufreq,
-            i915,
-            intel_pstate,
-            intel_rapl,
-            #[cfg(feature = "nvml")]
-            nvml,
-        };
-        Some(s)
-    }
-
+#[async_trait]
+impl Write for System {
     async fn write(&self) {
-        if self.cpufreq.is_some() || self.intel_pstate.is_some() {
-            let mut onlined = vec![];
-            if let Some(r) = &self.cpufreq {
-                onlined.extend(r.devices.iter().map(|d| d.id));
-            }
-            if let Some(r) = &self.intel_pstate {
-                onlined.extend(r.devices.iter().map(|d| d.id));
-            }
-            onlined.sort_unstable();
-            onlined.dedup();
-            let onlined = set_cpus_online(onlined).await;
-            if let Some(r) = self.cpufreq.as_ref() {
-                r.write().await;
-            }
-            if let Some(r) = self.cpufreq.as_ref() {
-                r.write().await;
-            }
-            wait_for_cpu_related().await;
-            set_cpus_offline(onlined).await;
+        if !self.cpufreq.is_empty() || !self.intel_pstate.is_empty() {
+            let mut ids = vec![];
+            ids.extend(self.cpufreq.devices.iter().map(|d| d.id));
+            ids.extend(self.intel_pstate.devices.iter().map(|d| d.id));
+            ids.sort_unstable();
+            ids.dedup();
+            let ids = util::set_cpus_online(ids).await;
+            self.cpufreq.write().await;
+            self.intel_pstate.write().await;
+            util::wait_for_cpu_related().await;
+            util::set_cpus_offline(ids).await;
         }
-        if let Some(r) = &self.cpu {
-            r.write().await;
-        }
-        if let Some(r) = &self.intel_rapl {
-            r.write().await;
-        }
-        if let Some(r) = &self.i915 {
-            r.write().await;
-        }
+        self.cpu.write().await;
+        self.intel_rapl.write().await;
+        self.i915.write().await;
         #[cfg(feature = "nvml")]
-        if let Some(r) = &self.nvml {
-            r.write().await;
-        }
+        self.nv.write().await;
     }
 }
 
-#[derive(Clone, Debug)]
-struct Value<T> {
-    cell: Option<T>,
+impl Values for System {
+    fn is_empty(&self) -> bool {
+        self.eq(&Self::default())
+    }
+
+    fn clear(&mut self) {
+        *self = Self::default();
+    }
 }
+
+#[async_trait]
+impl Single for System {}

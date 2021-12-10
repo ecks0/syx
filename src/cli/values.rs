@@ -192,7 +192,7 @@ impl Values {
         b
     }
 
-    async fn as_cpu(&self) -> Option<crate::Cpu> {
+    async fn as_cpu(&self) -> Option<crate::System> {
         if !self.has_cpu_values() {
             return None;
         }
@@ -220,11 +220,11 @@ impl Values {
             }
         }
         devices.sort_unstable_by(|a, b| a.id.cmp(&b.id));
-        let r = crate::Cpu { devices };
+        let r = crate::System { cpus: devices };
         Some(r)
     }
 
-    async fn as_cpufreq(&self) -> Option<crate::Cpufreq> {
+    async fn as_cpufreq(&self) -> Option<crate::System> {
         if !self.has_cpufreq_values() {
             return None;
         }
@@ -248,11 +248,11 @@ impl Values {
                 }
             })
             .collect();
-        let r = crate::Cpufreq { devices };
+        let r = crate::System { devices };
         Some(r)
     }
 
-    async fn as_intel_pstate(&self) -> Option<crate::IntelPstate> {
+    async fn as_intel_pstate(&self) -> Option<crate::System> {
         if !self.has_pstate_values() {
             return None;
         }
@@ -274,14 +274,14 @@ impl Values {
                 }
             })
             .collect();
-        let r = crate::intel_pstate::IntelPstate {
+        let r = crate::intel_pstate::System {
             devices,
             ..Default::default()
         };
         Some(r)
     }
 
-    async fn as_intel_rapl(&self) -> Option<crate::IntelRapl> {
+    async fn as_intel_rapl(&self) -> Option<crate::System> {
         let zone = self.rapl_package?;
         let id = self.rapl_constraint?;
         let subzone = self.rapl_zone;
@@ -301,11 +301,11 @@ impl Values {
             ..Default::default()
         };
         let devices = vec![device];
-        let r = crate::IntelRapl { devices };
+        let r = crate::System { devices };
         Some(r)
     }
 
-    async fn as_i915(&self) -> Option<crate::I915> {
+    async fn as_i915(&self) -> Option<crate::System> {
         if !self.has_i915_values() {
             return None;
         }
@@ -339,7 +339,7 @@ impl Values {
                 }
             })
             .collect();
-        let r = crate::I915 { devices };
+        let r = crate::System { devices };
         Some(r)
     }
 

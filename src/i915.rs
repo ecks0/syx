@@ -1,57 +1,57 @@
-pub mod path {
+pub(crate) mod path {
     use std::path::PathBuf;
 
-    pub fn root() -> PathBuf {
+    pub(crate) fn root() -> PathBuf {
         PathBuf::from("/sys/class/drm")
     }
 
-    pub fn device(id: u64) -> PathBuf {
+    pub(crate) fn device(id: u64) -> PathBuf {
         let mut p = root();
         p.push(format!("card{}", id));
         p
     }
 
-    pub fn device_attr(id: u64, s: &str) -> PathBuf {
+    pub(crate) fn device_attr(id: u64, s: &str) -> PathBuf {
         let mut p = device(id);
         p.push(s);
         p
     }
 
-    pub fn driver(id: u64) -> PathBuf {
+    pub(crate) fn driver(id: u64) -> PathBuf {
         let mut p = device_attr(id, "device");
         p.push("driver");
         p
     }
 
-    pub fn act_freq_mhz(id: u64) -> PathBuf {
+    pub(crate) fn act_freq_mhz(id: u64) -> PathBuf {
         device_attr(id, "gt_act_freq_mhz")
     }
 
-    pub fn boost_freq_mhz(id: u64) -> PathBuf {
+    pub(crate) fn boost_freq_mhz(id: u64) -> PathBuf {
         device_attr(id, "gt_boost_freq_mhz")
     }
 
-    pub fn cur_freq_mhz(id: u64) -> PathBuf {
+    pub(crate) fn cur_freq_mhz(id: u64) -> PathBuf {
         device_attr(id, "gt_cur_freq_mhz")
     }
 
-    pub fn max_freq_mhz(id: u64) -> PathBuf {
+    pub(crate) fn max_freq_mhz(id: u64) -> PathBuf {
         device_attr(id, "gt_max_freq_mhz")
     }
 
-    pub fn min_freq_mhz(id: u64) -> PathBuf {
+    pub(crate) fn min_freq_mhz(id: u64) -> PathBuf {
         device_attr(id, "gt_min_freq_mhz")
     }
 
-    pub fn rp0_freq_mhz(id: u64) -> PathBuf {
+    pub(crate) fn rp0_freq_mhz(id: u64) -> PathBuf {
         device_attr(id, "gt_RP0_freq_mhz")
     }
 
-    pub fn rp1_freq_mhz(id: u64) -> PathBuf {
+    pub(crate) fn rp1_freq_mhz(id: u64) -> PathBuf {
         device_attr(id, "gt_RP1_freq_mhz")
     }
 
-    pub fn rpn_freq_mhz(id: u64) -> PathBuf {
+    pub(crate) fn rpn_freq_mhz(id: u64) -> PathBuf {
         device_attr(id, "gt_RPn_freq_mhz")
     }
 }
@@ -59,7 +59,7 @@ pub mod path {
 use async_trait::async_trait;
 
 use crate::sysfs::{self, Result};
-use crate::{Feature, Values};
+use crate::{Feature, Multi, Read, Single, Values, Write};
 
 pub async fn devices() -> Result<Vec<u64>> {
     let mut ids = vec![];
@@ -148,90 +148,110 @@ pub struct Device {
 }
 
 #[async_trait]
-impl Values for Device {
-    type Id = u64;
-    type Output = Self;
-
-    async fn ids() -> Vec<u64> {
-        devices().await.ok().unwrap_or_default()
+impl Read for Device {
+    async fn read(&mut self) {
+        self.act_freq_mhz = act_freq_mhz(self.id).await.ok();
+        self.boost_freq_mhz = boost_freq_mhz(self.id).await.ok();
+        self.cur_freq_mhz = cur_freq_mhz(self.id).await.ok();
+        self.max_freq_mhz = max_freq_mhz(self.id).await.ok();
+        self.min_freq_mhz = min_freq_mhz(self.id).await.ok();
+        self.rp0_freq_mhz = rp0_freq_mhz(self.id).await.ok();
+        self.rp1_freq_mhz = rp1_freq_mhz(self.id).await.ok();
+        self.rpn_freq_mhz = rpn_freq_mhz(self.id).await.ok();
     }
+}
 
-    async fn read(id: u64) -> Option<Self> {
-        let act_freq_mhz = act_freq_mhz(id).await.ok();
-        let boost_freq_mhz = boost_freq_mhz(id).await.ok();
-        let cur_freq_mhz = cur_freq_mhz(id).await.ok();
-        let max_freq_mhz = max_freq_mhz(id).await.ok();
-        let min_freq_mhz = min_freq_mhz(id).await.ok();
-        let rp0_freq_mhz = rp0_freq_mhz(id).await.ok();
-        let rp1_freq_mhz = rp1_freq_mhz(id).await.ok();
-        let rpn_freq_mhz = rpn_freq_mhz(id).await.ok();
-        let s = Self {
-            id,
-            act_freq_mhz,
-            boost_freq_mhz,
-            cur_freq_mhz,
-            max_freq_mhz,
-            min_freq_mhz,
-            rp0_freq_mhz,
-            rp1_freq_mhz,
-            rpn_freq_mhz,
-        };
-        Some(s)
-    }
-
+#[async_trait]
+impl Write for Device {
     async fn write(&self) {
-        if let Some(val) = self.boost_freq_mhz {
-            let _ = set_boost_freq_mhz(self.id, val).await;
+        if let Some(v) = self.boost_freq_mhz {
+            let _ = set_boost_freq_mhz(self.id, v).await;
         }
-        if let Some(val) = self.max_freq_mhz {
-            let _ = set_max_freq_mhz(self.id, val).await;
+        if let Some(v) = self.max_freq_mhz {
+            let _ = set_max_freq_mhz(self.id, v).await;
         }
-        if let Some(val) = self.min_freq_mhz {
-            let _ = set_min_freq_mhz(self.id, val).await;
+        if let Some(v) = self.min_freq_mhz {
+            let _ = set_min_freq_mhz(self.id, v).await;
         }
-        if let Some(val) = self.rp0_freq_mhz {
-            let _ = set_rp0_freq_mhz(self.id, val).await;
+        if let Some(v) = self.rp0_freq_mhz {
+            let _ = set_rp0_freq_mhz(self.id, v).await;
         }
-        if let Some(val) = self.rp1_freq_mhz {
-            let _ = set_rp1_freq_mhz(self.id, val).await;
+        if let Some(v) = self.rp1_freq_mhz {
+            let _ = set_rp1_freq_mhz(self.id, v).await;
         }
-        if let Some(val) = self.rpn_freq_mhz {
-            let _ = set_rpn_freq_mhz(self.id, val).await;
+        if let Some(v) = self.rpn_freq_mhz {
+            let _ = set_rpn_freq_mhz(self.id, v).await;
         }
+    }
+}
+
+#[async_trait]
+impl Values for Device {
+    fn is_empty(&self) -> bool {
+        self.eq(&Self::new(self.id))
+    }
+
+    fn clear(&mut self) {
+        *self = Self::new(self.id);
+    }
+}
+
+#[async_trait]
+impl Multi for Device {
+    type Id = u64;
+
+    async fn ids() -> Vec<Self::Id> {
+        devices().await.unwrap_or_default()
+    }
+
+    fn id(&self) -> Self::Id {
+        self.id
+    }
+
+    fn set_id(&mut self, v: Self::Id) {
+        self.id = v;
     }
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct I915 {
-    pub devices: Vec<Device>,
+pub struct System {
+    devices: Vec<Device>,
 }
 
 #[async_trait]
-impl Feature for I915 {
-    async fn present() -> bool {
-        !Self::ids().await.is_empty()
+impl Read for System {
+    async fn read(&mut self) {
+        self.devices.clear();
+        self.devices.extend(Device::load_all().await);
     }
 }
 
 #[async_trait]
-impl Values for I915 {
-    type Id = ();
-    type Output = Self;
-
-    async fn ids() -> Vec<()> {
-        vec![()]
-    }
-
-    async fn read(_: ()) -> Option<Self> {
-        let devices = Device::all().await;
-        let s = Self { devices };
-        Some(s)
-    }
-
+impl Write for System {
     async fn write(&self) {
         for device in &self.devices {
             device.write().await;
         }
+    }
+}
+
+#[async_trait]
+impl Values for System {
+    fn is_empty(&self) -> bool {
+        self.devices.is_empty()
+    }
+
+    fn clear(&mut self) {
+        self.devices.clear();
+    }
+}
+
+impl Single for System {}
+
+#[async_trait]
+impl Feature for System {
+    async fn present() -> bool {
+        !Device::ids().await.is_empty()
     }
 }

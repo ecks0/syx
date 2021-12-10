@@ -1,51 +1,51 @@
-pub mod path {
+pub(crate) mod path {
     use std::path::PathBuf;
 
-    pub fn root() -> PathBuf {
+    pub(crate) fn root() -> PathBuf {
         PathBuf::from("/sys/devices/system/cpu/cpufreq")
     }
 
-    pub fn device(id: u64) -> PathBuf {
+    pub(crate) fn device(id: u64) -> PathBuf {
         let mut p = root();
         p.push(&format!("policy{}", id));
         p
     }
 
-    pub fn device_attr(id: u64, a: &str) -> PathBuf {
-        let mut p = device(id);
+    pub(crate) fn device_attr(i: u64, a: &str) -> PathBuf {
+        let mut p = device(i);
         p.push(a);
         p
     }
 
-    pub fn cpuinfo_max_freq(id: u64) -> PathBuf {
+    pub(crate) fn cpuinfo_max_freq(id: u64) -> PathBuf {
         device_attr(id, "cpuinfo_max_freq")
     }
 
-    pub fn cpuinfo_min_freq(id: u64) -> PathBuf {
+    pub(crate) fn cpuinfo_min_freq(id: u64) -> PathBuf {
         device_attr(id, "cpuinfo_min_freq")
     }
 
-    pub fn scaling_cur_freq(id: u64) -> PathBuf {
+    pub(crate) fn scaling_cur_freq(id: u64) -> PathBuf {
         device_attr(id, "scaling_cur_freq")
     }
 
-    pub fn scaling_driver(id: u64) -> PathBuf {
+    pub(crate) fn scaling_driver(id: u64) -> PathBuf {
         device_attr(id, "scaling_driver")
     }
 
-    pub fn scaling_governor(id: u64) -> PathBuf {
+    pub(crate) fn scaling_governor(id: u64) -> PathBuf {
         device_attr(id, "scaling_governor")
     }
 
-    pub fn scaling_available_governors(id: u64) -> PathBuf {
+    pub(crate) fn scaling_available_governors(id: u64) -> PathBuf {
         device_attr(id, "scaling_available_governors")
     }
 
-    pub fn scaling_max_freq(id: u64) -> PathBuf {
+    pub(crate) fn scaling_max_freq(id: u64) -> PathBuf {
         device_attr(id, "scaling_max_freq")
     }
 
-    pub fn scaling_min_freq(id: u64) -> PathBuf {
+    pub(crate) fn scaling_min_freq(id: u64) -> PathBuf {
         device_attr(id, "scaling_min_freq")
     }
 }
@@ -53,7 +53,7 @@ pub mod path {
 use async_trait::async_trait;
 
 use crate::sysfs::{self, Result};
-use crate::{Feature, Values};
+use crate::{Feature, Multi, Read, Single, Values, Write, util};
 
 pub async fn devices() -> Result<Vec<u64>> {
     sysfs::read_ids(&path::root(), "policy").await
@@ -118,87 +118,112 @@ pub struct Device {
 }
 
 #[async_trait]
-impl Values for Device {
-    type Id = u64;
-    type Output = Self;
-
-    async fn ids() -> Vec<u64> {
-        devices().await.ok().unwrap_or_default()
+impl Read for Device {
+    async fn read(&mut self) {
+        self.cpuinfo_max_freq = cpuinfo_max_freq(self.id).await.ok();
+        self.cpuinfo_min_freq = cpuinfo_min_freq(self.id).await.ok();
+        self.scaling_cur_freq = scaling_cur_freq(self.id).await.ok();
+        self.scaling_driver = scaling_driver(self.id).await.ok();
+        self.scaling_governor = scaling_governor(self.id).await.ok();
+        self.scaling_available_governors = scaling_available_governors(self.id).await.ok();
+        self.scaling_max_freq = scaling_max_freq(self.id).await.ok();
+        self.scaling_min_freq = scaling_min_freq(self.id).await.ok();
     }
+}
 
-    async fn read(id: u64) -> Option<Self> {
-        let cpuinfo_max_freq = cpuinfo_max_freq(id).await.ok();
-        let cpuinfo_min_freq = cpuinfo_min_freq(id).await.ok();
-        let scaling_cur_freq = scaling_cur_freq(id).await.ok();
-        let scaling_driver = scaling_driver(id).await.ok();
-        let scaling_governor = scaling_governor(id).await.ok();
-        let scaling_available_governors = scaling_available_governors(id).await.ok();
-        let scaling_max_freq = scaling_max_freq(id).await.ok();
-        let scaling_min_freq = scaling_min_freq(id).await.ok();
-        let s = Self {
-            id,
-            cpuinfo_max_freq,
-            cpuinfo_min_freq,
-            scaling_cur_freq,
-            scaling_driver,
-            scaling_governor,
-            scaling_available_governors,
-            scaling_max_freq,
-            scaling_min_freq,
-        };
-        Some(s)
-    }
-
+#[async_trait]
+impl Write for Device {
     async fn write(&self) {
-        if let Some(val) = &self.scaling_governor {
-            let _ = set_scaling_governor(self.id, val).await;
+        if let Some(v) = &self.scaling_governor {
+            let _ = set_scaling_governor(self.id, v).await;
         }
-        if let Some(val) = self.scaling_max_freq {
-            let _ = set_scaling_max_freq(self.id, val).await;
+        if let Some(v) = self.scaling_max_freq {
+            let _ = set_scaling_max_freq(self.id, v).await;
         }
-        if let Some(val) = self.scaling_min_freq {
-            let _ = set_scaling_min_freq(self.id, val).await;
+        if let Some(v) = self.scaling_min_freq {
+            let _ = set_scaling_min_freq(self.id, v).await;
         }
+    }
+}
+
+#[async_trait]
+impl Values for Device {
+    fn is_empty(&self) -> bool {
+        self.eq(&Self::new(self.id))
+    }
+
+    fn clear(&mut self) {
+        *self = Self::new(self.id);
+    }
+}
+
+#[async_trait]
+impl Multi for Device {
+    type Id = u64;
+
+    async fn ids() -> Vec<Self::Id> {
+        devices().await.unwrap_or_default()
+    }
+
+    fn id(&self) -> Self::Id {
+        self.id
+    }
+
+    fn set_id(&mut self, v: Self::Id) {
+        self.id = v;
     }
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Cpufreq {
+pub struct System {
     pub devices: Vec<Device>,
 }
 
 #[async_trait]
-impl Feature for Cpufreq {
-    async fn present() -> bool {
-        path::root().is_dir()
+impl Read for System {
+    async fn read(&mut self) {
+        self.devices.clear();
+        self.devices.extend(Device::load_all().await);
     }
 }
 
 #[async_trait]
-impl Values for Cpufreq {
-    type Id = ();
-    type Output = Self;
-
-    async fn ids() -> Vec<()> {
-        vec![()]
-    }
-
-    async fn read(_: ()) -> Option<Self> {
-        let devices = Device::all().await;
-        let s = Self { devices };
-        Some(s)
-    }
-
+impl Write for System {
     async fn write(&self) {
-        let onlined = self.devices.iter().map(|d| d.id).collect();
-        let onlined = crate::set_cpus_online(onlined).await;
-        for device in &self.devices {
-            device.write().await;
-        }
         if !self.devices.is_empty() {
-            crate::wait_for_cpu_related().await;
+            let ids = self
+                .devices
+                .iter()
+                .filter_map(|d| if d.is_empty() { None } else { Some(d.id) })
+                .collect();
+            let ids = util::set_cpus_online(ids).await;
+            for device in &self.devices {
+                device.write().await;
+            }
+            util::wait_for_cpu_related().await;
+            util::set_cpus_offline(ids).await;
         }
-        crate::set_cpus_offline(onlined).await;
+    }
+}
+
+#[async_trait]
+impl Values for System {
+    fn is_empty(&self) -> bool {
+        self.devices.is_empty()
+    }
+
+    fn clear(&mut self) {
+        self.devices.clear();
+    }
+}
+
+#[async_trait]
+impl Single for System {}
+
+#[async_trait]
+impl Feature for System {
+    async fn present() -> bool {
+        path::root().is_dir()
     }
 }

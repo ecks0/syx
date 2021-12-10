@@ -18,7 +18,6 @@ cli = [
   "serde",
   "serde_yaml",
   "tokio/io-std",
-  "tokio/io-util",
   "tokio/macros",
   "tokio/rt-multi-thread",
 ]
@@ -46,6 +45,7 @@ version = "~1.14"
 default-features = false
 features = [
   "fs",
+  "io-util",
   "rt",
   "parking_lot",
   "sync",

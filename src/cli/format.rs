@@ -110,7 +110,7 @@ where
     }
 
     fn cpu_cpufreq(machine: &Machine) -> Option<String> {
-        let cpu_devs = &machine.cpu.as_ref()?.devices;
+        let cpu_devs = &machine.cpu.as_ref()?.cpus;
         if cpu_devs.is_empty() {
             return None;
         }

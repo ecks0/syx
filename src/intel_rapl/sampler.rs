@@ -7,7 +7,6 @@ use tokio::sync::Mutex;
 use tokio::time::sleep;
 
 use crate::intel_rapl::{energy_uj, Device, ZoneId};
-use crate::Values as _;
 
 fn umean(n: &[u64]) -> f64 {
     let sum: u64 = n.iter().sum();
@@ -39,6 +38,7 @@ impl Sampler {
     const COUNT: usize = 11;
 
     pub async fn all(interval: Duration) -> Samplers {
+        use crate::Multi as _;
         Device::ids()
             .await
             .into_iter()
@@ -65,7 +65,7 @@ impl Sampler {
     }
 
     async fn poll(&self) -> Option<u64> {
-        energy_uj(self.zone.zone, self.zone.subzone).await.ok()
+        energy_uj(self.zone.package, self.zone.subzone).await.ok()
     }
 
     async fn work(&mut self) {
