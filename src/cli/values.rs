@@ -7,7 +7,7 @@ use serde::{Deserialize, Deserializer};
 use tokio::sync::OnceCell;
 
 use crate::cli::{Error, Result};
-#[cfg(feature = "nvml")]
+#[cfg(feature = "nvml-wrapper")]
 use crate::nvml;
 use crate::Values as _;
 
@@ -27,7 +27,7 @@ async fn i915_ids() -> &'static Vec<u64> {
     I915_IDS.get_or_init(i915_ids).await
 }
 
-#[cfg(feature = "nvml")]
+#[cfg(feature = "nvml-wrapper")]
 async fn nvml_ids() -> &'static Vec<u32> {
     static NVML_IDS: OnceCell<Vec<u32>> = OnceCell::const_new();
     async fn nvml_ids() -> Vec<u32> {
@@ -125,27 +125,27 @@ pub(in crate::cli) struct Values {
     #[serde(deserialize_with = "de::frequency")]
     pub(in crate::cli) i915_boost: Option<Frequency>,
 
-    #[cfg(feature = "nvml")]
+    #[cfg(feature = "nvml-wrapper")]
     #[serde(default)]
     #[serde(deserialize_with = "de::card_ids")]
     pub(in crate::cli) nv: Option<Vec<CardId>>,
 
-    #[cfg(feature = "nvml")]
+    #[cfg(feature = "nvml-wrapper")]
     #[serde(default)]
     #[serde(deserialize_with = "de::frequency")]
     pub(in crate::cli) nv_gpu_min: Option<Frequency>,
 
-    #[cfg(feature = "nvml")]
+    #[cfg(feature = "nvml-wrapper")]
     #[serde(default)]
     #[serde(deserialize_with = "de::frequency")]
     pub(in crate::cli) nv_gpu_max: Option<Frequency>,
 
-    #[cfg(feature = "nvml")]
+    #[cfg(feature = "nvml-wrapper")]
     #[serde(default)]
     #[serde(deserialize_with = "de::bool")]
     pub(in crate::cli) nv_gpu_reset: Option<bool>,
 
-    #[cfg(feature = "nvml")]
+    #[cfg(feature = "nvml-wrapper")]
     #[serde(default)]
     #[serde(deserialize_with = "de::power")]
     pub(in crate::cli) nv_power_limit: Option<Power>,
@@ -176,7 +176,7 @@ impl Values {
         self.i915_min.is_some() || self.i915_max.is_some() || self.i915_boost.is_some()
     }
 
-    #[cfg(feature = "nvml")]
+    #[cfg(feature = "nvml-wrapper")]
     pub(in crate::cli) fn has_nvml_values(&self) -> bool {
         self.nv_gpu_min.is_some()
             || self.nv_gpu_max.is_some()
@@ -187,7 +187,7 @@ impl Values {
     #[allow(clippy::let_and_return)]
     pub(in crate::cli) fn has_values(&self) -> bool {
         let b = self.has_cpu_related_values() || self.has_i915_values() || self.has_rapl_values();
-        #[cfg(feature = "nvml")]
+        #[cfg(feature = "nvml-wrapper")]
         let b = b || self.has_nvml_values();
         b
     }
@@ -343,7 +343,7 @@ impl Values {
         Some(r)
     }
 
-    #[cfg(feature = "nvml")]
+    #[cfg(feature = "nvml-wrapper")]
     async fn as_nvml(&self) -> Option<nvml::Nvml> {
         if !self.has_nvml_values() {
             return None;
@@ -392,7 +392,7 @@ impl Values {
         let intel_pstate = self.as_intel_pstate().await;
         let intel_rapl = self.as_intel_rapl().await;
         let i915 = self.as_i915().await;
-        #[cfg(feature = "nvml")]
+        #[cfg(feature = "nvml-wrapper")]
         let nvml = self.as_nvml().await;
         crate::Machine {
             cpu,
@@ -400,7 +400,7 @@ impl Values {
             i915,
             intel_pstate,
             intel_rapl,
-            #[cfg(feature = "nvml")]
+            #[cfg(feature = "nvml-wrapper")]
             nvml,
         }
     }

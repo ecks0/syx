@@ -52,8 +52,8 @@ pub(crate) mod path {
 use async_trait::async_trait;
 
 pub use crate::cpufreq::devices;
-use crate::sysfs::{self, Result};
-use crate::{Feature, Multi, Read, Single, Values, Write, util};
+use crate::util::sysfs::{self, Result};
+use crate::{util, Feature, Multi, Read, Single, Values, Write};
 
 pub async fn energy_perf_bias(id: u64) -> Result<u64> {
     sysfs::read_u64(&path::energy_perf_bias(id)).await
@@ -109,16 +109,53 @@ pub async fn set_no_turbo(v: bool) -> Result<()> {
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Global {
-    pub max_perf_pct: Option<u64>,
-    pub min_perf_pct: Option<u64>,
-    pub no_turbo: Option<bool>,
-    pub status: Option<String>,
-    pub turbo_pct: Option<u64>,
+pub struct Globals {
+    max_perf_pct: Option<u64>,
+    min_perf_pct: Option<u64>,
+    no_turbo: Option<bool>,
+    status: Option<String>,
+    turbo_pct: Option<u64>,
+}
+
+impl Globals {
+    pub fn max_perf_pct(&self) -> Option<u64> {
+        self.max_perf_pct
+    }
+
+    pub fn min_perf_pct(&self) -> Option<u64> {
+        self.min_perf_pct
+    }
+
+    pub fn no_turbo(&self) -> Option<bool> {
+        self.no_turbo
+    }
+
+    pub fn status(&self) -> Option<&str> {
+        self.status.as_deref()
+    }
+
+    pub fn turbo_pct(&self) -> Option<u64> {
+        self.turbo_pct
+    }
+
+    pub fn set_max_perf_pct(&mut self, v: impl Into<Option<u64>>) -> &mut Self {
+        self.max_perf_pct = v.into();
+        self
+    }
+
+    pub fn set_min_perf_pct(&mut self, v: impl Into<Option<u64>>) -> &mut Self {
+        self.min_perf_pct = v.into();
+        self
+    }
+
+    pub fn set_no_turbo(&mut self, v: impl Into<Option<bool>>) -> &mut Self {
+        self.no_turbo = v.into();
+        self
+    }
 }
 
 #[async_trait]
-impl Read for Global {
+impl Read for Globals {
     async fn read(&mut self) {
         self.max_perf_pct = max_perf_pct().await.ok();
         self.min_perf_pct = min_perf_pct().await.ok();
@@ -129,7 +166,7 @@ impl Read for Global {
 }
 
 #[async_trait]
-impl Write for Global {
+impl Write for Globals {
     async fn write(&self) {
         if let Some(val) = self.max_perf_pct {
             let _ = set_max_perf_pct(val);
@@ -144,26 +181,27 @@ impl Write for Global {
 }
 
 #[async_trait]
-impl Values for Global {
+impl Values for Globals {
     fn is_empty(&self) -> bool {
         self.eq(&Self::default())
     }
 
-    fn clear(&mut self) {
+    fn clear(&mut self) -> &mut Self {
         *self = Self::default();
+        self
     }
 }
 
 #[async_trait]
-impl Single for Global {}
+impl Single for Globals {}
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Device {
-    pub id: u64,
-    pub energy_perf_bias: Option<u64>,
-    pub energy_performance_preference: Option<String>,
-    pub energy_performance_available_preferences: Option<Vec<String>>,
+    id: u64,
+    energy_perf_bias: Option<u64>,
+    energy_performance_preference: Option<String>,
+    energy_performance_available_preferences: Option<Vec<String>>,
 }
 
 impl Device {
@@ -179,12 +217,18 @@ impl Device {
         self.energy_performance_available_preferences.as_deref()
     }
 
-    pub fn set_energy_perf_bias(&mut self, v: u64) {
-        self.energy_perf_bias = Some(v);
+    pub fn set_energy_perf_bias(&mut self, v: impl Into<Option<u64>>) -> &mut Self {
+        self.energy_perf_bias = v.into();
+        self
     }
 
-    pub fn set_energy_performance_preference<S: Into<String>>(&mut self, v: S) {
-        self.energy_performance_preference = Some(v.into());
+    pub fn set_energy_performance_preference<O, S>(&mut self, v: O) -> &mut Self
+    where
+        O: Into<Option<S>>,
+        S: Into<String>,
+    {
+        self.energy_performance_preference = v.into().map(|s| s.into());
+        self
     }
 }
 
@@ -216,8 +260,9 @@ impl Values for Device {
         self.eq(&Self::new(self.id))
     }
 
-    fn clear(&mut self) {
+    fn clear(&mut self) -> &mut Self {
         *self = Self::new(self.id);
+        self
     }
 }
 
@@ -233,22 +278,63 @@ impl Multi for Device {
         self.id
     }
 
-    fn set_id(&mut self, v: Self::Id) {
+    fn set_id(&mut self, v: Self::Id) -> &mut Self {
         self.id = v;
+        self
     }
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct System {
-    pub global: Global,
-    pub devices: Vec<Device>,
+    globals: Globals,
+    devices: Vec<Device>,
+}
+
+impl System {
+    pub fn set_globals(&mut self, v: Globals) -> &mut Self {
+        self.globals = v;
+        self
+    }
+
+    pub fn globals(&self) -> &Globals {
+        &self.globals
+    }
+
+    pub fn into_globals(self) -> Globals {
+        self.globals
+    }
+
+    pub fn push_device(&mut self, v: Device) -> &mut Self {
+        if let Some(i) = self.devices.iter().position(|d| v.id.eq(&d.id)) {
+            self.devices[i] = v;
+        } else {
+            self.devices.push(v);
+            self.devices.sort_unstable_by(|a, b| a.id.cmp(&b.id));
+        }
+        self
+    }
+
+    pub fn push_devices(&mut self, v: impl IntoIterator<Item = Device>) -> &mut Self {
+        for d in v.into_iter() {
+            self.push_device(d);
+        }
+        self
+    }
+
+    pub fn devices(&self) -> std::slice::Iter<'_, Device> {
+        self.devices.iter()
+    }
+
+    pub fn into_devices(self) -> impl IntoIterator<Item = Device> {
+        self.devices.into_iter()
+    }
 }
 
 #[async_trait]
 impl Read for System {
     async fn read(&mut self) {
-        self.global.read().await;
+        self.globals.read().await;
         self.devices.clear();
         self.devices.extend(Device::load_all().await);
     }
@@ -257,19 +343,19 @@ impl Read for System {
 #[async_trait]
 impl Write for System {
     async fn write(&self) {
-        self.global.write().await;
+        self.globals.write().await;
         if !self.devices.is_empty() {
             let ids = self
                 .devices
                 .iter()
                 .filter_map(|d| if d.is_empty() { None } else { Some(d.id) })
                 .collect();
-            let ids = util::set_cpus_online(ids).await;
+            let ids = util::cpu::set_online(ids).await;
             for device in &self.devices {
                 device.write().await;
             }
-            util::wait_for_cpu_related().await;
-            util::set_cpus_offline(ids).await;
+            util::cpu::wait_for_write().await;
+            util::cpu::set_offline(ids).await;
         }
     }
 }
@@ -279,9 +365,10 @@ impl Values for System {
         self.eq(&Self::default())
     }
 
-    fn clear(&mut self) {
-        self.global = Default::default();
+    fn clear(&mut self) -> &mut Self {
+        self.globals = Globals::default();
         self.devices.clear();
+        self
     }
 }
 
@@ -291,5 +378,23 @@ impl Single for System {}
 impl Feature for System {
     async fn present() -> bool {
         path::status().is_file()
+    }
+}
+
+impl From<Globals> for System {
+    fn from(v: Globals) -> Self {
+        let mut s = Self::default();
+        s.set_globals(v);
+        s
+    }
+}
+
+impl From<Vec<Device>> for System {
+    fn from(v: Vec<Device>) -> Self {
+        let mut s = Self::default();
+        for d in v {
+            s.push_device(d);
+        }
+        s
     }
 }

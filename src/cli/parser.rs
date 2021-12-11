@@ -12,7 +12,7 @@ pub(super) const ARG_SHOW_CPU: &str = "show-cpu";
 pub(super) const ARG_SHOW_PSTATE: &str = "show-pstate";
 pub(super) const ARG_SHOW_RAPL: &str = "show-rapl";
 pub(super) const ARG_SHOW_I915: &str = "show-i915";
-#[cfg(feature = "nvml")]
+#[cfg(feature = "nvml-wrapper")]
 pub(super) const ARG_SHOW_NV: &str = "show-nv";
 
 pub(super) const ARG_CPU: &str = "cpu";
@@ -37,15 +37,15 @@ pub(super) const ARG_I915_MIN: &str = "i915-min";
 pub(super) const ARG_I915_MAX: &str = "i915-max";
 pub(super) const ARG_I915_BOOST: &str = "i915-boost";
 
-#[cfg(feature = "nvml")]
+#[cfg(feature = "nvml-wrapper")]
 pub(super) const ARG_NV: &str = "nv";
-#[cfg(feature = "nvml")]
+#[cfg(feature = "nvml-wrapper")]
 pub(super) const ARG_NV_GPU_MIN: &str = "nv-gpu-min";
-#[cfg(feature = "nvml")]
+#[cfg(feature = "nvml-wrapper")]
 pub(super) const ARG_NV_GPU_MAX: &str = "nv-gpu-max";
-#[cfg(feature = "nvml")]
+#[cfg(feature = "nvml-wrapper")]
 pub(super) const ARG_NV_GPU_RESET: &str = "nv-gpu-reset";
-#[cfg(feature = "nvml")]
+#[cfg(feature = "nvml-wrapper")]
 pub(super) const ARG_NV_POWER_LIMIT: &str = "nv-power-limit";
 
 pub(super) const ARG_PROFILE: &str = "PROFILE";
@@ -113,7 +113,7 @@ fn app<'a, 'b>() -> clap::App<'a, 'b> {
                 .help("Print drm values"),
         );
 
-    #[cfg(feature = "nvml")]
+    #[cfg(feature = "nvml-wrapper")]
     let a = a.arg(
         Arg::with_name(ARG_SHOW_NV)
             .long(ARG_SHOW_NV)
@@ -257,7 +257,7 @@ fn app<'a, 'b>() -> clap::App<'a, 'b> {
                 .help("Set i915 boost freq per --drm-i915, ex. 1200 or 1.2ghz"),
         );
 
-    #[cfg(feature = "nvml")]
+    #[cfg(feature = "nvml-wrapper")]
     let a = a
         .arg(
             Arg::with_name(ARG_NV)
@@ -429,15 +429,15 @@ impl TryFrom<&Parser<'_>> for Values {
             i915_min: p.from_str_as::<FrequencyStr, _>(ARG_I915_MIN)?,
             i915_max: p.from_str_as::<FrequencyStr, _>(ARG_I915_MAX)?,
             i915_boost: p.from_str_as::<FrequencyStr, _>(ARG_I915_BOOST)?,
-            #[cfg(feature = "nvml")]
+            #[cfg(feature = "nvml-wrapper")]
             nv: p.from_str_as::<CardIds, _>(ARG_NV)?,
-            #[cfg(feature = "nvml")]
+            #[cfg(feature = "nvml-wrapper")]
             nv_gpu_min: p.from_str_as::<FrequencyStr, _>(ARG_NV_GPU_MIN)?,
-            #[cfg(feature = "nvml")]
+            #[cfg(feature = "nvml-wrapper")]
             nv_gpu_max: p.from_str_as::<FrequencyStr, _>(ARG_NV_GPU_MAX)?,
-            #[cfg(feature = "nvml")]
+            #[cfg(feature = "nvml-wrapper")]
             nv_gpu_reset: p.flag(ARG_NV_GPU_RESET).map(|_| true),
-            #[cfg(feature = "nvml")]
+            #[cfg(feature = "nvml-wrapper")]
             nv_power_limit: p.from_str_as::<PowerStr, _>(ARG_NV_POWER_LIMIT)?,
         };
         Ok(s)

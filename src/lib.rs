@@ -6,10 +6,9 @@ pub mod drm;
 pub mod i915;
 pub mod intel_pstate;
 pub mod intel_rapl;
-#[cfg(feature = "nvml")]
+#[cfg(feature = "nvml-wrapper")]
 pub mod nv;
 pub mod prelude;
-pub(crate) mod sysfs;
 pub(crate) mod util;
 
 use async_trait::async_trait;
@@ -27,7 +26,7 @@ pub trait Write {
 pub trait Values {
     fn is_empty(&self) -> bool;
 
-    fn clear(&mut self);
+    fn clear(&mut self) -> &mut Self;
 }
 
 #[async_trait]
@@ -68,7 +67,7 @@ pub trait Multi: Default + PartialEq + Read + Send + Sized + Values {
 
     fn id(&self) -> Self::Id;
 
-    fn set_id(&mut self, v: Self::Id);
+    fn set_id(&mut self, v: Self::Id) -> &mut Self;
 }
 
 #[async_trait]
@@ -83,7 +82,7 @@ pub struct System {
     pub i915: i915::System,
     pub intel_pstate: intel_pstate::System,
     pub intel_rapl: intel_rapl::System,
-    #[cfg(feature = "nvml")]
+    #[cfg(feature = "nvml-wrapper")]
     pub nv: nv::System,
 }
 
@@ -95,7 +94,8 @@ impl Read for System {
         self.i915 = i915::System::load().await;
         self.intel_pstate = intel_pstate::System::load().await;
         self.intel_rapl = intel_rapl::System::load().await;
-        #[cfg(feature = "nvml")] {
+        #[cfg(feature = "nvml-wrapper")]
+        {
             self.nv = nv::System::load().await;
         }
     }
@@ -104,22 +104,25 @@ impl Read for System {
 #[async_trait]
 impl Write for System {
     async fn write(&self) {
-        if !self.cpufreq.is_empty() || !self.intel_pstate.is_empty() {
-            let mut ids = vec![];
-            ids.extend(self.cpufreq.devices.iter().map(|d| d.id));
-            ids.extend(self.intel_pstate.devices.iter().map(|d| d.id));
+        if !(self.cpufreq.is_empty() && self.intel_pstate.is_empty()) {
+            let mut ids = self
+                .cpufreq
+                .devices()
+                .map(|d| d.id())
+                .chain(self.intel_pstate.devices().map(|d| d.id()))
+                .collect::<Vec<_>>();
             ids.sort_unstable();
             ids.dedup();
-            let ids = util::set_cpus_online(ids).await;
+            let ids = util::cpu::set_online(ids).await;
             self.cpufreq.write().await;
             self.intel_pstate.write().await;
-            util::wait_for_cpu_related().await;
-            util::set_cpus_offline(ids).await;
+            util::cpu::wait_for_write().await;
+            util::cpu::set_offline(ids).await;
         }
         self.cpu.write().await;
         self.intel_rapl.write().await;
         self.i915.write().await;
-        #[cfg(feature = "nvml")]
+        #[cfg(feature = "nvml-wrapper")]
         self.nv.write().await;
     }
 }
@@ -129,8 +132,9 @@ impl Values for System {
         self.eq(&Self::default())
     }
 
-    fn clear(&mut self) {
+    fn clear(&mut self) -> &mut Self {
         *self = Self::default();
+        self
     }
 }
 

@@ -1,5 +1,5 @@
 pub(crate) mod path {
-   use std::path::PathBuf;
+    use std::path::PathBuf;
 
     pub(crate) fn root() -> PathBuf {
         PathBuf::from("/sys/class/drm")
@@ -38,7 +38,7 @@ pub(crate) mod path {
 
 use async_trait::async_trait;
 
-use crate::sysfs::{self, Result};
+use crate::util::sysfs::{self, Result};
 use crate::{Feature, Multi, Read, Single, Values};
 
 pub async fn devices() -> Result<Vec<u64>> {
@@ -95,8 +95,9 @@ impl Values for Device {
         self.eq(&Self::new(self.id))
     }
 
-    fn clear(&mut self) {
+    fn clear(&mut self) -> &mut Self {
         *self = Self::default();
+        self
     }
 }
 
@@ -112,8 +113,9 @@ impl Multi for Device {
         self.id
     }
 
-    fn set_id(&mut self, v: u64) {
+    fn set_id(&mut self, v: u64) -> &mut Self {
         self.id = v;
+        self
     }
 }
 
@@ -124,12 +126,12 @@ pub struct System {
 }
 
 impl System {
-    pub fn devices(&self) -> &[Device] {
-        &self.devices
+    pub fn devices(&self) -> std::slice::Iter<'_, Device> {
+        self.devices.iter()
     }
 
-    pub fn devices_mut(&mut self) -> &mut [Device] {
-        &mut self.devices
+    pub fn into_devices(self) -> impl IntoIterator<Item = Device> {
+        self.devices.into_iter()
     }
 }
 
@@ -147,8 +149,9 @@ impl Values for System {
         self.devices.is_empty()
     }
 
-    fn clear(&mut self) {
+    fn clear(&mut self) -> &mut Self {
         self.devices.clear();
+        self
     }
 }
 

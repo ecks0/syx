@@ -1,17 +1,17 @@
+#[cfg(feature = "nvml-wrapper")]
+pub use crate::nv;
 pub use crate::{
-    Read,
-    Write,
-    Values,
-    Single,
-    Multi,
-    Feature,
-    System,
     cpu,
     cpufreq,
     drm,
     i915,
     intel_pstate,
     intel_rapl,
+    Feature,
+    Multi,
+    Read,
+    Single,
+    System,
+    Values,
+    Write,
 };
-#[cfg(feature = "nvml")]
-pub use crate::nv;

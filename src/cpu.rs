@@ -46,26 +46,26 @@ pub(crate) mod path {
 
 use async_trait::async_trait;
 
-use crate::sysfs::{self, Result};
-use crate::{Feature, Multi, Read, Single, Values, Write, util};
+use crate::util::sysfs::{self, Result};
+use crate::{util, Feature, Multi, Read, Single, Values, Write};
 
 pub async fn devices() -> Result<Vec<u64>> {
     sysfs::read_ids(&path::root(), "cpu").await
 }
 
-pub async fn online_devices() -> Result<Vec<u64>> {
+pub async fn devices_online() -> Result<Vec<u64>> {
     sysfs::read_indices(&path::online_devices()).await
 }
 
-pub async fn offline_devices() -> Result<Vec<u64>> {
+pub async fn devices_offline() -> Result<Vec<u64>> {
     sysfs::read_indices(&path::offline_devices()).await
 }
 
-pub async fn present_devices() -> Result<Vec<u64>> {
+pub async fn devices_present() -> Result<Vec<u64>> {
     sysfs::read_indices(&path::present_devices()).await
 }
 
-pub async fn possible_devices() -> Result<Vec<u64>> {
+pub async fn devices_possible() -> Result<Vec<u64>> {
     sysfs::read_indices(&path::possible_devices()).await
 }
 
@@ -80,8 +80,19 @@ pub async fn set_online(id: u64, val: bool) -> Result<()> {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Device {
-    pub id: u64,
-    pub online: Option<bool>,
+    id: u64,
+    online: Option<bool>,
+}
+
+impl Device {
+    pub fn online(&self) -> Option<bool> {
+        self.online
+    }
+
+    pub fn set_online(&mut self, v: impl Into<Option<bool>>) -> &mut Self {
+        self.online = v.into();
+        self
+    }
 }
 
 #[async_trait]
@@ -103,11 +114,12 @@ impl Write for Device {
 #[async_trait]
 impl Values for Device {
     fn is_empty(&self) -> bool {
-        self.eq(&Self::new(self.id))
+        self.online.is_none()
     }
 
-    fn clear(&mut self) {
-        *self = Self::new(self.id);
+    fn clear(&mut self) -> &mut Self {
+        self.online = None;
+        self
     }
 }
 
@@ -123,15 +135,43 @@ impl Multi for Device {
         self.id
     }
 
-    fn set_id(&mut self, v: Self::Id) {
+    fn set_id(&mut self, v: Self::Id) -> &mut Self {
         self.id = v;
+        self
     }
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
- pub struct System {
-    pub devices: Vec<Device>,
+pub struct System {
+    devices: Vec<Device>,
+}
+
+impl System {
+    pub fn push_device(&mut self, v: Device) -> &mut Self {
+        if let Some(i) = self.devices.iter().position(|d| v.id.eq(&d.id)) {
+            self.devices[i] = v;
+        } else {
+            self.devices.push(v);
+            self.devices.sort_unstable_by(|a, b| a.id.cmp(&b.id));
+        }
+        self
+    }
+
+    pub fn push_devices(&mut self, v: impl IntoIterator<Item = Device>) -> &mut Self {
+        for d in v.into_iter() {
+            self.push_device(d);
+        }
+        self
+    }
+
+    pub fn devices(&self) -> std::slice::Iter<'_, Device> {
+        self.devices.iter()
+    }
+
+    pub fn into_devices(self) -> impl IntoIterator<Item = Device> {
+        self.devices.into_iter()
+    }
 }
 
 #[async_trait]
@@ -149,7 +189,7 @@ impl Write for System {
             device.write().await;
         }
         if self.devices.iter().any(|d| d.online.is_some()) {
-            util::wait_for_cpu_onoff().await;
+            util::cpu::wait_for_onoff().await;
         }
     }
 }
@@ -160,8 +200,9 @@ impl Values for System {
         self.devices.is_empty()
     }
 
-    fn clear(&mut self) {
+    fn clear(&mut self) -> &mut Self {
         self.devices.clear();
+        self
     }
 }
 
@@ -172,5 +213,15 @@ impl Single for System {}
 impl Feature for System {
     async fn present() -> bool {
         path::root().is_dir()
+    }
+}
+
+impl From<Vec<Device>> for System {
+    fn from(v: Vec<Device>) -> Self {
+        let mut s = Self::default();
+        for d in v {
+            s.push_device(d);
+        }
+        s
     }
 }

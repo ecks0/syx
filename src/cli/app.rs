@@ -1,6 +1,6 @@
 use tokio::io::{stdout, AsyncWriteExt as _};
 
-#[cfg(feature = "nvml")]
+#[cfg(feature = "nvml-wrapper")]
 use crate::cli::parser::ARG_SHOW_NV;
 use crate::cli::parser::{
     Parser,
@@ -16,7 +16,7 @@ use crate::cli::profile::{Error as ProfileError, Profile};
 use crate::cli::sampler::Samplers;
 use crate::cli::values::Values;
 use crate::cli::{format, logging, Error, Result};
-use crate::{Machine, Values as _};
+use crate::System;
 
 #[derive(Clone, Debug)]
 pub struct Cli {
@@ -25,7 +25,7 @@ pub struct Cli {
     pub(in crate::cli) show_pstate: Option<()>,
     pub(in crate::cli) show_rapl: Option<()>,
     pub(in crate::cli) show_i915: Option<()>,
-    #[cfg(feature = "nvml")]
+    #[cfg(feature = "nvml-wrapper")]
     pub(in crate::cli) show_nvml: Option<()>,
     pub(in crate::cli) profile: Option<Profile>,
     pub(in crate::cli) values: Vec<Values>,
@@ -58,7 +58,7 @@ impl Cli {
         let show_pstate = p.flag(ARG_SHOW_PSTATE);
         let show_rapl = p.flag(ARG_SHOW_RAPL);
         let show_i915 = p.flag(ARG_SHOW_I915);
-        #[cfg(feature = "nvml")]
+        #[cfg(feature = "nvml-wrapper")]
         let show_nvml = p.flag(ARG_SHOW_NV);
         let s = Self {
             quiet,
@@ -66,7 +66,7 @@ impl Cli {
             show_pstate,
             show_rapl,
             show_i915,
-            #[cfg(feature = "nvml")]
+            #[cfg(feature = "nvml-wrapper")]
             show_nvml,
             profile,
             values,
@@ -80,7 +80,7 @@ impl Cli {
             || self.show_i915.is_some()
             || self.show_pstate.is_some()
             || self.show_rapl.is_some();
-        #[cfg(feature = "nvml")]
+        #[cfg(feature = "nvml-wrapper")]
         let b = b || self.show_nvml.is_some();
         b
     }
@@ -107,7 +107,7 @@ impl Cli {
         if show_all || self.show_i915.is_some() {
             format::i915(&mut buf, &machine).await.unwrap();
         }
-        #[cfg(feature = "nvml")]
+        #[cfg(feature = "nvml-wrapper")]
         if show_all || self.show_nvml.is_some() {
             format::nvml(&mut buf, &machine).await.unwrap();
         }

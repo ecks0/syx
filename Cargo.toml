@@ -21,10 +21,6 @@ cli = [
   "tokio/macros",
   "tokio/rt-multi-thread",
 ]
-nvml = [
-  "nvml-wrapper",
-]
-
 [dependencies]
 async-trait = "~0.1"
 clap = { version = "~2.33", optional = true }

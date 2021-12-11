@@ -5,7 +5,7 @@ use log::{debug, error, log_enabled, warn, Level};
 use nix::errno::Errno;
 use tokio::io::Error as IoError;
 
-use crate::sysfs::Error;
+use crate::util::sysfs::Error;
 
 pub fn read<T: Debug>(path: &Path, result: Result<T, IoError>) -> Result<T, Error> {
     match &result {

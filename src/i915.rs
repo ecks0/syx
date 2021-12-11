@@ -58,7 +58,7 @@ pub(crate) mod path {
 
 use async_trait::async_trait;
 
-use crate::sysfs::{self, Result};
+use crate::util::sysfs::{self, Result};
 use crate::{Feature, Multi, Read, Single, Values, Write};
 
 pub async fn devices() -> Result<Vec<u64>> {
@@ -136,15 +136,79 @@ pub async fn set_rpn_freq_mhz(id: u64, v: u64) -> Result<()> {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Device {
-    pub id: u64,
-    pub act_freq_mhz: Option<u64>,
-    pub boost_freq_mhz: Option<u64>,
-    pub cur_freq_mhz: Option<u64>,
-    pub max_freq_mhz: Option<u64>,
-    pub min_freq_mhz: Option<u64>,
-    pub rp0_freq_mhz: Option<u64>,
-    pub rp1_freq_mhz: Option<u64>,
-    pub rpn_freq_mhz: Option<u64>,
+    id: u64,
+    act_freq_mhz: Option<u64>,
+    boost_freq_mhz: Option<u64>,
+    cur_freq_mhz: Option<u64>,
+    max_freq_mhz: Option<u64>,
+    min_freq_mhz: Option<u64>,
+    rp0_freq_mhz: Option<u64>,
+    rp1_freq_mhz: Option<u64>,
+    rpn_freq_mhz: Option<u64>,
+}
+
+impl Device {
+    pub fn act_freq_mhz(&self) -> Option<u64> {
+        self.act_freq_mhz
+    }
+
+    pub fn boost_freq_mhz(&self) -> Option<u64> {
+        self.boost_freq_mhz
+    }
+
+    pub fn cur_freq_mhz(&self) -> Option<u64> {
+        self.cur_freq_mhz
+    }
+
+    pub fn max_freq_mhz(&self) -> Option<u64> {
+        self.max_freq_mhz
+    }
+
+    pub fn min_freq_mhz(&self) -> Option<u64> {
+        self.min_freq_mhz
+    }
+
+    pub fn rp0_freq_mhz(&self) -> Option<u64> {
+        self.rp0_freq_mhz
+    }
+
+    pub fn rp1_freq_mhz(&self) -> Option<u64> {
+        self.rp1_freq_mhz
+    }
+
+    pub fn rpn_freq_mhz(&self) -> Option<u64> {
+        self.rpn_freq_mhz
+    }
+
+    pub fn set_boost_freq_mhz(&mut self, v: impl Into<Option<u64>>) -> &mut Self {
+        self.boost_freq_mhz = v.into();
+        self
+    }
+
+    pub fn set_max_freq_mhz(&mut self, v: impl Into<Option<u64>>) -> &mut Self {
+        self.max_freq_mhz = v.into();
+        self
+    }
+
+    pub fn set_min_freq_mhz(&mut self, v: impl Into<Option<u64>>) -> &mut Self {
+        self.min_freq_mhz = v.into();
+        self
+    }
+
+    pub fn set_rp0_freq_mhz(&mut self, v: impl Into<Option<u64>>) -> &mut Self {
+        self.rp0_freq_mhz = v.into();
+        self
+    }
+
+    pub fn set_rp1_freq_mhz(&mut self, v: impl Into<Option<u64>>) -> &mut Self {
+        self.rp1_freq_mhz = v.into();
+        self
+    }
+
+    pub fn set_rpn_freq_mhz(&mut self, v: impl Into<Option<u64>>) -> &mut Self {
+        self.rpn_freq_mhz = v.into();
+        self
+    }
 }
 
 #[async_trait]
@@ -191,8 +255,9 @@ impl Values for Device {
         self.eq(&Self::new(self.id))
     }
 
-    fn clear(&mut self) {
+    fn clear(&mut self) -> &mut Self {
         *self = Self::new(self.id);
+        self
     }
 }
 
@@ -208,8 +273,9 @@ impl Multi for Device {
         self.id
     }
 
-    fn set_id(&mut self, v: Self::Id) {
+    fn set_id(&mut self, v: Self::Id) -> &mut Self {
         self.id = v;
+        self
     }
 }
 
@@ -217,6 +283,33 @@ impl Multi for Device {
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct System {
     devices: Vec<Device>,
+}
+
+impl System {
+    pub fn push_device(&mut self, v: Device) -> &mut Self {
+        if let Some(i) = self.devices.iter().position(|d| v.id.eq(&d.id)) {
+            self.devices[i] = v;
+        } else {
+            self.devices.push(v);
+            self.devices.sort_unstable_by(|a, b| a.id.cmp(&b.id));
+        }
+        self
+    }
+
+    pub fn push_devices(&mut self, v: impl IntoIterator<Item = Device>) -> &mut Self {
+        for d in v.into_iter() {
+            self.push_device(d);
+        }
+        self
+    }
+
+    pub fn devices(&self) -> std::slice::Iter<'_, Device> {
+        self.devices.iter()
+    }
+
+    pub fn into_devices(self) -> impl IntoIterator<Item = Device> {
+        self.devices.into_iter()
+    }
 }
 
 #[async_trait]
@@ -242,8 +335,9 @@ impl Values for System {
         self.devices.is_empty()
     }
 
-    fn clear(&mut self) {
+    fn clear(&mut self) -> &mut Self {
         self.devices.clear();
+        self
     }
 }
 

@@ -5,7 +5,7 @@ use measurements::{Frequency, Power};
 use tokio::io::{AsyncWrite, AsyncWriteExt, Error as IoError};
 
 use crate::intel_rapl::Samplers;
-#[cfg(feature = "nvml")]
+#[cfg(feature = "nvml-wrapper")]
 use crate::nvml;
 use crate::Machine;
 
@@ -54,7 +54,7 @@ fn hz(hz: u64) -> String {
     }
 }
 
-#[cfg(feature = "nvml")]
+#[cfg(feature = "nvml-wrapper")]
 fn bytes(b: u64) -> String {
     if b < 1000 {
         format!("{} B", b)
@@ -409,7 +409,7 @@ where
     Ok(())
 }
 
-#[cfg(feature = "nvml")]
+#[cfg(feature = "nvml-wrapper")]
 pub(in crate::cli) async fn nvml<W>(w: &mut W, machine: &Machine) -> Result<()>
 where
     W: AsyncWrite + Send + Unpin,
