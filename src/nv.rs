@@ -304,62 +304,62 @@ impl Card {
     }
 
     pub async fn gfx_freq(&self) -> Result<u32> {
-        self.gfx_freq.get_with(gfx_freq(self.id)).await
+        self.gfx_freq.get_or(gfx_freq(self.id)).await
     }
 
     pub async fn gfx_max_freq(&self) -> Result<u32> {
-        self.gfx_max_freq.get_with(gfx_max_freq(self.id)).await
+        self.gfx_max_freq.get_or(gfx_max_freq(self.id)).await
     }
 
     pub async fn mem_freq(&self) -> Result<u32> {
-        self.mem_freq.get_with(mem_freq(self.id)).await
+        self.mem_freq.get_or(mem_freq(self.id)).await
     }
 
     pub async fn mem_max_freq(&self) -> Result<u32> {
-        self.mem_max_freq.get_with(mem_max_freq(self.id)).await
+        self.mem_max_freq.get_or(mem_max_freq(self.id)).await
     }
 
     pub async fn sm_freq(&self) -> Result<u32> {
-        self.sm_freq.get_with(sm_freq(self.id)).await
+        self.sm_freq.get_or(sm_freq(self.id)).await
     }
 
     pub async fn video_freq(&self) -> Result<u32> {
-        self.video_freq.get_with(video_freq(self.id)).await
+        self.video_freq.get_or(video_freq(self.id)).await
     }
 
     pub async fn video_max_freq(&self) -> Result<u32> {
-        self.video_max_freq.get_with(video_max_freq(self.id)).await
+        self.video_max_freq.get_or(video_max_freq(self.id)).await
     }
 
     pub async fn mem_total(&self) -> Result<u64> {
-        self.mem_total.get_with(mem_total(self.id)).await
+        self.mem_total.get_or(mem_total(self.id)).await
     }
 
     pub async fn mem_used(&self) -> Result<u64> {
-        self.mem_used.get_with(mem_used(self.id)).await
+        self.mem_used.get_or(mem_used(self.id)).await
     }
 
     pub async fn name(&self) -> Result<String> {
-        self.name.get_with(name(self.id)).await
+        self.name.get_or(name(self.id)).await
     }
 
     pub async fn power(&self) -> Result<u32> {
-        self.power.get_with(power(self.id)).await
+        self.power.get_or(power(self.id)).await
     }
 
     pub async fn power_limit(&self) -> Result<u32> {
-        self.power_limit.get_with(power_limit(self.id)).await
+        self.power_limit.get_or(power_limit(self.id)).await
     }
 
     pub async fn power_max_limit(&self) -> Result<u32> {
         self.power_limit_max
-            .get_with(power_max_limit(self.id))
+            .get_or(power_max_limit(self.id))
             .await
     }
 
     pub async fn power_min_limit(&self) -> Result<u32> {
         self.power_limit_min
-            .get_with(power_min_limit(self.id))
+            .get_or(power_min_limit(self.id))
             .await
     }
 

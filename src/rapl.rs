@@ -317,28 +317,28 @@ impl Constraint {
     pub async fn name(&self) -> Result<String> {
         let (package, subzone, index) = self.id.decompose();
         self.name
-            .get_with(constraint_name(package, subzone, index))
+            .get_or(constraint_name(package, subzone, index))
             .await
     }
 
     pub async fn max_power_uw(&self) -> Result<u64> {
         let (package, subzone, index) = self.id.decompose();
         self.max_power_uw
-            .get_with(constraint_max_power_uw(package, subzone, index))
+            .get_or(constraint_max_power_uw(package, subzone, index))
             .await
     }
 
     pub async fn power_limit_uw(&self) -> Result<u64> {
         let (package, subzone, index) = self.id.decompose();
         self.power_limit_uw
-            .get_with(constraint_power_limit_uw(package, subzone, index))
+            .get_or(constraint_power_limit_uw(package, subzone, index))
             .await
     }
 
     pub async fn time_window_us(&self) -> Result<u64> {
         let (package, subzone, index) = self.id.decompose();
         self.time_window_us
-            .get_with(constraint_time_window_us(package, subzone, index))
+            .get_or(constraint_time_window_us(package, subzone, index))
             .await
     }
 
@@ -406,25 +406,25 @@ impl Zone {
 
     pub async fn enabled(&self) -> Result<bool> {
         self.enabled
-            .get_with(enabled(self.id.package, self.id.subzone))
+            .get_or(enabled(self.id.package, self.id.subzone))
             .await
     }
 
     pub async fn energy_uj(&self) -> Result<u64> {
         self.energy_uj
-            .get_with(energy_uj(self.id.package, self.id.subzone))
+            .get_or(energy_uj(self.id.package, self.id.subzone))
             .await
     }
 
     pub async fn max_energy_range_uj(&self) -> Result<u64> {
         self.max_energy_range_uj
-            .get_with(max_energy_range_uj(self.id.package, self.id.subzone))
+            .get_or(max_energy_range_uj(self.id.package, self.id.subzone))
             .await
     }
 
     pub async fn name(&self) -> Result<String> {
         self.name
-            .get_with(name(self.id.package, self.id.subzone))
+            .get_or(name(self.id.package, self.id.subzone))
             .await
     }
 

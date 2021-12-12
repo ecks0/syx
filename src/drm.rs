@@ -96,14 +96,14 @@ impl Card {
     }
 
     pub async fn bus(&self) -> Result<String> {
-        self.bus.get_with(bus(self.id)).await
+        self.bus.get_or(bus(self.id)).await
     }
 
     pub async fn bus_id(&self) -> Result<String> {
-        self.bus_id.get_with(bus_id(self.id)).await
+        self.bus_id.get_or(bus_id(self.id)).await
     }
 
     pub async fn driver(&self) -> Result<String> {
-        self.driver.get_with(driver(self.id)).await
+        self.driver.get_or(driver(self.id)).await
     }
 }

@@ -167,47 +167,47 @@ impl Cpu {
 
     pub async fn cpuinfo_max_freq(&self) -> Result<u64> {
         self.cpuinfo_max_freq
-            .get_with(cpuinfo_max_freq(self.id))
+            .get_or(cpuinfo_max_freq(self.id))
             .await
     }
 
     pub async fn cpuinfo_min_freq(&self) -> Result<u64> {
         self.cpuinfo_min_freq
-            .get_with(cpuinfo_min_freq(self.id))
+            .get_or(cpuinfo_min_freq(self.id))
             .await
     }
 
     pub async fn scaling_cur_freq(&self) -> Result<u64> {
         self.scaling_cur_freq
-            .get_with(scaling_cur_freq(self.id))
+            .get_or(scaling_cur_freq(self.id))
             .await
     }
 
     pub async fn scaling_driver(&self) -> Result<String> {
-        self.scaling_driver.get_with(scaling_driver(self.id)).await
+        self.scaling_driver.get_or(scaling_driver(self.id)).await
     }
 
     pub async fn scaling_governor(&self) -> Result<String> {
         self.scaling_governor
-            .get_with(scaling_governor(self.id))
+            .get_or(scaling_governor(self.id))
             .await
     }
 
     pub async fn scaling_available_governors(&self) -> Result<Vec<String>> {
         self.scaling_available_governors
-            .get_with(scaling_available_governors(self.id))
+            .get_or(scaling_available_governors(self.id))
             .await
     }
 
     pub async fn scaling_max_freq(&self) -> Result<u64> {
         self.scaling_max_freq
-            .get_with(scaling_max_freq(self.id))
+            .get_or(scaling_max_freq(self.id))
             .await
     }
 
     pub async fn scaling_min_freq(&self) -> Result<u64> {
         self.scaling_min_freq
-            .get_with(scaling_min_freq(self.id))
+            .get_or(scaling_min_freq(self.id))
             .await
     }
 

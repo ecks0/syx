@@ -133,23 +133,23 @@ impl System {
     }
 
     pub async fn max_perf_pct(&self) -> Result<u64> {
-        self.max_perf_pct.get_with(max_perf_pct()).await
+        self.max_perf_pct.get_or(max_perf_pct()).await
     }
 
     pub async fn min_perf_pct(&self) -> Result<u64> {
-        self.min_perf_pct.get_with(min_perf_pct()).await
+        self.min_perf_pct.get_or(min_perf_pct()).await
     }
 
     pub async fn no_turbo(&self) -> Result<bool> {
-        self.no_turbo.get_with(no_turbo()).await
+        self.no_turbo.get_or(no_turbo()).await
     }
 
     pub async fn status(&self) -> Result<String> {
-        self.status.get_with(status()).await
+        self.status.get_or(status()).await
     }
 
     pub async fn turbo_pct(&self) -> Result<u64> {
-        self.turbo_pct.get_with(turbo_pct()).await
+        self.turbo_pct.get_or(turbo_pct()).await
     }
 
     pub async fn set_max_perf_pct(&self, v: u64) -> Result<()> {
@@ -208,19 +208,19 @@ impl Cpu {
 
     pub async fn energy_perf_bias(&self) -> Result<u64> {
         self.energy_perf_bias
-            .get_with(energy_perf_bias(self.id))
+            .get_or(energy_perf_bias(self.id))
             .await
     }
 
     pub async fn energy_performance_preference(&self) -> Result<String> {
         self.energy_performance_preference
-            .get_with(energy_performance_preference(self.id))
+            .get_or(energy_performance_preference(self.id))
             .await
     }
 
     pub async fn energy_performance_available_preferences(&self) -> Result<Vec<String>> {
         self.energy_performance_available_preferences
-            .get_with(energy_performance_available_preferences(self.id))
+            .get_or(energy_performance_available_preferences(self.id))
             .await
     }
 

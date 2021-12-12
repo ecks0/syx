@@ -200,35 +200,35 @@ impl Card {
     }
 
     pub async fn act_freq_mhz(&self) -> Result<u64> {
-        self.act_freq_mhz.get_with(act_freq_mhz(self.id)).await
+        self.act_freq_mhz.get_or(act_freq_mhz(self.id)).await
     }
 
     pub async fn boost_freq_mhz(&self) -> Result<u64> {
-        self.boost_freq_mhz.get_with(boost_freq_mhz(self.id)).await
+        self.boost_freq_mhz.get_or(boost_freq_mhz(self.id)).await
     }
 
     pub async fn cur_freq_mhz(&self) -> Result<u64> {
-        self.cur_freq_mhz.get_with(cur_freq_mhz(self.id)).await
+        self.cur_freq_mhz.get_or(cur_freq_mhz(self.id)).await
     }
 
     pub async fn max_freq_mhz(&self) -> Result<u64> {
-        self.max_freq_mhz.get_with(max_freq_mhz(self.id)).await
+        self.max_freq_mhz.get_or(max_freq_mhz(self.id)).await
     }
 
     pub async fn min_freq_mhz(&self) -> Result<u64> {
-        self.min_freq_mhz.get_with(min_freq_mhz(self.id)).await
+        self.min_freq_mhz.get_or(min_freq_mhz(self.id)).await
     }
 
     pub async fn rp0_freq_mhz(&self) -> Result<u64> {
-        self.rp0_freq_mhz.get_with(rp0_freq_mhz(self.id)).await
+        self.rp0_freq_mhz.get_or(rp0_freq_mhz(self.id)).await
     }
 
     pub async fn rp1_freq_mhz(&self) -> Result<u64> {
-        self.rp1_freq_mhz.get_with(rp1_freq_mhz(self.id)).await
+        self.rp1_freq_mhz.get_or(rp1_freq_mhz(self.id)).await
     }
 
     pub async fn rpn_freq_mhz(&self) -> Result<u64> {
-        self.rpn_freq_mhz.get_with(rpn_freq_mhz(self.id)).await
+        self.rpn_freq_mhz.get_or(rpn_freq_mhz(self.id)).await
     }
 
     pub async fn set_boost_freq_mhz(&self, v: u64) -> Result<()> {

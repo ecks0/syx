@@ -107,7 +107,7 @@ impl Cpu {
     }
 
     pub async fn online(&self) -> Result<bool> {
-        self.online.get_with(online(self.id)).await
+        self.online.get_or(online(self.id)).await
     }
 
     pub async fn set_online(&self, v: bool) -> Result<()> {

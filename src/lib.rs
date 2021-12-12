@@ -1,3 +1,4 @@
+mod cell;
 pub mod cpu;
 pub mod cpufreq;
 pub mod drm;
@@ -5,14 +6,14 @@ pub mod i915;
 pub mod nv;
 pub mod pstate;
 pub mod rapl;
-pub(crate) mod sysfs;
+mod sysfs;
 
 use std::path::PathBuf;
-use std::sync::Arc;
 
 pub use nvml_wrapper::error::NvmlError;
 pub use tokio::io::Error as IoError;
 
+pub(crate) use crate::cell::Cached;
 pub use crate::cpu::Cpu;
 pub use crate::cpufreq::Cpu as CpufreqCpu;
 pub use crate::drm::Card as DrmCard;
@@ -114,69 +115,3 @@ impl Error {
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
-
-use std::future::Future;
-
-use parking_lot::FairMutex;
-use tokio::task::spawn_blocking;
-
-#[derive(Clone, Debug, Default)]
-struct Cached<T>
-where
-    T: Clone + Send + 'static,
-{
-    cell: Arc<FairMutex<Option<T>>>,
-}
-
-impl<T> Cached<T>
-where
-    T: Clone + Send + 'static,
-{
-    async fn set(&self, v: T) {
-        let cell = Arc::clone(&self.cell);
-        spawn_blocking(move || cell.lock().replace(v))
-            .await
-            .unwrap();
-    }
-
-    async fn get(&self) -> Option<T> {
-        let cell = Arc::clone(&self.cell);
-        spawn_blocking(move || cell.lock().as_ref().cloned())
-            .await
-            .unwrap()
-    }
-
-    async fn get_with<F>(&self, f: F) -> Result<T>
-    where
-        F: Future<Output = Result<T>>,
-    {
-        if let Some(v) = self.get().await {
-            Ok(v)
-        } else {
-            match f.await {
-                Ok(v) => {
-                    self.set(v.clone()).await;
-                    Ok(v)
-                },
-                Err(e) => Err(e),
-            }
-        }
-    }
-
-    async fn clear(&self) {
-        let cell = Arc::clone(&self.cell);
-        spawn_blocking(move || cell.lock().take()).await.unwrap();
-    }
-
-    async fn clear_if<F, R>(&self, f: F) -> Result<R>
-    where
-        F: Future<Output = Result<R>>,
-        R: Send + 'static,
-    {
-        let r = f.await;
-        if r.is_ok() {
-            self.clear().await;
-        }
-        r
-    }
-}
