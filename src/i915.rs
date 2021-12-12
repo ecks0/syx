@@ -232,32 +232,38 @@ impl Card {
     }
 
     pub async fn set_boost_freq_mhz(&self, v: u64) -> Result<()> {
-        let f = set_boost_freq_mhz(self.id, v);
-        self.boost_freq_mhz.clear_if(f).await
+        self.boost_freq_mhz
+            .clear_if(set_boost_freq_mhz(self.id, v))
+            .await
     }
 
     pub async fn set_max_freq_mhz(&self, v: u64) -> Result<()> {
-        let f = set_max_freq_mhz(self.id, v);
-        self.max_freq_mhz.clear_if(f).await
+        self.max_freq_mhz
+            .clear_if(set_max_freq_mhz(self.id, v))
+            .await
     }
 
     pub async fn set_min_freq_mhz(&self, v: u64) -> Result<()> {
-        let f = set_min_freq_mhz(self.id, v);
-        self.min_freq_mhz.clear_if(f).await
+        self.min_freq_mhz
+            .clear_if(set_min_freq_mhz(self.id, v))
+            .await
     }
 
     pub async fn set_rp0_freq_mhz(&self, v: u64) -> Result<()> {
-        let f = set_rp0_freq_mhz(self.id, v);
-        self.rp0_freq_mhz.clear_if(f).await
+        self.rp0_freq_mhz
+            .clear_if(set_rp0_freq_mhz(self.id, v))
+            .await
     }
 
     pub async fn set_rp1_freq_mhz(&self, v: u64) -> Result<()> {
-        let f = set_rp1_freq_mhz(self.id, v);
-        self.rp1_freq_mhz.clear_if(f).await
+        self.rp1_freq_mhz
+            .clear_if(set_rp1_freq_mhz(self.id, v))
+            .await
     }
 
     pub async fn set_rpn_freq_mhz(&self, v: u64) -> Result<()> {
-        let f = set_rpn_freq_mhz(self.id, v);
-        self.rpn_freq_mhz.clear_if(f).await
+        self.rpn_freq_mhz
+            .clear_if(set_rpn_freq_mhz(self.id, v))
+            .await
     }
 }

@@ -212,17 +212,20 @@ impl Cpu {
     }
 
     pub async fn set_scaling_governor(&self, v: impl AsRef<str>) -> Result<()> {
-        let f = set_scaling_governor(self.id, v.as_ref());
-        self.scaling_governor.clear_if(f).await
+        self.scaling_governor
+            .clear_if(set_scaling_governor(self.id, v.as_ref()))
+            .await
     }
 
     pub async fn set_scaling_max_freq(&self, v: u64) -> Result<()> {
-        let f = set_scaling_max_freq(self.id, v);
-        self.scaling_max_freq.clear_if(f).await
+        self.scaling_max_freq
+            .clear_if(set_scaling_max_freq(self.id, v))
+            .await
     }
 
     pub async fn set_scaling_min_freq(&self, v: u64) -> Result<()> {
-        let f = set_scaling_min_freq(self.id, v);
-        self.scaling_min_freq.clear_if(f).await
+        self.scaling_min_freq
+            .clear_if(set_scaling_min_freq(self.id, v))
+            .await
     }
 }

@@ -111,7 +111,6 @@ impl Cpu {
     }
 
     pub async fn set_online(&self, v: bool) -> Result<()> {
-        let f = set_online(self.id, v);
-        self.online.clear_if(f).await
+        self.online.clear_if(set_online(self.id, v)).await
     }
 }

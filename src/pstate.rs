@@ -207,30 +207,32 @@ impl Cpu {
     }
 
     pub async fn energy_perf_bias(&self) -> Result<u64> {
-        let f = energy_perf_bias(self.id);
-        self.energy_perf_bias.get_with(f).await
+        self.energy_perf_bias
+            .get_with(energy_perf_bias(self.id))
+            .await
     }
 
     pub async fn energy_performance_preference(&self) -> Result<String> {
-        let f = energy_performance_preference(self.id);
-        self.energy_performance_preference.get_with(f).await
+        self.energy_performance_preference
+            .get_with(energy_performance_preference(self.id))
+            .await
     }
 
     pub async fn energy_performance_available_preferences(&self) -> Result<Vec<String>> {
-        let f = energy_performance_available_preferences(self.id);
         self.energy_performance_available_preferences
-            .get_with(f)
+            .get_with(energy_performance_available_preferences(self.id))
             .await
     }
 
     pub async fn set_energy_perf_bias(&self, v: u64) -> Result<()> {
-        let f = set_energy_perf_bias(self.id, v);
-        self.energy_perf_bias.clear_if(f).await
+        self.energy_perf_bias
+            .clear_if(set_energy_perf_bias(self.id, v))
+            .await
     }
 
     pub async fn set_energy_performance_preference(&self, v: impl AsRef<str>) -> Result<()> {
-        let v = v.as_ref();
-        let f = set_energy_performance_preference(self.id, v);
-        self.energy_performance_preference.clear_if(f).await
+        self.energy_performance_preference
+            .clear_if(set_energy_performance_preference(self.id, v.as_ref()))
+            .await
     }
 }

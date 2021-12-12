@@ -429,7 +429,8 @@ impl Zone {
     }
 
     pub async fn set_enabled(&self, v: bool) -> Result<()> {
-        let f = set_enabled(self.id.package, self.id.subzone, v);
-        self.enabled.clear_if(f).await
+        self.enabled
+            .clear_if(set_enabled(self.id.package, self.id.subzone, v))
+            .await
     }
 }

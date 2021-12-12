@@ -364,22 +364,20 @@ impl Card {
     }
 
     pub async fn set_gfx_freq(&self, min: u32, max: u32) -> Result<()> {
-        let f = set_gfx_freq(self.id, min, max);
-        self.gfx_freq.clear_if(f).await
+        self.gfx_freq
+            .clear_if(set_gfx_freq(self.id, min, max))
+            .await
     }
 
     pub async fn reset_gfx_freq(&self) -> Result<()> {
-        let f = reset_gfx_freq(self.id);
-        self.gfx_freq.clear_if(f).await
+        self.gfx_freq.clear_if(reset_gfx_freq(self.id)).await
     }
 
     pub async fn set_power_limit(&self, v: u32) -> Result<()> {
-        let f = set_power_limit(self.id, v);
-        self.power_limit.clear_if(f).await
+        self.power_limit.clear_if(set_power_limit(self.id, v)).await
     }
 
     pub async fn reset_power_limit(&self) -> Result<()> {
-        let f = reset_power_limit(self.id);
-        self.power_limit.clear_if(f).await
+        self.power_limit.clear_if(reset_power_limit(self.id)).await
     }
 }
