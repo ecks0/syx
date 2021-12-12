@@ -44,10 +44,11 @@ pub(crate) mod path {
     }
 }
 
-use async_trait::async_trait;
+use crate::{sysfs, Cached, Result};
 
-use crate::util::{self, sysfs};
-use crate::{Feature, Multi, Read, Result, Single, Values, Write};
+pub async fn available() -> bool {
+    path::root().is_dir()
+}
 
 pub async fn devices() -> Result<Vec<u64>> {
     sysfs::read_ids(&path::root(), "cpu").await
@@ -77,141 +78,40 @@ pub async fn set_online(id: u64, val: bool) -> Result<()> {
     sysfs::write_bool(&path::online(id), val).await
 }
 
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Device {
+#[derive(Clone, Debug)]
+pub struct Cpu {
     id: u64,
-    online: Option<bool>,
+    online: Cached<bool>,
 }
 
-impl Device {
-    pub fn online(&self) -> Option<bool> {
-        self.online
+impl Cpu {
+    pub async fn available() -> bool {
+        available().await
     }
 
-    pub fn set_online(&mut self, v: impl Into<Option<bool>>) -> &mut Self {
-        self.online = v.into();
-        self
-    }
-}
-
-#[async_trait]
-impl Read for Device {
-    async fn read(&mut self) {
-        self.online = online(self.id).await.ok();
-    }
-}
-
-#[async_trait]
-impl Write for Device {
-    async fn write(&self) {
-        if let Some(v) = self.online {
-            let _ = set_online(self.id, v).await;
-        }
-    }
-}
-
-#[async_trait]
-impl Values for Device {
-    fn is_empty(&self) -> bool {
-        self.online.is_none()
+    pub async fn ids() -> Result<Vec<u64>> {
+        devices().await
     }
 
-    fn clear(&mut self) -> &mut Self {
-        self.online = None;
-        self
-    }
-}
-
-#[async_trait]
-impl Multi for Device {
-    type Id = u64;
-
-    async fn ids() -> Vec<Self::Id> {
-        devices().await.unwrap_or_default()
+    pub fn new(id: u64) -> Self {
+        let online = Cached::default();
+        Self { id, online }
     }
 
-    fn id(&self) -> Self::Id {
+    pub async fn clear(&self) {
+        self.online.clear().await;
+    }
+
+    pub fn id(&self) -> u64 {
         self.id
     }
 
-    fn set_id(&mut self, v: Self::Id) -> &mut Self {
-        self.id = v;
-        self
-    }
-}
-
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct System {
-    devices: Vec<Device>,
-}
-
-impl System {
-    pub fn push_device(&mut self, v: Device) -> &mut Self {
-        if let Some(i) = self.devices.iter().position(|d| v.id.eq(&d.id)) {
-            self.devices[i] = v;
-        } else {
-            self.devices.push(v);
-            self.devices.sort_unstable_by(|a, b| a.id.cmp(&b.id));
-        }
-        self
+    pub async fn online(&self) -> Result<bool> {
+        self.online.get_with(online(self.id)).await
     }
 
-    pub fn push_devices(&mut self, v: impl IntoIterator<Item = Device>) -> &mut Self {
-        for d in v.into_iter() {
-            self.push_device(d);
-        }
-        self
-    }
-
-    pub fn devices(&self) -> std::slice::Iter<'_, Device> {
-        self.devices.iter()
-    }
-
-    pub fn into_devices(self) -> impl IntoIterator<Item = Device> {
-        self.devices.into_iter()
-    }
-}
-
-#[async_trait]
-impl Read for System {
-    async fn read(&mut self) {
-        self.devices.clear();
-        self.devices.extend(Device::load_all().await);
-    }
-}
-
-#[async_trait]
-impl Write for System {
-    async fn write(&self) {
-        for device in &self.devices {
-            device.write().await;
-        }
-        if self.devices.iter().any(|d| d.online.is_some()) {
-            util::cpu::wait_for_onoff().await;
-        }
-    }
-}
-
-#[async_trait]
-impl Values for System {
-    fn is_empty(&self) -> bool {
-        self.devices.is_empty()
-    }
-
-    fn clear(&mut self) -> &mut Self {
-        self.devices.clear();
-        self
-    }
-}
-
-#[async_trait]
-impl Single for System {}
-
-#[async_trait]
-impl Feature for System {
-    async fn present() -> bool {
-        path::root().is_dir()
+    pub async fn set_online(&self, v: bool) -> Result<()> {
+        let f = set_online(self.id, v);
+        self.online.clear_if(f).await
     }
 }

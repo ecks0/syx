@@ -1,6 +1,10 @@
 pub(crate) mod path {
     use std::path::PathBuf;
 
+    pub(crate) fn module() -> PathBuf {
+        PathBuf::from("/sys/module/i915")
+    }
+
     pub(crate) fn root() -> PathBuf {
         PathBuf::from("/sys/class/drm")
     }
@@ -56,10 +60,11 @@ pub(crate) mod path {
     }
 }
 
-use async_trait::async_trait;
+use crate::{sysfs, Cached, Result};
 
-use crate::util::sysfs;
-use crate::{Feature, Multi, Read, Result, Single, Values, Write};
+pub async fn available() -> bool {
+    path::module().is_dir()
+}
 
 pub async fn devices() -> Result<Vec<u64>> {
     let mut ids = vec![];
@@ -133,219 +138,126 @@ pub async fn set_rpn_freq_mhz(id: u64, v: u64) -> Result<()> {
     sysfs::write_u64(&path::rpn_freq_mhz(id), v).await
 }
 
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Device {
+#[derive(Clone, Debug)]
+pub struct Card {
     id: u64,
-    act_freq_mhz: Option<u64>,
-    boost_freq_mhz: Option<u64>,
-    cur_freq_mhz: Option<u64>,
-    max_freq_mhz: Option<u64>,
-    min_freq_mhz: Option<u64>,
-    rp0_freq_mhz: Option<u64>,
-    rp1_freq_mhz: Option<u64>,
-    rpn_freq_mhz: Option<u64>,
+    act_freq_mhz: Cached<u64>,
+    boost_freq_mhz: Cached<u64>,
+    cur_freq_mhz: Cached<u64>,
+    max_freq_mhz: Cached<u64>,
+    min_freq_mhz: Cached<u64>,
+    rp0_freq_mhz: Cached<u64>,
+    rp1_freq_mhz: Cached<u64>,
+    rpn_freq_mhz: Cached<u64>,
 }
 
-impl Device {
-    pub fn act_freq_mhz(&self) -> Option<u64> {
-        self.act_freq_mhz
+impl Card {
+    pub async fn available() -> bool {
+        available().await
     }
 
-    pub fn boost_freq_mhz(&self) -> Option<u64> {
-        self.boost_freq_mhz
+    pub async fn ids() -> Result<Vec<u64>> {
+        devices().await
     }
 
-    pub fn cur_freq_mhz(&self) -> Option<u64> {
-        self.cur_freq_mhz
-    }
-
-    pub fn max_freq_mhz(&self) -> Option<u64> {
-        self.max_freq_mhz
-    }
-
-    pub fn min_freq_mhz(&self) -> Option<u64> {
-        self.min_freq_mhz
-    }
-
-    pub fn rp0_freq_mhz(&self) -> Option<u64> {
-        self.rp0_freq_mhz
-    }
-
-    pub fn rp1_freq_mhz(&self) -> Option<u64> {
-        self.rp1_freq_mhz
-    }
-
-    pub fn rpn_freq_mhz(&self) -> Option<u64> {
-        self.rpn_freq_mhz
-    }
-
-    pub fn set_boost_freq_mhz(&mut self, v: impl Into<Option<u64>>) -> &mut Self {
-        self.boost_freq_mhz = v.into();
-        self
-    }
-
-    pub fn set_max_freq_mhz(&mut self, v: impl Into<Option<u64>>) -> &mut Self {
-        self.max_freq_mhz = v.into();
-        self
-    }
-
-    pub fn set_min_freq_mhz(&mut self, v: impl Into<Option<u64>>) -> &mut Self {
-        self.min_freq_mhz = v.into();
-        self
-    }
-
-    pub fn set_rp0_freq_mhz(&mut self, v: impl Into<Option<u64>>) -> &mut Self {
-        self.rp0_freq_mhz = v.into();
-        self
-    }
-
-    pub fn set_rp1_freq_mhz(&mut self, v: impl Into<Option<u64>>) -> &mut Self {
-        self.rp1_freq_mhz = v.into();
-        self
-    }
-
-    pub fn set_rpn_freq_mhz(&mut self, v: impl Into<Option<u64>>) -> &mut Self {
-        self.rpn_freq_mhz = v.into();
-        self
-    }
-}
-
-#[async_trait]
-impl Read for Device {
-    async fn read(&mut self) {
-        self.act_freq_mhz = act_freq_mhz(self.id).await.ok();
-        self.boost_freq_mhz = boost_freq_mhz(self.id).await.ok();
-        self.cur_freq_mhz = cur_freq_mhz(self.id).await.ok();
-        self.max_freq_mhz = max_freq_mhz(self.id).await.ok();
-        self.min_freq_mhz = min_freq_mhz(self.id).await.ok();
-        self.rp0_freq_mhz = rp0_freq_mhz(self.id).await.ok();
-        self.rp1_freq_mhz = rp1_freq_mhz(self.id).await.ok();
-        self.rpn_freq_mhz = rpn_freq_mhz(self.id).await.ok();
-    }
-}
-
-#[async_trait]
-impl Write for Device {
-    async fn write(&self) {
-        if let Some(v) = self.boost_freq_mhz {
-            let _ = set_boost_freq_mhz(self.id, v).await;
-        }
-        if let Some(v) = self.max_freq_mhz {
-            let _ = set_max_freq_mhz(self.id, v).await;
-        }
-        if let Some(v) = self.min_freq_mhz {
-            let _ = set_min_freq_mhz(self.id, v).await;
-        }
-        if let Some(v) = self.rp0_freq_mhz {
-            let _ = set_rp0_freq_mhz(self.id, v).await;
-        }
-        if let Some(v) = self.rp1_freq_mhz {
-            let _ = set_rp1_freq_mhz(self.id, v).await;
-        }
-        if let Some(v) = self.rpn_freq_mhz {
-            let _ = set_rpn_freq_mhz(self.id, v).await;
+    pub fn new(id: u64) -> Self {
+        let act_freq_mhz = Cached::default();
+        let boost_freq_mhz = Cached::default();
+        let cur_freq_mhz = Cached::default();
+        let max_freq_mhz = Cached::default();
+        let min_freq_mhz = Cached::default();
+        let rp0_freq_mhz = Cached::default();
+        let rp1_freq_mhz = Cached::default();
+        let rpn_freq_mhz = Cached::default();
+        Self {
+            id,
+            act_freq_mhz,
+            boost_freq_mhz,
+            cur_freq_mhz,
+            max_freq_mhz,
+            min_freq_mhz,
+            rp0_freq_mhz,
+            rp1_freq_mhz,
+            rpn_freq_mhz,
         }
     }
-}
 
-#[async_trait]
-impl Values for Device {
-    fn is_empty(&self) -> bool {
-        self.eq(&Self::new(self.id))
+    pub async fn clear(&self) {
+        tokio::join!(
+            self.act_freq_mhz.clear(),
+            self.boost_freq_mhz.clear(),
+            self.cur_freq_mhz.clear(),
+            self.max_freq_mhz.clear(),
+            self.min_freq_mhz.clear(),
+            self.rp0_freq_mhz.clear(),
+            self.rp1_freq_mhz.clear(),
+            self.rpn_freq_mhz.clear(),
+        );
     }
 
-    fn clear(&mut self) -> &mut Self {
-        *self = Self::new(self.id);
-        self
-    }
-}
-
-#[async_trait]
-impl Multi for Device {
-    type Id = u64;
-
-    async fn ids() -> Vec<Self::Id> {
-        devices().await.unwrap_or_default()
-    }
-
-    fn id(&self) -> Self::Id {
+    pub fn id(&self) -> u64 {
         self.id
     }
 
-    fn set_id(&mut self, v: Self::Id) -> &mut Self {
-        self.id = v;
-        self
-    }
-}
-
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct System {
-    devices: Vec<Device>,
-}
-
-impl System {
-    pub fn push_device(&mut self, v: Device) -> &mut Self {
-        if let Some(i) = self.devices.iter().position(|d| v.id.eq(&d.id)) {
-            self.devices[i] = v;
-        } else {
-            self.devices.push(v);
-            self.devices.sort_unstable_by(|a, b| a.id.cmp(&b.id));
-        }
-        self
+    pub async fn act_freq_mhz(&self) -> Result<u64> {
+        self.act_freq_mhz.get_with(act_freq_mhz(self.id)).await
     }
 
-    pub fn push_devices(&mut self, v: impl IntoIterator<Item = Device>) -> &mut Self {
-        for d in v.into_iter() {
-            self.push_device(d);
-        }
-        self
+    pub async fn boost_freq_mhz(&self) -> Result<u64> {
+        self.boost_freq_mhz.get_with(boost_freq_mhz(self.id)).await
     }
 
-    pub fn devices(&self) -> std::slice::Iter<'_, Device> {
-        self.devices.iter()
+    pub async fn cur_freq_mhz(&self) -> Result<u64> {
+        self.cur_freq_mhz.get_with(cur_freq_mhz(self.id)).await
     }
 
-    pub fn into_devices(self) -> impl IntoIterator<Item = Device> {
-        self.devices.into_iter()
-    }
-}
-
-#[async_trait]
-impl Read for System {
-    async fn read(&mut self) {
-        self.devices.clear();
-        self.devices.extend(Device::load_all().await);
-    }
-}
-
-#[async_trait]
-impl Write for System {
-    async fn write(&self) {
-        for device in &self.devices {
-            device.write().await;
-        }
-    }
-}
-
-#[async_trait]
-impl Values for System {
-    fn is_empty(&self) -> bool {
-        self.devices.is_empty()
+    pub async fn max_freq_mhz(&self) -> Result<u64> {
+        self.max_freq_mhz.get_with(max_freq_mhz(self.id)).await
     }
 
-    fn clear(&mut self) -> &mut Self {
-        self.devices.clear();
-        self
+    pub async fn min_freq_mhz(&self) -> Result<u64> {
+        self.min_freq_mhz.get_with(min_freq_mhz(self.id)).await
     }
-}
 
-impl Single for System {}
+    pub async fn rp0_freq_mhz(&self) -> Result<u64> {
+        self.rp0_freq_mhz.get_with(rp0_freq_mhz(self.id)).await
+    }
 
-#[async_trait]
-impl Feature for System {
-    async fn present() -> bool {
-        !Device::ids().await.is_empty()
+    pub async fn rp1_freq_mhz(&self) -> Result<u64> {
+        self.rp1_freq_mhz.get_with(rp1_freq_mhz(self.id)).await
+    }
+
+    pub async fn rpn_freq_mhz(&self) -> Result<u64> {
+        self.rpn_freq_mhz.get_with(rpn_freq_mhz(self.id)).await
+    }
+
+    pub async fn set_boost_freq_mhz(&self, v: u64) -> Result<()> {
+        let f = set_boost_freq_mhz(self.id, v);
+        self.boost_freq_mhz.clear_if(f).await
+    }
+
+    pub async fn set_max_freq_mhz(&self, v: u64) -> Result<()> {
+        let f = set_max_freq_mhz(self.id, v);
+        self.max_freq_mhz.clear_if(f).await
+    }
+
+    pub async fn set_min_freq_mhz(&self, v: u64) -> Result<()> {
+        let f = set_min_freq_mhz(self.id, v);
+        self.min_freq_mhz.clear_if(f).await
+    }
+
+    pub async fn set_rp0_freq_mhz(&self, v: u64) -> Result<()> {
+        let f = set_rp0_freq_mhz(self.id, v);
+        self.rp0_freq_mhz.clear_if(f).await
+    }
+
+    pub async fn set_rp1_freq_mhz(&self, v: u64) -> Result<()> {
+        let f = set_rp1_freq_mhz(self.id, v);
+        self.rp1_freq_mhz.clear_if(f).await
+    }
+
+    pub async fn set_rpn_freq_mhz(&self, v: u64) -> Result<()> {
+        let f = set_rpn_freq_mhz(self.id, v);
+        self.rpn_freq_mhz.clear_if(f).await
     }
 }

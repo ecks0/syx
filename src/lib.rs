@@ -3,24 +3,23 @@ pub mod cpufreq;
 pub mod drm;
 pub mod i915;
 pub mod nv;
-pub mod prelude;
 pub mod pstate;
 pub mod rapl;
-pub(crate) mod util;
+pub(crate) mod sysfs;
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
-use async_trait::async_trait;
 pub use nvml_wrapper::error::NvmlError;
 pub use tokio::io::Error as IoError;
 
-pub use crate::cpu::System as Cpu;
-pub use crate::cpufreq::System as Cpufreq;
-pub use crate::drm::System as Drm;
-pub use crate::i915::System as I915;
-pub use crate::nv::System as Nv;
-pub use crate::pstate::System as Pstate;
-pub use crate::rapl::System as Rapl;
+pub use crate::cpu::Cpu;
+pub use crate::cpufreq::Cpu as CpufreqCpu;
+pub use crate::drm::Card as DrmCard;
+pub use crate::i915::Card as I915Card;
+pub use crate::nv::Card as NvCard;
+pub use crate::pstate::{Cpu as PstateCpu, System as PstateSystem};
+pub use crate::rapl::{Constraint as RaplConstraint, Zone as RaplZone};
 
 #[derive(Clone, Debug)]
 pub enum Op {
@@ -116,129 +115,68 @@ impl Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[async_trait]
-pub trait Read {
-    async fn read(&mut self);
+use std::future::Future;
+
+use parking_lot::FairMutex;
+use tokio::task::spawn_blocking;
+
+#[derive(Clone, Debug, Default)]
+struct Cached<T>
+where
+    T: Clone + Send + 'static,
+{
+    cell: Arc<FairMutex<Option<T>>>,
 }
 
-#[async_trait]
-pub trait Write {
-    async fn write(&self);
-}
-
-pub trait Values {
-    fn is_empty(&self) -> bool;
-
-    fn clear(&mut self) -> &mut Self;
-}
-
-#[async_trait]
-pub trait Single: Default + Read + Send + Sized + Values {
-    async fn load() -> Self {
-        let mut s = Self::default();
-        s.read().await;
-        s
-    }
-}
-
-#[async_trait]
-pub trait Multi: Default + PartialEq + Read + Send + Sized + Values {
-    type Id: Send + Sized;
-
-    async fn ids() -> Vec<Self::Id>;
-
-    async fn load(id: Self::Id) -> Self {
-        let mut s = Self::new(id);
-        s.read().await;
-        s
+impl<T> Cached<T>
+where
+    T: Clone + Send + 'static,
+{
+    async fn set(&self, v: T) {
+        let cell = Arc::clone(&self.cell);
+        spawn_blocking(move || cell.lock().replace(v))
+            .await
+            .unwrap();
     }
 
-    async fn load_all() -> Vec<Self> {
-        let mut all = vec![];
-        for id in Self::ids().await {
-            let s = Self::load(id).await;
-            all.push(s);
+    async fn get(&self) -> Option<T> {
+        let cell = Arc::clone(&self.cell);
+        spawn_blocking(move || cell.lock().as_ref().cloned())
+            .await
+            .unwrap()
+    }
+
+    async fn get_with<F>(&self, f: F) -> Result<T>
+    where
+        F: Future<Output = Result<T>>,
+    {
+        if let Some(v) = self.get().await {
+            Ok(v)
+        } else {
+            match f.await {
+                Ok(v) => {
+                    self.set(v.clone()).await;
+                    Ok(v)
+                },
+                Err(e) => Err(e),
+            }
         }
-        all
     }
 
-    fn new(id: Self::Id) -> Self {
-        let mut s = Self::default();
-        s.set_id(id);
-        s
+    async fn clear(&self) {
+        let cell = Arc::clone(&self.cell);
+        spawn_blocking(move || cell.lock().take()).await.unwrap();
     }
 
-    fn id(&self) -> Self::Id;
-
-    fn set_id(&mut self, v: Self::Id) -> &mut Self;
-}
-
-#[async_trait]
-pub trait Feature {
-    async fn present() -> bool;
-}
-
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct System {
-    cpu: cpu::System,
-    cpufreq: cpufreq::System,
-    i915: i915::System,
-    intel_pstate: pstate::System,
-    intel_rapl: rapl::System,
-    nv: nv::System,
-}
-
-impl System {
-    // TODO
-}
-
-#[async_trait]
-impl Read for System {
-    async fn read(&mut self) {
-        self.cpu = cpu::System::load().await;
-        self.cpufreq = cpufreq::System::load().await;
-        self.i915 = i915::System::load().await;
-        self.intel_pstate = pstate::System::load().await;
-        self.intel_rapl = rapl::System::load().await;
-        self.nv = nv::System::load().await;
-    }
-}
-
-#[async_trait]
-impl Write for System {
-    async fn write(&self) {
-        if !(self.cpufreq.is_empty() && self.intel_pstate.is_empty()) {
-            let mut ids = self
-                .cpufreq
-                .devices()
-                .map(|d| d.id())
-                .chain(self.intel_pstate.devices().map(|d| d.id()))
-                .collect::<Vec<_>>();
-            ids.sort_unstable();
-            ids.dedup();
-            let ids = util::cpu::set_online(ids).await;
-            self.cpufreq.write().await;
-            self.intel_pstate.write().await;
-            util::cpu::wait_for_write().await;
-            util::cpu::set_offline(ids).await;
+    async fn clear_if<F, R>(&self, f: F) -> Result<R>
+    where
+        F: Future<Output = Result<R>>,
+        R: Send + 'static,
+    {
+        let r = f.await;
+        if r.is_ok() {
+            self.clear().await;
         }
-        self.cpu.write().await;
-        self.intel_rapl.write().await;
-        self.i915.write().await;
-        self.nv.write().await;
+        r
     }
 }
-
-impl Values for System {
-    fn is_empty(&self) -> bool {
-        self.eq(&Self::default())
-    }
-
-    fn clear(&mut self) -> &mut Self {
-        *self = Self::default();
-        self
-    }
-}
-
-#[async_trait]
-impl Single for System {}

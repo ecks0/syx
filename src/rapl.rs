@@ -49,49 +49,46 @@ pub(crate) mod path {
     pub(crate) fn constraint_attr(
         package: u64,
         subzone: Option<u64>,
-        constraint: u64,
+        index: u64,
         a: &str,
     ) -> PathBuf {
-        device_attr(
-            package,
-            subzone,
-            &format!("constraint_{}_{}", constraint, a),
-        )
+        device_attr(package, subzone, &format!("constraint_{}_{}", index, a))
     }
 
-    pub(crate) fn constraint_name(package: u64, subzone: Option<u64>, constraint: u64) -> PathBuf {
-        constraint_attr(package, subzone, constraint, "name")
+    pub(crate) fn constraint_name(package: u64, subzone: Option<u64>, index: u64) -> PathBuf {
+        constraint_attr(package, subzone, index, "name")
     }
 
     pub(crate) fn constraint_max_power_uw(
         package: u64,
         subzone: Option<u64>,
-        constraint: u64,
+        index: u64,
     ) -> PathBuf {
-        constraint_attr(package, subzone, constraint, "max_power_uw")
+        constraint_attr(package, subzone, index, "max_power_uw")
     }
 
     pub(crate) fn constraint_power_limit_uw(
         package: u64,
         subzone: Option<u64>,
-        constraint: u64,
+        index: u64,
     ) -> PathBuf {
-        constraint_attr(package, subzone, constraint, "power_limit_uw")
+        constraint_attr(package, subzone, index, "power_limit_uw")
     }
 
     pub(crate) fn constraint_time_window_us(
         package: u64,
         subzone: Option<u64>,
-        constraint: u64,
+        index: u64,
     ) -> PathBuf {
-        constraint_attr(package, subzone, constraint, "time_window_us")
+        constraint_attr(package, subzone, index, "time_window_us")
     }
 }
 
-use async_trait::async_trait;
+use crate::{sysfs, Cached, Result};
 
-use crate::util::sysfs;
-use crate::{Feature, Multi, Read, Result, Single, Values, Write};
+pub async fn available() -> bool {
+    path::root().is_dir()
+}
 
 pub async fn zones() -> Result<Vec<u64>> {
     sysfs::read_ids(&path::root(), "intel-rapl:").await
@@ -127,14 +124,14 @@ pub async fn max_energy_range_uj(package: u64, subzone: Option<u64>) -> Result<u
 }
 
 pub async fn name(package: u64, subzone: Option<u64>) -> Result<String> {
-    sysfs::read_str(&path::name(package, subzone)).await
+    sysfs::read_string(&path::name(package, subzone)).await
 }
 
 pub async fn set_enabled(package: u64, subzone: Option<u64>, v: bool) -> Result<()> {
     sysfs::write_bool(&path::enabled(package, subzone), v).await
 }
 
-pub async fn constraints(package: u64, subzone: Option<u64>) -> Vec<u64> {
+pub async fn constraints(package: u64, subzone: Option<u64>) -> Result<Vec<u64>> {
     let mut indices = vec![];
     for i in 0.. {
         if path::constraint_name(package, subzone, i).is_file() {
@@ -143,7 +140,7 @@ pub async fn constraints(package: u64, subzone: Option<u64>) -> Vec<u64> {
             break;
         }
     }
-    indices
+    Ok(indices)
 }
 
 pub async fn constraint_name(
@@ -151,7 +148,7 @@ pub async fn constraint_name(
     subzone: Option<u64>,
     constraint: u64,
 ) -> Result<String> {
-    sysfs::read_str(&path::constraint_name(package, subzone, constraint)).await
+    sysfs::read_string(&path::constraint_name(package, subzone, constraint)).await
 }
 
 pub async fn constraint_max_power_uw(
@@ -224,8 +221,7 @@ pub async fn set_constraint_time_window_us(
     .await
 }
 
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ZoneId {
     package: u64,
     subzone: Option<u64>,
@@ -245,8 +241,7 @@ impl ZoneId {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ConstraintId {
     zone: ZoneId,
     index: u64,
@@ -264,288 +259,177 @@ impl ConstraintId {
     pub fn index(&self) -> u64 {
         self.index
     }
+
+    fn decompose(&self) -> (u64, Option<u64>, u64) {
+        (self.zone.package(), self.zone.subzone(), self.index)
+    }
 }
 
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug)]
 pub struct Constraint {
     id: ConstraintId,
-    name: Option<String>,
-    max_power_uw: Option<u64>,
-    power_limit_uw: Option<u64>,
-    time_window_us: Option<u64>,
+    name: Cached<String>,
+    max_power_uw: Cached<u64>,
+    power_limit_uw: Cached<u64>,
+    time_window_us: Cached<u64>,
 }
 
 impl Constraint {
-    pub async fn ids_for_zone(zone: ZoneId) -> Vec<ConstraintId> {
-        let mut ids = vec![];
-        for index in constraints(zone.package, zone.subzone).await {
-            let id = ConstraintId::new(zone, index);
-            ids.push(id);
+    pub async fn available() -> bool {
+        available().await
+    }
+
+    pub async fn ids(zone: ZoneId) -> Result<Vec<ConstraintId>> {
+        constraints(zone.package, zone.subzone).await.map(|ids| {
+            ids.into_iter()
+                .map(|index| ConstraintId::new(zone, index))
+                .collect()
+        })
+    }
+
+    pub fn new(id: ConstraintId) -> Self {
+        let name = Cached::default();
+        let max_power_uw = Cached::default();
+        let power_limit_uw = Cached::default();
+        let time_window_us = Cached::default();
+        Self {
+            id,
+            name,
+            max_power_uw,
+            power_limit_uw,
+            time_window_us,
         }
-        ids
     }
 
-    pub async fn load_for_zone(zone: ZoneId) -> Vec<Constraint> {
-        let mut constraints = vec![];
-        for id in Self::ids_for_zone(zone).await {
-            let s = Self::new(id);
-            constraints.push(s);
-        }
-        constraints
+    pub async fn clear(&self) {
+        tokio::join!(
+            self.name.clear(),
+            self.max_power_uw.clear(),
+            self.power_limit_uw.clear(),
+            self.time_window_us.clear(),
+        );
     }
 
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+    pub fn id(&self) -> ConstraintId {
+        self.id
     }
 
-    pub fn max_power_uw(&self) -> Option<u64> {
+    pub async fn name(&self) -> Result<String> {
+        let (package, subzone, index) = self.id.decompose();
+        self.name
+            .get_with(constraint_name(package, subzone, index))
+            .await
+    }
+
+    pub async fn max_power_uw(&self) -> Result<u64> {
+        let (package, subzone, index) = self.id.decompose();
         self.max_power_uw
+            .get_with(constraint_max_power_uw(package, subzone, index))
+            .await
     }
 
-    pub fn power_limit_uw(&self) -> Option<u64> {
+    pub async fn power_limit_uw(&self) -> Result<u64> {
+        let (package, subzone, index) = self.id.decompose();
         self.power_limit_uw
+            .get_with(constraint_power_limit_uw(package, subzone, index))
+            .await
     }
 
-    pub fn time_window_us(&self) -> Option<u64> {
+    pub async fn time_window_us(&self) -> Result<u64> {
+        let (package, subzone, index) = self.id.decompose();
         self.time_window_us
-    }
-
-    pub fn set_power_limit_uw(&mut self, v: impl Into<Option<u64>>) -> &mut Self {
-        self.power_limit_uw = v.into();
-        self
-    }
-
-    pub fn set_time_window_us(&mut self, v: impl Into<Option<u64>>) -> &mut Self {
-        self.time_window_us = v.into();
-        self
-    }
-}
-
-#[async_trait]
-impl Read for Constraint {
-    async fn read(&mut self) {
-        let (package, subzone, index) = (self.id.zone.package, self.id.zone.subzone, self.id.index);
-        self.name = constraint_name(package, subzone, index).await.ok();
-        self.max_power_uw = constraint_max_power_uw(package, subzone, index).await.ok();
-        self.power_limit_uw = constraint_power_limit_uw(package, subzone, index)
+            .get_with(constraint_time_window_us(package, subzone, index))
             .await
-            .ok();
-        self.time_window_us = constraint_time_window_us(package, subzone, index)
-            .await
-            .ok();
+    }
+
+    pub async fn set_power_limit_uw(&mut self, v: u64) -> Result<()> {
+        let (package, subzone, index) = self.id.decompose();
+        let f = set_constraint_power_limit_uw(package, subzone, index, v);
+        self.power_limit_uw.clear_if(f).await
+    }
+
+    pub async fn set_time_window_us(&mut self, v: u64) -> Result<()> {
+        let (package, subzone, index) = self.id.decompose();
+        let f = set_constraint_time_window_us(package, subzone, index, v);
+        self.time_window_us.clear_if(f).await
     }
 }
 
-#[async_trait]
-impl Write for Constraint {
-    async fn write(&self) {
-        let (package, subzone, index) = (self.id.zone.package, self.id.zone.subzone, self.id.index);
-        if let Some(v) = self.power_limit_uw {
-            let _ = set_constraint_power_limit_uw(package, subzone, index, v).await;
-        };
-        if let Some(v) = self.time_window_us {
-            let _ = set_constraint_time_window_us(package, subzone, index, v).await;
-        };
-    }
-}
-
-#[async_trait]
-impl Values for Constraint {
-    fn is_empty(&self) -> bool {
-        self.eq(&Self::new(self.id))
-    }
-
-    fn clear(&mut self) -> &mut Self {
-        *self = Self::new(self.id);
-        self
-    }
-}
-
-#[async_trait]
-impl Multi for Constraint {
-    type Id = ConstraintId;
-
-    async fn ids() -> Vec<Self::Id> {
-        let mut ids = vec![];
-        for (package, subzone) in devices().await.unwrap_or_default() {
-            let zone = ZoneId::new(package, subzone);
-            ids.extend(Self::ids_for_zone(zone).await);
-        }
-        ids
-    }
-
-    fn id(&self) -> Self::Id {
-        self.id
-    }
-
-    fn set_id(&mut self, v: Self::Id) -> &mut Self {
-        self.id = v;
-        self
-    }
-}
-
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Device {
+#[derive(Clone, Debug)]
+pub struct Zone {
     id: ZoneId,
-    constraints: Vec<Constraint>,
-    enabled: Option<bool>,
-    energy_uj: Option<u64>,
-    max_energy_range_uj: Option<u64>,
-    name: Option<String>,
+    enabled: Cached<bool>,
+    energy_uj: Cached<u64>,
+    max_energy_range_uj: Cached<u64>,
+    name: Cached<String>,
 }
 
-impl Device {
-    pub fn push_constraint(&mut self, v: Constraint) -> &mut Self {
-        if let Some(i) = self.constraints.iter().position(|c| v.id.eq(&c.id)) {
-            self.constraints[i] = v;
-        } else {
-            self.constraints.push(v);
-            self.constraints.sort_unstable_by(|a, b| a.id.cmp(&b.id));
-        }
-        self
+impl Zone {
+    pub async fn available() -> bool {
+        available().await
     }
 
-    pub fn push_constraints<I>(&mut self, v: impl IntoIterator<Item = Constraint>) -> &mut Self {
-        for c in v.into_iter() {
-            self.push_constraint(c);
-        }
-        self
+    pub async fn ids() -> Result<Vec<ZoneId>> {
+        devices().await.map(|ids| {
+            ids.into_iter()
+                .map(|(package, subzone)| ZoneId::new(package, subzone))
+                .collect()
+        })
     }
 
-    pub fn constraints(&self) -> std::slice::Iter<'_, Constraint> {
-        self.constraints.iter()
-    }
-
-    pub fn into_constraints(self) -> impl IntoIterator<Item = Constraint> {
-        self.constraints.into_iter()
-    }
-
-    pub fn enabled(&self) -> Option<bool> {
-        self.enabled
-    }
-
-    pub fn energy_uj(&self) -> Option<u64> {
-        self.energy_uj
-    }
-
-    pub fn max_energy_range_uj(&self) -> Option<u64> {
-        self.max_energy_range_uj
-    }
-
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
-    }
-
-    pub fn set_enabled(&mut self, v: impl Into<Option<bool>>) -> &mut Self {
-        self.enabled = v.into();
-        self
-    }
-}
-
-#[async_trait]
-impl Read for Device {
-    async fn read(&mut self) {
-        self.constraints.clear();
-        self.constraints
-            .extend(Constraint::load_for_zone(self.id).await);
-        self.enabled = enabled(self.id.package, self.id.subzone).await.ok();
-        self.energy_uj = energy_uj(self.id.package, self.id.subzone).await.ok();
-        self.max_energy_range_uj = max_energy_range_uj(self.id.package, self.id.subzone)
-            .await
-            .ok();
-        self.name = name(self.id.package, self.id.subzone).await.ok();
-    }
-}
-
-#[async_trait]
-impl Write for Device {
-    async fn write(&self) {
-        for constraint in &self.constraints {
-            constraint.write().await;
-        }
-        if let Some(v) = self.enabled {
-            let _ = set_enabled(self.id.package, self.id.subzone, v);
+    pub fn new(id: ZoneId) -> Self {
+        let enabled = Cached::default();
+        let energy_uj = Cached::default();
+        let max_energy_range_uj = Cached::default();
+        let name = Cached::default();
+        Self {
+            id,
+            enabled,
+            energy_uj,
+            max_energy_range_uj,
+            name,
         }
     }
-}
 
-#[async_trait]
-impl Values for Device {
-    fn is_empty(&self) -> bool {
-        self.eq(&Self::new(self.id))
+    pub async fn clear(&self) {
+        tokio::join!(
+            self.enabled.clear(),
+            self.energy_uj.clear(),
+            self.max_energy_range_uj.clear(),
+            self.name.clear(),
+        );
     }
 
-    fn clear(&mut self) -> &mut Self {
-        *self = Self::new(self.id);
-        self
-    }
-}
-
-#[async_trait]
-impl Multi for Device {
-    type Id = ZoneId;
-
-    async fn ids() -> Vec<ZoneId> {
-        devices()
-            .await
-            .unwrap_or_default()
-            .into_iter()
-            .map(|(package, subzone)| ZoneId::new(package, subzone))
-            .collect()
-    }
-
-    fn id(&self) -> Self::Id {
+    pub fn id(&self) -> ZoneId {
         self.id
     }
 
-    fn set_id(&mut self, v: Self::Id) -> &mut Self {
-        self.id = v;
-        self
-    }
-}
-
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct System {
-    devices: Vec<Device>,
-}
-
-#[async_trait]
-impl Read for System {
-    async fn read(&mut self) {
-        self.devices.clear();
-        self.devices.extend(Device::load_all().await);
-    }
-}
-
-#[async_trait]
-impl Write for System {
-    async fn write(&self) {
-        for device in &self.devices {
-            device.write().await;
-        }
-    }
-}
-
-#[async_trait]
-impl Values for System {
-    fn is_empty(&self) -> bool {
-        self.devices.is_empty()
+    pub async fn enabled(&self) -> Result<bool> {
+        self.enabled
+            .get_with(enabled(self.id.package, self.id.subzone))
+            .await
     }
 
-    fn clear(&mut self) -> &mut Self {
-        self.devices.clear();
-        self
+    pub async fn energy_uj(&self) -> Result<u64> {
+        self.energy_uj
+            .get_with(energy_uj(self.id.package, self.id.subzone))
+            .await
     }
-}
 
-impl Single for System {}
+    pub async fn max_energy_range_uj(&self) -> Result<u64> {
+        self.max_energy_range_uj
+            .get_with(max_energy_range_uj(self.id.package, self.id.subzone))
+            .await
+    }
 
-#[async_trait]
-impl Feature for System {
-    async fn present() -> bool {
-        path::root().is_dir()
+    pub async fn name(&self) -> Result<String> {
+        self.name
+            .get_with(name(self.id.package, self.id.subzone))
+            .await
+    }
+
+    pub async fn set_enabled(&self, v: bool) -> Result<()> {
+        let f = set_enabled(self.id.package, self.id.subzone, v);
+        self.enabled.clear_if(f).await
     }
 }

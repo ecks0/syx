@@ -7,7 +7,7 @@ use tokio::io::{AsyncReadExt as _, Error as IoError};
 use crate::{Error, Result};
 
 pub(crate) async fn read_bool(path: &Path) -> Result<bool> {
-    let val = read_str(path).await?;
+    let val = read_string(path).await?;
     match val.as_str() {
         "0" => Ok(false),
         "1" => Ok(true),
@@ -45,7 +45,7 @@ pub(crate) async fn read_ids(path: &Path, prefix: &str) -> Result<Vec<u64>> {
 }
 
 pub(crate) async fn read_indices(path: &Path) -> Result<Vec<u64>> {
-    let s = read_str(path).await?;
+    let s = read_string(path).await?;
     let mut ids = vec![];
     for item in s.split(',') {
         let parts: Vec<&str> = item.split('-').collect();
@@ -85,35 +85,35 @@ pub(crate) async fn read_link_name(path: &Path) -> Result<String> {
     Ok(val)
 }
 
-pub(crate) async fn read_str(path: &Path) -> Result<String> {
-    async fn read_str(path: &Path) -> StdResult<String, IoError> {
+pub(crate) async fn read_string(path: &Path) -> Result<String> {
+    async fn read_string(path: &Path) -> StdResult<String, IoError> {
         let mut f = tokio::fs::File::open(path).await?;
         let mut s = String::with_capacity(256);
         f.read_to_string(&mut s).await?;
         let s = s.trim_end_matches('\n').to_string();
         Ok(s)
     }
-    handle_read(path, read_str(path).await).map(|s| s.trim_end_matches('\n').to_string())
+    handle_read(path, read_string(path).await).map(|s| s.trim_end_matches('\n').to_string())
 }
 
-pub(crate) async fn write_str(path: &Path, val: &str) -> Result<()> {
+pub(crate) async fn write_string(path: &Path, val: &str) -> Result<()> {
     handle_write(path, tokio::fs::write(path, val).await, val)
 }
 
-pub(crate) async fn read_str_list(path: &Path, delim: char) -> Result<Vec<String>> {
-    read_str(path)
+pub(crate) async fn read_string_list(path: &Path, delim: char) -> Result<Vec<String>> {
+    read_string(path)
         .await
         .map(|s| s.split(delim).map(String::from).collect())
 }
 
 pub(crate) async fn read_u64(path: &Path) -> Result<u64> {
-    let val = read_str(path).await?;
+    let val = read_string(path).await?;
     val.parse::<u64>()
         .map_err(|_| Error::sysfs_parse(path, "u64", val))
 }
 
 pub(crate) async fn write_u64(path: &Path, val: u64) -> Result<()> {
-    write_str(path, &val.to_string()).await
+    write_string(path, &val.to_string()).await
 }
 
 fn handle_read<T: Debug>(path: &Path, result: StdResult<T, IoError>) -> Result<T> {

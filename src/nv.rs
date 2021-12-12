@@ -1,18 +1,18 @@
 use std::result::Result as StdResult;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use async_trait::async_trait;
 use nvml_wrapper::enum_wrappers::device::{Clock as NVMLClock, ClockId as NVMLClockId};
 use nvml_wrapper::error::NvmlError;
 use nvml_wrapper::NVML;
 use once_cell::sync::OnceCell;
+use parking_lot::FairMutex;
 use tokio::task::spawn_blocking;
 
-use crate::{Error, Feature, Multi, Read, Result, Single, Values, Write};
+use crate::{Cached, Error, Result};
 
-fn nvml() -> Result<Arc<Mutex<NVML>>> {
-    static INSTANCE: OnceCell<StdResult<Arc<Mutex<NVML>>, NvmlError>> = OnceCell::new();
-    let r = INSTANCE.get_or_init(|| NVML::init().map(|nvml| Arc::new(Mutex::new(nvml))));
+fn nvml() -> Result<Arc<FairMutex<NVML>>> {
+    static INSTANCE: OnceCell<StdResult<Arc<FairMutex<NVML>>, NvmlError>> = OnceCell::new();
+    let r = INSTANCE.get_or_init(|| NVML::init().map(|nvml| Arc::new(FairMutex::new(nvml))));
     match r {
         Ok(v) => Ok(Arc::clone(v)),
         Err(e) => Err(Error::nvml_init(e)),
@@ -26,16 +26,18 @@ where
 {
     let res = {
         let nvml = nvml()?;
-        let nvml = nvml.lock().expect("nvml lock is poisoned");
+        let nvml = nvml.lock();
         let device = nvml
             .device_by_index(id.try_into().unwrap())
             .map_err(|e| Error::nvml_read(id, name, e))?;
-        f(&device).map_err(|e| Error::nvml_read(id, name, e))
+        let r = f(&device);
+        drop(nvml);
+        r.map_err(|e| Error::nvml_read(id, name, e))
     };
     #[cfg(feature = "logging")]
     match &res {
         Ok(v) => log::debug!("OK nvml r {} {} {:?}", name, id, v),
-        Err(e) => log::warn!("ERR nvml w {} {} {}", name, id, e),
+        Err(e) => log::warn!("ERR nvml r {} {} {}", name, id, e),
     }
     res
 }
@@ -46,11 +48,13 @@ where
 {
     let res = {
         let nvml = nvml()?;
-        let nvml = nvml.lock().expect("nvml lock is poisoned");
+        let nvml = nvml.lock();
         let mut device = nvml
             .device_by_index(id.try_into().unwrap())
             .map_err(|e| Error::nvml_write(id, name, e))?;
-        f(&mut device).map_err(|e| Error::nvml_write(id, name, e))
+        let r = f(&mut device);
+        drop(nvml);
+        r.map_err(|e| Error::nvml_write(id, name, e))
     };
     #[cfg(feature = "logging")]
     match &res {
@@ -80,13 +84,18 @@ where
         .unwrap()
 }
 
+pub async fn available() -> bool {
+    spawn_blocking(|| nvml().is_ok()).await.unwrap()
+}
+
 fn devices_blocking() -> Result<Vec<u64>> {
     let nvml = nvml()?;
-    let nvml = nvml.lock().expect("nvml lock is poisoned");
-    let c = nvml.device_count().map_err(Error::NvmlListDevices)?;
+    let nvml = nvml.lock();
+    let r = nvml.device_count();
     drop(nvml);
-    let r = (0u64..c as u64).collect();
-    Ok(r)
+    let c = r.map_err(Error::NvmlListDevices)?;
+    let v = (0u64..c as u64).collect();
+    Ok(v)
 }
 
 pub async fn devices() -> Result<Vec<u64>> {
@@ -156,8 +165,8 @@ pub async fn name(id: u64) -> Result<String> {
     read_device(id, "name", |d| d.name()).await
 }
 
-pub async fn power_usage(id: u64) -> Result<u32> {
-    read_device(id, "power_usage", |d| d.power_usage()).await
+pub async fn power(id: u64) -> Result<u32> {
+    read_device(id, "power", |d| d.power_usage()).await
 }
 
 pub async fn power_limit(id: u64) -> Result<u32> {
@@ -187,8 +196,8 @@ pub async fn set_gfx_freq(id: u64, min: u32, max: u32) -> Result<()> {
     .await
 }
 
-pub async fn gfx_freq_reset(id: u64) -> Result<()> {
-    write_device(id, "gfx_freq_reset", move |d| d.reset_gpu_locked_clocks()).await
+pub async fn reset_gfx_freq(id: u64) -> Result<()> {
+    write_device(id, "reset_gfx_freq", move |d| d.reset_gpu_locked_clocks()).await
 }
 
 pub async fn set_power_limit(id: u64, v: u32) -> Result<()> {
@@ -198,274 +207,179 @@ pub async fn set_power_limit(id: u64, v: u32) -> Result<()> {
     .await
 }
 
-pub async fn power_limit_reset(id: u64) -> Result<()> {
-    write_device(id, "power_limit_reset", move |d| {
+pub async fn reset_power_limit(id: u64) -> Result<()> {
+    write_device(id, "reset_power_limit", move |d| {
         d.set_power_management_limit(d.power_management_limit_default()?)
     })
     .await
 }
 
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Device {
+#[derive(Clone, Debug)]
+pub struct Card {
     id: u64,
-    gfx_freq: Option<u32>,
-    gfx_max_freq: Option<u32>,
-    gfx_min_freq: Option<u32>,
-    gfx_reset_freq: Option<bool>,
-    mem_freq: Option<u32>,
-    mem_max_freq: Option<u32>,
-    sm_freq: Option<u32>,
-    sm_max_freq: Option<u32>,
-    video_freq: Option<u32>,
-    video_max_freq: Option<u32>,
-    mem_total: Option<u64>,
-    mem_used: Option<u64>,
-    name: Option<String>,
-    power: Option<u32>,
-    power_limit: Option<u32>,
-    power_limit_max: Option<u32>,
-    power_limit_min: Option<u32>,
-    power_reset_limit: Option<bool>,
+    gfx_freq: Cached<u32>,
+    gfx_max_freq: Cached<u32>,
+    mem_freq: Cached<u32>,
+    mem_max_freq: Cached<u32>,
+    sm_freq: Cached<u32>,
+    sm_max_freq: Cached<u32>,
+    video_freq: Cached<u32>,
+    video_max_freq: Cached<u32>,
+    mem_total: Cached<u64>,
+    mem_used: Cached<u64>,
+    name: Cached<String>,
+    power: Cached<u32>,
+    power_limit: Cached<u32>,
+    power_limit_max: Cached<u32>,
+    power_limit_min: Cached<u32>,
 }
 
-impl Device {
-    pub fn gfx_freq(&self) -> Option<u32> {
-        self.gfx_freq
+impl Card {
+    pub async fn available() -> bool {
+        available().await
     }
 
-    pub fn gfx_max_freq(&self) -> Option<u32> {
-        self.gfx_max_freq
+    pub async fn ids() -> Result<Vec<u64>> {
+        devices().await
     }
 
-    pub fn gfx_min_freq(&self) -> Option<u32> {
-        self.gfx_min_freq
-    }
-
-    pub fn gfx_freq_reset(&self) -> Option<bool> {
-        self.gfx_reset_freq
-    }
-
-    pub fn mem_freq(&self) -> Option<u32> {
-        self.mem_freq
-    }
-
-    pub fn mem_max_freq(&self) -> Option<u32> {
-        self.mem_max_freq
-    }
-
-    pub fn sm_freq(&self) -> Option<u32> {
-        self.sm_freq
-    }
-
-    pub fn video_freq(&self) -> Option<u32> {
-        self.video_freq
-    }
-
-    pub fn video_max_freq(&self) -> Option<u32> {
-        self.video_max_freq
-    }
-
-    pub fn mem_total(&self) -> Option<u64> {
-        self.mem_total
-    }
-
-    pub fn mem_used(&self) -> Option<u64> {
-        self.mem_used
-    }
-
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
-    }
-
-    pub fn power(&self) -> Option<u32> {
-        self.power
-    }
-
-    pub fn power_limit(&self) -> Option<u32> {
-        self.power_limit
-    }
-
-    pub fn power_limit_max(&self) -> Option<u32> {
-        self.power_limit_max
-    }
-
-    pub fn power_limit_min(&self) -> Option<u32> {
-        self.power_limit_min
-    }
-
-    pub fn power_limit_reset(&self) -> Option<bool> {
-        self.power_reset_limit
-    }
-
-    pub fn set_gfx_max_freq(&mut self, v: impl Into<Option<u32>>) -> &mut Self {
-        self.gfx_max_freq = v.into();
-        self
-    }
-
-    pub fn set_gfx_min_freq(&mut self, v: impl Into<Option<u32>>) -> &mut Self {
-        self.gfx_min_freq = v.into();
-        self
-    }
-
-    pub fn set_gfx_reset_freq(&mut self, v: impl Into<Option<bool>>) -> &mut Self {
-        self.gfx_reset_freq = v.into();
-        self
-    }
-
-    pub fn set_power_limit(&mut self, v: impl Into<Option<u32>>) -> &mut Self {
-        self.power_limit = v.into();
-        self
-    }
-
-    pub fn set_power_reset_limit(&mut self, v: impl Into<Option<bool>>) -> &mut Self {
-        self.power_reset_limit = v.into();
-        self
-    }
-}
-
-#[async_trait]
-impl Read for Device {
-    async fn read(&mut self) {
-        self.gfx_freq = gfx_freq(self.id).await.ok();
-        self.gfx_max_freq = gfx_max_freq(self.id).await.ok();
-        self.gfx_min_freq = None;
-        self.gfx_reset_freq = None;
-        self.mem_freq = mem_freq(self.id).await.ok();
-        self.mem_max_freq = mem_max_freq(self.id).await.ok();
-        self.sm_freq = sm_freq(self.id).await.ok();
-        self.sm_max_freq = sm_max_freq(self.id).await.ok();
-        self.video_freq = video_freq(self.id).await.ok();
-        self.video_max_freq = video_max_freq(self.id).await.ok();
-        self.mem_total = mem_total(self.id).await.ok();
-        self.mem_used = mem_used(self.id).await.ok();
-        self.name = name(self.id).await.ok();
-        self.power = power_usage(self.id).await.ok();
-        self.power_limit = power_limit(self.id).await.ok();
-        self.power_limit_max = power_max_limit(self.id).await.ok();
-        self.power_limit_min = power_min_limit(self.id).await.ok();
-        self.power_reset_limit = None;
-    }
-}
-
-#[async_trait]
-impl Write for Device {
-    async fn write(&self) {
-        if let Some(min) = self.gfx_min_freq {
-            if let Some(max) = self.gfx_max_freq {
-                let _ = set_gfx_freq(self.id, min, max).await;
-            }
-        }
-        if self.gfx_reset_freq.unwrap_or(false) {
-            let _ = gfx_freq_reset(self.id).await;
-        }
-        if let Some(v) = self.power_limit {
-            let _ = set_power_limit(self.id, v).await;
-        }
-        if self.power_reset_limit.unwrap_or(false) {
-            let _ = power_limit_reset(self.id).await;
+    pub fn new(id: u64) -> Self {
+        let gfx_freq = Cached::default();
+        let gfx_max_freq = Cached::default();
+        let mem_freq = Cached::default();
+        let mem_max_freq = Cached::default();
+        let sm_freq = Cached::default();
+        let sm_max_freq = Cached::default();
+        let video_freq = Cached::default();
+        let video_max_freq = Cached::default();
+        let mem_total = Cached::default();
+        let mem_used = Cached::default();
+        let name = Cached::default();
+        let power = Cached::default();
+        let power_limit = Cached::default();
+        let power_limit_max = Cached::default();
+        let power_limit_min = Cached::default();
+        Self {
+            id,
+            gfx_freq,
+            gfx_max_freq,
+            mem_freq,
+            mem_max_freq,
+            sm_freq,
+            sm_max_freq,
+            video_freq,
+            video_max_freq,
+            mem_total,
+            mem_used,
+            name,
+            power,
+            power_limit,
+            power_limit_max,
+            power_limit_min,
         }
     }
-}
 
-#[async_trait]
-impl Values for Device {
-    fn is_empty(&self) -> bool {
-        self.eq(&Self::new(self.id))
+    pub async fn clear(&self) {
+        tokio::join!(
+            self.gfx_freq.clear(),
+            self.gfx_max_freq.clear(),
+            self.mem_freq.clear(),
+            self.mem_max_freq.clear(),
+            self.sm_freq.clear(),
+            self.sm_max_freq.clear(),
+            self.video_freq.clear(),
+            self.video_max_freq.clear(),
+            self.mem_total.clear(),
+            self.mem_used.clear(),
+            self.name.clear(),
+            self.power.clear(),
+            self.power_limit.clear(),
+            self.power_limit_max.clear(),
+            self.power_limit_min.clear(),
+        );
     }
 
-    fn clear(&mut self) -> &mut Self {
-        *self = Self::new(self.id);
-        self
-    }
-}
-
-#[async_trait]
-impl Multi for Device {
-    type Id = u64;
-
-    async fn ids() -> Vec<Self::Id> {
-        devices().await.unwrap_or_default()
-    }
-
-    fn id(&self) -> Self::Id {
+    pub fn id(&self) -> u64 {
         self.id
     }
 
-    fn set_id(&mut self, v: Self::Id) -> &mut Self {
-        self.id = v;
-        self
-    }
-}
-
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct System {
-    devices: Vec<Device>,
-}
-
-impl System {
-    pub fn push_device(&mut self, v: Device) -> &mut Self {
-        if let Some(i) = self.devices.iter().position(|d| v.id.eq(&d.id)) {
-            self.devices[i] = v;
-        } else {
-            self.devices.push(v);
-            self.devices.sort_unstable_by(|a, b| a.id.cmp(&b.id));
-        }
-        self
+    pub async fn gfx_freq(&self) -> Result<u32> {
+        self.gfx_freq.get_with(gfx_freq(self.id)).await
     }
 
-    pub fn push_devices(&mut self, v: impl IntoIterator<Item = Device>) -> &mut Self {
-        for d in v.into_iter() {
-            self.push_device(d);
-        }
-        self
+    pub async fn gfx_max_freq(&self) -> Result<u32> {
+        self.gfx_max_freq.get_with(gfx_max_freq(self.id)).await
     }
 
-    pub fn devices(&self) -> std::slice::Iter<'_, Device> {
-        self.devices.iter()
+    pub async fn mem_freq(&self) -> Result<u32> {
+        self.mem_freq.get_with(mem_freq(self.id)).await
     }
 
-    pub fn into_devices(self) -> impl IntoIterator<Item = Device> {
-        self.devices.into_iter()
-    }
-}
-
-#[async_trait]
-impl Read for System {
-    async fn read(&mut self) {
-        self.devices.clear();
-        self.devices.extend(Device::load_all().await);
-    }
-}
-
-#[async_trait]
-impl Write for System {
-    async fn write(&self) {
-        for device in &self.devices {
-            device.write().await;
-        }
-    }
-}
-
-#[async_trait]
-impl Values for System {
-    fn is_empty(&self) -> bool {
-        self.devices.is_empty()
+    pub async fn mem_max_freq(&self) -> Result<u32> {
+        self.mem_max_freq.get_with(mem_max_freq(self.id)).await
     }
 
-    fn clear(&mut self) -> &mut Self {
-        self.devices.clear();
-        self
+    pub async fn sm_freq(&self) -> Result<u32> {
+        self.sm_freq.get_with(sm_freq(self.id)).await
     }
-}
 
-#[async_trait]
-impl Single for System {}
+    pub async fn video_freq(&self) -> Result<u32> {
+        self.video_freq.get_with(video_freq(self.id)).await
+    }
 
-#[async_trait]
-impl Feature for System {
-    async fn present() -> bool {
-        spawn_blocking(|| nvml().is_ok()).await.unwrap()
+    pub async fn video_max_freq(&self) -> Result<u32> {
+        self.video_max_freq.get_with(video_max_freq(self.id)).await
+    }
+
+    pub async fn mem_total(&self) -> Result<u64> {
+        self.mem_total.get_with(mem_total(self.id)).await
+    }
+
+    pub async fn mem_used(&self) -> Result<u64> {
+        self.mem_used.get_with(mem_used(self.id)).await
+    }
+
+    pub async fn name(&self) -> Result<String> {
+        self.name.get_with(name(self.id)).await
+    }
+
+    pub async fn power(&self) -> Result<u32> {
+        self.power.get_with(power(self.id)).await
+    }
+
+    pub async fn power_limit(&self) -> Result<u32> {
+        self.power_limit.get_with(power_limit(self.id)).await
+    }
+
+    pub async fn power_max_limit(&self) -> Result<u32> {
+        self.power_limit_max
+            .get_with(power_max_limit(self.id))
+            .await
+    }
+
+    pub async fn power_min_limit(&self) -> Result<u32> {
+        self.power_limit_min
+            .get_with(power_min_limit(self.id))
+            .await
+    }
+
+    pub async fn set_gfx_freq(&self, min: u32, max: u32) -> Result<()> {
+        let f = set_gfx_freq(self.id, min, max);
+        self.gfx_freq.clear_if(f).await
+    }
+
+    pub async fn reset_gfx_freq(&self) -> Result<()> {
+        let f = reset_gfx_freq(self.id);
+        self.gfx_freq.clear_if(f).await
+    }
+
+    pub async fn set_power_limit(&self, v: u32) -> Result<()> {
+        let f = set_power_limit(self.id, v);
+        self.power_limit.clear_if(f).await
+    }
+
+    pub async fn reset_power_limit(&self) -> Result<()> {
+        let f = reset_power_limit(self.id);
+        self.power_limit.clear_if(f).await
     }
 }

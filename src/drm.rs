@@ -36,10 +36,11 @@ pub(crate) mod path {
     }
 }
 
-use async_trait::async_trait;
+use crate::{sysfs, Cached, Result};
 
-use crate::util::sysfs;
-use crate::{Feature, Multi, Read, Result, Single, Values};
+pub async fn available() -> bool {
+    path::root().is_dir()
+}
 
 pub async fn devices() -> Result<Vec<u64>> {
     sysfs::read_ids(&path::root(), "card").await
@@ -57,110 +58,52 @@ pub async fn driver(id: u64) -> Result<String> {
     sysfs::read_link_name(&path::driver(id)).await
 }
 
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Device {
+#[derive(Clone, Debug)]
+pub struct Card {
     id: u64,
-    bus: Option<String>,
-    bus_id: Option<String>,
-    driver: Option<String>,
+    bus: Cached<String>,
+    bus_id: Cached<String>,
+    driver: Cached<String>,
 }
 
-impl Device {
-    pub fn bus(&self) -> Option<&str> {
-        self.bus.as_deref()
+impl Card {
+    pub async fn available() -> bool {
+        available().await
     }
 
-    pub fn bus_id(&self) -> Option<&str> {
-        self.bus_id.as_deref()
+    pub async fn ids() -> Result<Vec<u64>> {
+        devices().await
     }
 
-    pub fn driver(&self) -> Option<&str> {
-        self.driver.as_deref()
-    }
-}
-
-#[async_trait]
-impl Read for Device {
-    async fn read(&mut self) {
-        self.bus = bus(self.id).await.ok();
-        self.bus_id = bus_id(self.id).await.ok();
-        self.driver = driver(self.id).await.ok();
-    }
-}
-
-#[async_trait]
-impl Values for Device {
-    fn is_empty(&self) -> bool {
-        self.eq(&Self::new(self.id))
+    pub fn new(id: u64) -> Self {
+        let bus = Cached::default();
+        let bus_id = Cached::default();
+        let driver = Cached::default();
+        Self {
+            id,
+            bus,
+            bus_id,
+            driver,
+        }
     }
 
-    fn clear(&mut self) -> &mut Self {
-        *self = Self::default();
-        self
-    }
-}
-
-#[async_trait]
-impl Multi for Device {
-    type Id = u64;
-
-    async fn ids() -> Vec<u64> {
-        devices().await.unwrap_or_default()
+    pub async fn clear(&self) {
+        tokio::join!(self.bus.clear(), self.bus_id.clear(), self.driver.clear(),);
     }
 
-    fn id(&self) -> u64 {
+    pub fn id(&self) -> u64 {
         self.id
     }
 
-    fn set_id(&mut self, v: u64) -> &mut Self {
-        self.id = v;
-        self
-    }
-}
-
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct System {
-    devices: Vec<Device>,
-}
-
-impl System {
-    pub fn devices(&self) -> std::slice::Iter<'_, Device> {
-        self.devices.iter()
+    pub async fn bus(&self) -> Result<String> {
+        self.bus.get_with(bus(self.id)).await
     }
 
-    pub fn into_devices(self) -> impl IntoIterator<Item = Device> {
-        self.devices.into_iter()
-    }
-}
-
-#[async_trait]
-impl Read for System {
-    async fn read(&mut self) {
-        self.devices.clear();
-        self.devices.extend(Device::load_all().await);
-    }
-}
-
-#[async_trait]
-impl Values for System {
-    fn is_empty(&self) -> bool {
-        self.devices.is_empty()
+    pub async fn bus_id(&self) -> Result<String> {
+        self.bus_id.get_with(bus_id(self.id)).await
     }
 
-    fn clear(&mut self) -> &mut Self {
-        self.devices.clear();
-        self
-    }
-}
-
-#[async_trait]
-impl Single for System {}
-
-#[async_trait]
-impl Feature for System {
-    async fn present() -> bool {
-        path::root().is_dir()
+    pub async fn driver(&self) -> Result<String> {
+        self.driver.get_with(driver(self.id)).await
     }
 }
