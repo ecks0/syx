@@ -38,8 +38,8 @@ pub(crate) mod path {
 
 use async_trait::async_trait;
 
-use crate::util::sysfs::{self, Result};
-use crate::{Feature, Multi, Read, Single, Values};
+use crate::util::sysfs;
+use crate::{Feature, Multi, Read, Result, Single, Values};
 
 pub async fn devices() -> Result<Vec<u64>> {
     sysfs::read_ids(&path::root(), "card").await

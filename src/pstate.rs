@@ -52,8 +52,8 @@ pub(crate) mod path {
 use async_trait::async_trait;
 
 pub use crate::cpufreq::devices;
-use crate::util::sysfs::{self, Result};
-use crate::{util, Feature, Multi, Read, Single, Values, Write};
+use crate::util::{self, sysfs};
+use crate::{Feature, Multi, Read, Result, Single, Values, Write};
 
 pub async fn energy_perf_bias(id: u64) -> Result<u64> {
     sysfs::read_u64(&path::energy_perf_bias(id)).await
@@ -378,23 +378,5 @@ impl Single for System {}
 impl Feature for System {
     async fn present() -> bool {
         path::status().is_file()
-    }
-}
-
-impl From<Globals> for System {
-    fn from(v: Globals) -> Self {
-        let mut s = Self::default();
-        s.set_globals(v);
-        s
-    }
-}
-
-impl From<Vec<Device>> for System {
-    fn from(v: Vec<Device>) -> Self {
-        let mut s = Self::default();
-        for d in v {
-            s.push_device(d);
-        }
-        s
     }
 }

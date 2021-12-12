@@ -58,8 +58,8 @@ pub(crate) mod path {
 
 use async_trait::async_trait;
 
-use crate::util::sysfs::{self, Result};
-use crate::{Feature, Multi, Read, Single, Values, Write};
+use crate::util::sysfs;
+use crate::{Feature, Multi, Read, Result, Single, Values, Write};
 
 pub async fn devices() -> Result<Vec<u64>> {
     let mut ids = vec![];

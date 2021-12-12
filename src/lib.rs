@@ -1,17 +1,120 @@
-// #[cfg(feature = "cli")]
-// pub mod cli;
 pub mod cpu;
 pub mod cpufreq;
 pub mod drm;
 pub mod i915;
-pub mod intel_pstate;
-pub mod intel_rapl;
-#[cfg(feature = "nvml-wrapper")]
 pub mod nv;
 pub mod prelude;
+pub mod pstate;
+pub mod rapl;
 pub(crate) mod util;
 
+use std::path::PathBuf;
+
 use async_trait::async_trait;
+pub use nvml_wrapper::error::NvmlError;
+pub use tokio::io::Error as IoError;
+
+pub use crate::cpu::System as Cpu;
+pub use crate::cpufreq::System as Cpufreq;
+pub use crate::drm::System as Drm;
+pub use crate::i915::System as I915;
+pub use crate::nv::System as Nv;
+pub use crate::pstate::System as Pstate;
+pub use crate::rapl::System as Rapl;
+
+#[derive(Clone, Debug)]
+pub enum Op {
+    Read,
+    Write,
+}
+
+impl std::fmt::Display for Op {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Read => write!(f, "read"),
+            Self::Write => write!(f, "write"),
+        }
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("sysfs {op}: {path}: {source}")]
+    SysfsIo {
+        path: PathBuf,
+        op: Op,
+        #[source]
+        source: IoError,
+    },
+
+    #[error("sysfs parse: {path}: Invalid value for {ty}: {value:?}")]
+    SysfsParse {
+        path: PathBuf,
+        ty: &'static str,
+        value: String,
+    },
+
+    #[error("nvml init: {0}")]
+    NvmlInit(&'static NvmlError),
+
+    #[error("nvml list devices: {0}")]
+    NvmlListDevices(#[source] NvmlError),
+
+    #[error("nvml {op} id {device}: {source}")]
+    NvmlIo {
+        device: u64,
+        op: Op,
+        method: &'static str,
+        #[source]
+        source: NvmlError,
+    },
+}
+
+impl Error {
+    fn sysfs_read(path: impl Into<PathBuf>, source: IoError) -> Self {
+        let path = path.into();
+        let op = Op::Read;
+        Self::SysfsIo { path, op, source }
+    }
+
+    fn sysfs_write(path: impl Into<PathBuf>, source: IoError) -> Self {
+        let path = path.into();
+        let op = Op::Write;
+        Self::SysfsIo { path, op, source }
+    }
+
+    fn sysfs_parse(path: impl Into<PathBuf>, ty: &'static str, value: impl Into<String>) -> Self {
+        let path = path.into();
+        let value = value.into();
+        Self::SysfsParse { path, ty, value }
+    }
+
+    fn nvml_init(error: &'static NvmlError) -> Self {
+        Self::NvmlInit(error)
+    }
+
+    fn nvml_read(device: u64, method: &'static str, source: NvmlError) -> Self {
+        let op = Op::Read;
+        Self::NvmlIo {
+            device,
+            op,
+            method,
+            source,
+        }
+    }
+
+    fn nvml_write(device: u64, method: &'static str, source: NvmlError) -> Self {
+        let op = Op::Write;
+        Self::NvmlIo {
+            device,
+            op,
+            method,
+            source,
+        }
+    }
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[async_trait]
 pub trait Read {
@@ -77,13 +180,16 @@ pub trait Feature {
 
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct System {
-    pub cpu: cpu::System,
-    pub cpufreq: cpufreq::System,
-    pub i915: i915::System,
-    pub intel_pstate: intel_pstate::System,
-    pub intel_rapl: intel_rapl::System,
-    #[cfg(feature = "nvml-wrapper")]
-    pub nv: nv::System,
+    cpu: cpu::System,
+    cpufreq: cpufreq::System,
+    i915: i915::System,
+    intel_pstate: pstate::System,
+    intel_rapl: rapl::System,
+    nv: nv::System,
+}
+
+impl System {
+    // TODO
 }
 
 #[async_trait]
@@ -92,12 +198,9 @@ impl Read for System {
         self.cpu = cpu::System::load().await;
         self.cpufreq = cpufreq::System::load().await;
         self.i915 = i915::System::load().await;
-        self.intel_pstate = intel_pstate::System::load().await;
-        self.intel_rapl = intel_rapl::System::load().await;
-        #[cfg(feature = "nvml-wrapper")]
-        {
-            self.nv = nv::System::load().await;
-        }
+        self.intel_pstate = pstate::System::load().await;
+        self.intel_rapl = rapl::System::load().await;
+        self.nv = nv::System::load().await;
     }
 }
 
@@ -122,7 +225,6 @@ impl Write for System {
         self.cpu.write().await;
         self.intel_rapl.write().await;
         self.i915.write().await;
-        #[cfg(feature = "nvml-wrapper")]
         self.nv.write().await;
     }
 }

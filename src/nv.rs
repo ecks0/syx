@@ -1,223 +1,205 @@
 use std::result::Result as StdResult;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use nvml_wrapper::enum_wrappers::device::{Clock as NVMLClock, ClockId as NVMLClockId};
-pub use nvml_wrapper::error::NvmlError;
+use nvml_wrapper::error::NvmlError;
 use nvml_wrapper::NVML;
-use tokio::sync::{Mutex, OnceCell};
+use once_cell::sync::OnceCell;
 use tokio::task::spawn_blocking;
 
-use crate::{Feature, Multi, Read, Single, Values, Write};
+use crate::{Error, Feature, Multi, Read, Result, Single, Values, Write};
 
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("nvml init failed: {0}")]
-    Init(&'static NvmlError),
-
-    #[error(transparent)]
-    Nvml(#[from] NvmlError),
-}
-
-pub type Result<T> = StdResult<T, Error>;
-
-async fn nvml() -> Result<&'static NVML> {
-    async fn instance() -> StdResult<NVML, NvmlError> {
-        spawn_blocking(NVML::init).await.unwrap()
-    }
-    static INSTANCE: OnceCell<StdResult<NVML, NvmlError>> = OnceCell::const_new();
-    match INSTANCE.get_or_init(instance).await {
-        Ok(v) => Ok(v),
-        Err(e) => Err(Error::Init(e)),
+fn nvml() -> Result<Arc<Mutex<NVML>>> {
+    static INSTANCE: OnceCell<StdResult<Arc<Mutex<NVML>>, NvmlError>> = OnceCell::new();
+    let r = INSTANCE.get_or_init(|| NVML::init().map(|nvml| Arc::new(Mutex::new(nvml))));
+    match r {
+        Ok(v) => Ok(Arc::clone(v)),
+        Err(e) => Err(Error::nvml_init(e)),
     }
 }
 
-async fn mutex() -> Arc<Mutex<()>> {
-    async fn mutex() -> Arc<Mutex<()>> {
-        Arc::new(Mutex::new(()))
+fn read_device_blocking<F, T>(id: u64, name: &'static str, f: F) -> Result<T>
+where
+    T: std::fmt::Debug,
+    F: FnOnce(&nvml_wrapper::Device) -> StdResult<T, NvmlError>,
+{
+    let res = {
+        let nvml = nvml()?;
+        let nvml = nvml.lock().expect("nvml lock is poisoned");
+        let device = nvml
+            .device_by_index(id.try_into().unwrap())
+            .map_err(|e| Error::nvml_read(id, name, e))?;
+        f(&device).map_err(|e| Error::nvml_read(id, name, e))
+    };
+    #[cfg(feature = "logging")]
+    match &res {
+        Ok(v) => log::debug!("OK nvml r {} {} {:?}", name, id, v),
+        Err(e) => log::warn!("ERR nvml w {} {} {}", name, id, e),
     }
-    static MUTEX: OnceCell<Arc<Mutex<()>>> = OnceCell::const_new();
-    MUTEX.get_or_init(mutex).await.clone()
+    res
 }
 
-const R: char = 'r';
-const W: char = 'w';
+fn write_device_blocking<F, T>(id: u64, name: &'static str, f: F) -> Result<T>
+where
+    F: FnOnce(&mut nvml_wrapper::Device) -> StdResult<T, NvmlError>,
+{
+    let res = {
+        let nvml = nvml()?;
+        let nvml = nvml.lock().expect("nvml lock is poisoned");
+        let mut device = nvml
+            .device_by_index(id.try_into().unwrap())
+            .map_err(|e| Error::nvml_write(id, name, e))?;
+        f(&mut device).map_err(|e| Error::nvml_write(id, name, e))
+    };
+    #[cfg(feature = "logging")]
+    match &res {
+        Ok(_) => log::debug!("OK nvml w {} {}", name, id),
+        Err(e) => log::error!("ERR nvml w {} {} {}", name, id, e),
+    }
+    res
+}
 
-async fn with_nvml<T, F>(op: char, method: &str, f: F) -> Result<T>
+async fn read_device<F, T>(id: u64, name: &'static str, f: F) -> Result<T>
 where
     T: std::fmt::Debug + Send + 'static,
-    F: FnOnce(&'static NVML) -> StdResult<T, NvmlError> + Send + 'static,
+    F: FnOnce(&nvml_wrapper::Device) -> StdResult<T, NvmlError> + Send + 'static,
 {
-    let nvml = nvml().await?;
-    let res = spawn_blocking(|| f(nvml)).await.unwrap();
-    match res {
-        Ok(v) => {
-            log::debug!("OK nvml {} NVML::{}() {:?}", op, method, v);
-            Ok(v)
-        },
-        Err(e) => {
-            let msg = format!("ERR nvml {} NVML::{}() {}", op, method, e);
-            match e {
-                NvmlError::DriverNotLoaded | NvmlError::LibraryNotFound => log::warn!("{}", msg),
-                _ => log::error!("{}", msg),
-            }
-            Err(e.into())
-        },
-    }
+    spawn_blocking(move || read_device_blocking(id, name, f))
+        .await
+        .unwrap()
 }
 
-async fn with_dev<T, F>(id: u32, op: char, method: &str, f: F) -> Result<T>
+async fn write_device<F, T>(id: u64, name: &'static str, f: F) -> Result<T>
 where
     T: std::fmt::Debug + Send + 'static,
     F: FnOnce(&mut nvml_wrapper::Device) -> StdResult<T, NvmlError> + Send + 'static,
 {
-    let mutex = mutex().await;
-    let guard = mutex.lock().await;
-    let mut device = { with_nvml('r', "device_by_index", move |n| n.device_by_index(id)).await? };
-    let res = spawn_blocking(move || f(&mut device)).await.unwrap();
-    drop(guard);
-    match res {
-        Ok(v) => {
-            log::debug!("OK nvml {} {} {} {:?}", op, method, id, v);
-            Ok(v)
-        },
-        Err(e) => {
-            let msg = format!("ERR nvml {} {} {} {}", op, method, id, e);
-            if op == W {
-                log::error!("{}", msg);
-            } else {
-                log::warn!("{}", msg);
-            }
-            Err(e.into())
-        },
-    }
+    spawn_blocking(move || write_device_blocking(id, name, f))
+        .await
+        .unwrap()
 }
 
-pub async fn devices() -> Result<Vec<u32>> {
-    let mutex = mutex().await;
-    let guard = mutex.lock().await;
-    let c = with_nvml(R, "device_count", |n| n.device_count()).await?;
-    drop(guard);
-    let r = (0u32..c).collect();
+fn devices_blocking() -> Result<Vec<u64>> {
+    let nvml = nvml()?;
+    let nvml = nvml.lock().expect("nvml lock is poisoned");
+    let c = nvml.device_count().map_err(Error::NvmlListDevices)?;
+    drop(nvml);
+    let r = (0u64..c as u64).collect();
     Ok(r)
 }
 
-pub async fn gfx_freq(id: u32) -> Result<u32> {
-    with_dev(id, R, "gfx_freq", |d| {
+pub async fn devices() -> Result<Vec<u64>> {
+    spawn_blocking(devices_blocking).await.unwrap()
+}
+
+pub async fn gfx_freq(id: u64) -> Result<u32> {
+    read_device(id, "gfx_freq", |d| {
         d.clock(NVMLClock::Graphics, NVMLClockId::Current)
     })
     .await
 }
 
-pub async fn gfx_max_freq(id: u32) -> Result<u32> {
-    with_dev(id, R, "gfx_max_freq", |d| {
+pub async fn gfx_max_freq(id: u64) -> Result<u32> {
+    read_device(id, "gfx_max_freq", |d| {
         d.max_clock_info(NVMLClock::Graphics)
     })
     .await
 }
 
-pub async fn mem_freq(id: u32) -> Result<u32> {
-    with_dev(id, R, "mem_freq", |d| {
+pub async fn mem_freq(id: u64) -> Result<u32> {
+    read_device(id, "mem_freq", |d| {
         d.clock(NVMLClock::Memory, NVMLClockId::Current)
     })
     .await
 }
 
-pub async fn mem_max_freq(id: u32) -> Result<u32> {
-    with_dev(id, R, "mem_max_freq", |d| {
-        d.max_clock_info(NVMLClock::Memory)
-    })
-    .await
+pub async fn mem_max_freq(id: u64) -> Result<u32> {
+    read_device(id, "mem_max_freq", |d| d.max_clock_info(NVMLClock::Memory)).await
 }
 
-pub async fn sm_freq(id: u32) -> Result<u32> {
-    with_dev(id, R, "sm_freq", |d| {
+pub async fn sm_freq(id: u64) -> Result<u32> {
+    read_device(id, "sm_freq", |d| {
         d.clock(NVMLClock::SM, NVMLClockId::Current)
     })
     .await
 }
 
-pub async fn sm_max_freq(id: u32) -> Result<u32> {
-    with_dev(id, R, "sm_max_freq", |d| d.max_clock_info(NVMLClock::SM)).await
+pub async fn sm_max_freq(id: u64) -> Result<u32> {
+    read_device(id, "sm_max_freq", |d| d.max_clock_info(NVMLClock::SM)).await
 }
 
-pub async fn video_freq(id: u32) -> Result<u32> {
-    with_dev(id, R, "video_freq", |d| {
+pub async fn video_freq(id: u64) -> Result<u32> {
+    read_device(id, "video_freq", |d| {
         d.clock(NVMLClock::Video, NVMLClockId::Current)
     })
     .await
 }
 
-pub async fn video_max_freq(id: u32) -> Result<u32> {
-    with_dev(id, R, "video_max_freq", |d| {
-        d.max_clock_info(NVMLClock::Video)
-    })
-    .await
+pub async fn video_max_freq(id: u64) -> Result<u32> {
+    read_device(id, "video_max_freq", |d| d.max_clock_info(NVMLClock::Video)).await
 }
 
-pub async fn mem_total(id: u32) -> Result<u64> {
-    with_dev(id, R, "mem_total", |d| d.memory_info())
+pub async fn mem_total(id: u64) -> Result<u64> {
+    read_device(id, "mem_total", |d| d.memory_info())
         .await
         .map(|i| i.total)
 }
 
-pub async fn mem_used(id: u32) -> Result<u64> {
-    with_dev(id, R, "mem_used", |d| d.memory_info())
+pub async fn mem_used(id: u64) -> Result<u64> {
+    read_device(id, "mem_used", |d| d.memory_info())
         .await
         .map(|i| i.used)
 }
 
-pub async fn name(id: u32) -> Result<String> {
-    with_dev(id, R, "name", |d| d.name()).await
+pub async fn name(id: u64) -> Result<String> {
+    read_device(id, "name", |d| d.name()).await
 }
 
-pub async fn power_usage(id: u32) -> Result<u32> {
-    with_dev(id, R, "power_usage", |d| d.power_usage()).await
+pub async fn power_usage(id: u64) -> Result<u32> {
+    read_device(id, "power_usage", |d| d.power_usage()).await
 }
 
-pub async fn power_limit(id: u32) -> Result<u32> {
-    with_dev(id, R, "power_limit", |d| d.enforced_power_limit()).await
+pub async fn power_limit(id: u64) -> Result<u32> {
+    read_device(id, "power_limit", |d| d.enforced_power_limit()).await
 }
 
-pub async fn power_max_limit(id: u32) -> Result<u32> {
-    with_dev(id, R, "power_max_limit", |d| {
+pub async fn power_max_limit(id: u64) -> Result<u32> {
+    read_device(id, "power_max_limit", |d| {
         d.power_management_limit_constraints()
     })
     .await
     .map(|c| c.max_limit)
 }
 
-pub async fn power_min_limit(id: u32) -> Result<u32> {
-    with_dev(id, R, "power_min_limit", |d| {
+pub async fn power_min_limit(id: u64) -> Result<u32> {
+    read_device(id, "power_min_limit", |d| {
         d.power_management_limit_constraints()
     })
     .await
     .map(|c| c.min_limit)
 }
 
-pub async fn set_gfx_freq(id: u32, min: u32, max: u32) -> Result<()> {
-    with_dev(id, W, "set_gfx_freq", move |d| {
+pub async fn set_gfx_freq(id: u64, min: u32, max: u32) -> Result<()> {
+    write_device(id, "set_gfx_freq", move |d| {
         d.set_gpu_locked_clocks(min, max)
     })
     .await
 }
 
-pub async fn gfx_freq_reset(id: u32) -> Result<()> {
-    with_dev(id, W, "gfx_freq_reset", move |d| {
-        d.reset_gpu_locked_clocks()
-    })
-    .await
+pub async fn gfx_freq_reset(id: u64) -> Result<()> {
+    write_device(id, "gfx_freq_reset", move |d| d.reset_gpu_locked_clocks()).await
 }
 
-pub async fn set_power_limit(id: u32, v: u32) -> Result<()> {
-    with_dev(id, W, "set_power_limit", move |d| {
+pub async fn set_power_limit(id: u64, v: u32) -> Result<()> {
+    write_device(id, "set_power_limit", move |d| {
         d.set_power_management_limit(v)
     })
     .await
 }
 
-pub async fn power_limit_reset(id: u32) -> Result<()> {
-    with_dev(id, W, "power_limit_reset", move |d| {
+pub async fn power_limit_reset(id: u64) -> Result<()> {
+    write_device(id, "power_limit_reset", move |d| {
         d.set_power_management_limit(d.power_management_limit_default()?)
     })
     .await
@@ -226,7 +208,7 @@ pub async fn power_limit_reset(id: u32) -> Result<()> {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Device {
-    id: u32,
+    id: u64,
     gfx_freq: Option<u32>,
     gfx_max_freq: Option<u32>,
     gfx_min_freq: Option<u32>,
@@ -400,7 +382,7 @@ impl Values for Device {
 
 #[async_trait]
 impl Multi for Device {
-    type Id = u32;
+    type Id = u64;
 
     async fn ids() -> Vec<Self::Id> {
         devices().await.unwrap_or_default()
@@ -484,20 +466,6 @@ impl Single for System {}
 #[async_trait]
 impl Feature for System {
     async fn present() -> bool {
-        let mutex = mutex().await;
-        let guard = mutex.lock().await;
-        let r = nvml().await.is_ok();
-        drop(guard);
-        r
-    }
-}
-
-impl From<Vec<Device>> for System {
-    fn from(v: Vec<Device>) -> Self {
-        let mut s = Self::default();
-        for d in v {
-            s.push_device(d);
-        }
-        s
+        spawn_blocking(|| nvml().is_ok()).await.unwrap()
     }
 }

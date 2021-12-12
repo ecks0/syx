@@ -46,8 +46,8 @@ pub(crate) mod path {
 
 use async_trait::async_trait;
 
-use crate::util::sysfs::{self, Result};
-use crate::{util, Feature, Multi, Read, Single, Values, Write};
+use crate::util::{self, sysfs};
+use crate::{Feature, Multi, Read, Result, Single, Values, Write};
 
 pub async fn devices() -> Result<Vec<u64>> {
     sysfs::read_ids(&path::root(), "cpu").await
@@ -213,15 +213,5 @@ impl Single for System {}
 impl Feature for System {
     async fn present() -> bool {
         path::root().is_dir()
-    }
-}
-
-impl From<Vec<Device>> for System {
-    fn from(v: Vec<Device>) -> Self {
-        let mut s = Self::default();
-        for d in v {
-            s.push_device(d);
-        }
-        s
     }
 }

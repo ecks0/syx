@@ -1,7 +1,3 @@
-pub mod sampler;
-
-pub use sampler::*;
-
 pub(crate) mod path {
     use std::path::PathBuf;
 
@@ -94,8 +90,8 @@ pub(crate) mod path {
 
 use async_trait::async_trait;
 
-use crate::util::sysfs::{self, Result};
-use crate::{Feature, Multi, Read, Single, Values, Write};
+use crate::util::sysfs;
+use crate::{Feature, Multi, Read, Result, Single, Values, Write};
 
 pub async fn zones() -> Result<Vec<u64>> {
     sysfs::read_ids(&path::root(), "intel-rapl:").await
