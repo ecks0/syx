@@ -79,7 +79,7 @@ mod sync {
 mod unsync {
     use std::cell::RefCell;
     use std::future::Future;
-    use std::sync::Arc;
+    use std::rc::Rc;
 
     use crate::Result;
 
@@ -88,7 +88,7 @@ mod unsync {
     where
         T: Clone + Send + 'static,
     {
-        cell: Arc<RefCell<Option<T>>>,
+        cell: Rc<RefCell<Option<T>>>,
     }
 
     impl<T> Cached<T>
