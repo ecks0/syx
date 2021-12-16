@@ -1,10 +1,5 @@
 #[cfg(feature = "sync")]
-pub(crate) use sync::Cached;
-#[cfg(not(feature = "sync"))]
-pub(crate) use unsync::Cached;
-
-#[cfg(feature = "sync")]
-mod sync {
+pub(crate) mod sync {
     use std::future::Future;
     use std::sync::Arc;
 
@@ -14,14 +9,14 @@ mod sync {
     use crate::Result;
 
     #[derive(Clone, Debug, Default)]
-    pub(crate) struct Cached<T>
+    pub(crate) struct Cell<T>
     where
         T: Clone + Send + 'static,
     {
         cell: Arc<FairMutex<Option<T>>>,
     }
 
-    impl<T> Cached<T>
+    impl<T> Cell<T>
     where
         T: Clone + Send + 'static,
     {
@@ -39,7 +34,7 @@ mod sync {
                 .unwrap()
         }
 
-        pub(crate) async fn get_or<F>(&self, f: F) -> Result<T>
+        pub(crate) async fn get_or_init<F>(&self, f: F) -> Result<T>
         where
             F: Future<Output = Result<T>>,
         {
@@ -61,7 +56,7 @@ mod sync {
             spawn_blocking(move || cell.lock().take()).await.unwrap();
         }
 
-        pub(crate) async fn clear_if<F, R>(&self, f: F) -> Result<R>
+        pub(crate) async fn clear_if_ok<F, R>(&self, f: F) -> Result<R>
         where
             F: Future<Output = Result<R>>,
             R: Send + 'static,
@@ -76,7 +71,7 @@ mod sync {
 }
 
 #[cfg(not(feature = "sync"))]
-mod unsync {
+pub(crate) mod unsync {
     use std::cell::RefCell;
     use std::future::Future;
     use std::rc::Rc;
@@ -84,14 +79,14 @@ mod unsync {
     use crate::Result;
 
     #[derive(Clone, Debug, Default)]
-    pub(crate) struct Cached<T>
+    pub(crate) struct Cell<T>
     where
         T: Clone + Send + 'static,
     {
         cell: Rc<RefCell<Option<T>>>,
     }
 
-    impl<T> Cached<T>
+    impl<T> Cell<T>
     where
         T: Clone + Send + 'static,
     {
@@ -103,7 +98,7 @@ mod unsync {
             self.cell.borrow().as_ref().cloned()
         }
 
-        pub(crate) async fn get_or<F>(&self, f: F) -> Result<T>
+        pub(crate) async fn get_or_init<F>(&self, f: F) -> Result<T>
         where
             F: Future<Output = Result<T>>,
         {
@@ -124,7 +119,7 @@ mod unsync {
             self.cell.borrow_mut().take();
         }
 
-        pub(crate) async fn clear_if<F, R>(&self, f: F) -> Result<R>
+        pub(crate) async fn clear_if_ok<F, R>(&self, f: F) -> Result<R>
         where
             F: Future<Output = Result<R>>,
             R: Send + 'static,

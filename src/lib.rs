@@ -13,7 +13,11 @@ use std::path::PathBuf;
 pub use nvml_wrapper::error::NvmlError;
 pub use tokio::io::Error as IoError;
 
-pub(crate) use crate::cell::Cached;
+#[cfg(feature = "sync")]
+pub(crate) use crate::cell::sync::Cell;
+#[cfg(not(feature = "sync"))]
+pub(crate) use crate::cell::unsync::Cell;
+
 pub use crate::cpu::Cpu;
 pub use crate::cpufreq::Cpu as CpufreqCpu;
 pub use crate::drm::Card as DrmCard;

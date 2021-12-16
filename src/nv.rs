@@ -8,7 +8,7 @@ use once_cell::sync::OnceCell;
 use parking_lot::FairMutex;
 use tokio::task::spawn_blocking;
 
-use crate::{Cached, Error, Result};
+use crate::{Cell, Error, Result};
 
 fn nvml() -> Result<Arc<FairMutex<NVML>>> {
     static INSTANCE: OnceCell<StdResult<Arc<FairMutex<NVML>>, NvmlError>> = OnceCell::new();
@@ -217,21 +217,21 @@ pub async fn reset_power_limit(id: u64) -> Result<()> {
 #[derive(Clone, Debug)]
 pub struct Card {
     id: u64,
-    gfx_freq: Cached<u32>,
-    gfx_max_freq: Cached<u32>,
-    mem_freq: Cached<u32>,
-    mem_max_freq: Cached<u32>,
-    sm_freq: Cached<u32>,
-    sm_max_freq: Cached<u32>,
-    video_freq: Cached<u32>,
-    video_max_freq: Cached<u32>,
-    mem_total: Cached<u64>,
-    mem_used: Cached<u64>,
-    name: Cached<String>,
-    power: Cached<u32>,
-    power_limit: Cached<u32>,
-    power_limit_max: Cached<u32>,
-    power_limit_min: Cached<u32>,
+    gfx_freq: Cell<u32>,
+    gfx_max_freq: Cell<u32>,
+    mem_freq: Cell<u32>,
+    mem_max_freq: Cell<u32>,
+    sm_freq: Cell<u32>,
+    sm_max_freq: Cell<u32>,
+    video_freq: Cell<u32>,
+    video_max_freq: Cell<u32>,
+    mem_total: Cell<u64>,
+    mem_used: Cell<u64>,
+    name: Cell<String>,
+    power: Cell<u32>,
+    power_limit: Cell<u32>,
+    power_limit_max: Cell<u32>,
+    power_limit_min: Cell<u32>,
 }
 
 impl Card {
@@ -244,21 +244,21 @@ impl Card {
     }
 
     pub fn new(id: u64) -> Self {
-        let gfx_freq = Cached::default();
-        let gfx_max_freq = Cached::default();
-        let mem_freq = Cached::default();
-        let mem_max_freq = Cached::default();
-        let sm_freq = Cached::default();
-        let sm_max_freq = Cached::default();
-        let video_freq = Cached::default();
-        let video_max_freq = Cached::default();
-        let mem_total = Cached::default();
-        let mem_used = Cached::default();
-        let name = Cached::default();
-        let power = Cached::default();
-        let power_limit = Cached::default();
-        let power_limit_max = Cached::default();
-        let power_limit_min = Cached::default();
+        let gfx_freq = Cell::default();
+        let gfx_max_freq = Cell::default();
+        let mem_freq = Cell::default();
+        let mem_max_freq = Cell::default();
+        let sm_freq = Cell::default();
+        let sm_max_freq = Cell::default();
+        let video_freq = Cell::default();
+        let video_max_freq = Cell::default();
+        let mem_total = Cell::default();
+        let mem_used = Cell::default();
+        let name = Cell::default();
+        let power = Cell::default();
+        let power_limit = Cell::default();
+        let power_limit_max = Cell::default();
+        let power_limit_min = Cell::default();
         Self {
             id,
             gfx_freq,
@@ -304,80 +304,80 @@ impl Card {
     }
 
     pub async fn gfx_freq(&self) -> Result<u32> {
-        self.gfx_freq.get_or(gfx_freq(self.id)).await
+        self.gfx_freq.get_or_init(gfx_freq(self.id)).await
     }
 
     pub async fn gfx_max_freq(&self) -> Result<u32> {
-        self.gfx_max_freq.get_or(gfx_max_freq(self.id)).await
+        self.gfx_max_freq.get_or_init(gfx_max_freq(self.id)).await
     }
 
     pub async fn mem_freq(&self) -> Result<u32> {
-        self.mem_freq.get_or(mem_freq(self.id)).await
+        self.mem_freq.get_or_init(mem_freq(self.id)).await
     }
 
     pub async fn mem_max_freq(&self) -> Result<u32> {
-        self.mem_max_freq.get_or(mem_max_freq(self.id)).await
+        self.mem_max_freq.get_or_init(mem_max_freq(self.id)).await
     }
 
     pub async fn sm_freq(&self) -> Result<u32> {
-        self.sm_freq.get_or(sm_freq(self.id)).await
+        self.sm_freq.get_or_init(sm_freq(self.id)).await
     }
 
     pub async fn video_freq(&self) -> Result<u32> {
-        self.video_freq.get_or(video_freq(self.id)).await
+        self.video_freq.get_or_init(video_freq(self.id)).await
     }
 
     pub async fn video_max_freq(&self) -> Result<u32> {
-        self.video_max_freq.get_or(video_max_freq(self.id)).await
+        self.video_max_freq.get_or_init(video_max_freq(self.id)).await
     }
 
     pub async fn mem_total(&self) -> Result<u64> {
-        self.mem_total.get_or(mem_total(self.id)).await
+        self.mem_total.get_or_init(mem_total(self.id)).await
     }
 
     pub async fn mem_used(&self) -> Result<u64> {
-        self.mem_used.get_or(mem_used(self.id)).await
+        self.mem_used.get_or_init(mem_used(self.id)).await
     }
 
     pub async fn name(&self) -> Result<String> {
-        self.name.get_or(name(self.id)).await
+        self.name.get_or_init(name(self.id)).await
     }
 
     pub async fn power(&self) -> Result<u32> {
-        self.power.get_or(power(self.id)).await
+        self.power.get_or_init(power(self.id)).await
     }
 
     pub async fn power_limit(&self) -> Result<u32> {
-        self.power_limit.get_or(power_limit(self.id)).await
+        self.power_limit.get_or_init(power_limit(self.id)).await
     }
 
     pub async fn power_max_limit(&self) -> Result<u32> {
         self.power_limit_max
-            .get_or(power_max_limit(self.id))
+            .get_or_init(power_max_limit(self.id))
             .await
     }
 
     pub async fn power_min_limit(&self) -> Result<u32> {
         self.power_limit_min
-            .get_or(power_min_limit(self.id))
+            .get_or_init(power_min_limit(self.id))
             .await
     }
 
     pub async fn set_gfx_freq(&self, min: u32, max: u32) -> Result<()> {
         self.gfx_freq
-            .clear_if(set_gfx_freq(self.id, min, max))
+            .clear_if_ok(set_gfx_freq(self.id, min, max))
             .await
     }
 
     pub async fn reset_gfx_freq(&self) -> Result<()> {
-        self.gfx_freq.clear_if(reset_gfx_freq(self.id)).await
+        self.gfx_freq.clear_if_ok(reset_gfx_freq(self.id)).await
     }
 
     pub async fn set_power_limit(&self, v: u32) -> Result<()> {
-        self.power_limit.clear_if(set_power_limit(self.id, v)).await
+        self.power_limit.clear_if_ok(set_power_limit(self.id, v)).await
     }
 
     pub async fn reset_power_limit(&self) -> Result<()> {
-        self.power_limit.clear_if(reset_power_limit(self.id)).await
+        self.power_limit.clear_if_ok(reset_power_limit(self.id)).await
     }
 }

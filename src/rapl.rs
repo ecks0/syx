@@ -84,7 +84,7 @@ pub(crate) mod path {
     }
 }
 
-use crate::{sysfs, Cached, Result};
+use crate::{sysfs, Cell, Result};
 
 pub async fn available() -> bool {
     path::root().is_dir()
@@ -268,10 +268,10 @@ impl ConstraintId {
 #[derive(Clone, Debug)]
 pub struct Constraint {
     id: ConstraintId,
-    name: Cached<String>,
-    max_power_uw: Cached<u64>,
-    power_limit_uw: Cached<u64>,
-    time_window_us: Cached<u64>,
+    name: Cell<String>,
+    max_power_uw: Cell<u64>,
+    power_limit_uw: Cell<u64>,
+    time_window_us: Cell<u64>,
 }
 
 impl Constraint {
@@ -288,10 +288,10 @@ impl Constraint {
     }
 
     pub fn new(id: ConstraintId) -> Self {
-        let name = Cached::default();
-        let max_power_uw = Cached::default();
-        let power_limit_uw = Cached::default();
-        let time_window_us = Cached::default();
+        let name = Cell::default();
+        let max_power_uw = Cell::default();
+        let power_limit_uw = Cell::default();
+        let time_window_us = Cell::default();
         Self {
             id,
             name,
@@ -317,51 +317,51 @@ impl Constraint {
     pub async fn name(&self) -> Result<String> {
         let (package, subzone, index) = self.id.decompose();
         self.name
-            .get_or(constraint_name(package, subzone, index))
+            .get_or_init(constraint_name(package, subzone, index))
             .await
     }
 
     pub async fn max_power_uw(&self) -> Result<u64> {
         let (package, subzone, index) = self.id.decompose();
         self.max_power_uw
-            .get_or(constraint_max_power_uw(package, subzone, index))
+            .get_or_init(constraint_max_power_uw(package, subzone, index))
             .await
     }
 
     pub async fn power_limit_uw(&self) -> Result<u64> {
         let (package, subzone, index) = self.id.decompose();
         self.power_limit_uw
-            .get_or(constraint_power_limit_uw(package, subzone, index))
+            .get_or_init(constraint_power_limit_uw(package, subzone, index))
             .await
     }
 
     pub async fn time_window_us(&self) -> Result<u64> {
         let (package, subzone, index) = self.id.decompose();
         self.time_window_us
-            .get_or(constraint_time_window_us(package, subzone, index))
+            .get_or_init(constraint_time_window_us(package, subzone, index))
             .await
     }
 
     pub async fn set_power_limit_uw(&mut self, v: u64) -> Result<()> {
         let (package, subzone, index) = self.id.decompose();
         let f = set_constraint_power_limit_uw(package, subzone, index, v);
-        self.power_limit_uw.clear_if(f).await
+        self.power_limit_uw.clear_if_ok(f).await
     }
 
     pub async fn set_time_window_us(&mut self, v: u64) -> Result<()> {
         let (package, subzone, index) = self.id.decompose();
         let f = set_constraint_time_window_us(package, subzone, index, v);
-        self.time_window_us.clear_if(f).await
+        self.time_window_us.clear_if_ok(f).await
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Zone {
     id: ZoneId,
-    enabled: Cached<bool>,
-    energy_uj: Cached<u64>,
-    max_energy_range_uj: Cached<u64>,
-    name: Cached<String>,
+    enabled: Cell<bool>,
+    energy_uj: Cell<u64>,
+    max_energy_range_uj: Cell<u64>,
+    name: Cell<String>,
 }
 
 impl Zone {
@@ -378,10 +378,10 @@ impl Zone {
     }
 
     pub fn new(id: ZoneId) -> Self {
-        let enabled = Cached::default();
-        let energy_uj = Cached::default();
-        let max_energy_range_uj = Cached::default();
-        let name = Cached::default();
+        let enabled = Cell::default();
+        let energy_uj = Cell::default();
+        let max_energy_range_uj = Cell::default();
+        let name = Cell::default();
         Self {
             id,
             enabled,
@@ -406,31 +406,31 @@ impl Zone {
 
     pub async fn enabled(&self) -> Result<bool> {
         self.enabled
-            .get_or(enabled(self.id.package, self.id.subzone))
+            .get_or_init(enabled(self.id.package, self.id.subzone))
             .await
     }
 
     pub async fn energy_uj(&self) -> Result<u64> {
         self.energy_uj
-            .get_or(energy_uj(self.id.package, self.id.subzone))
+            .get_or_init(energy_uj(self.id.package, self.id.subzone))
             .await
     }
 
     pub async fn max_energy_range_uj(&self) -> Result<u64> {
         self.max_energy_range_uj
-            .get_or(max_energy_range_uj(self.id.package, self.id.subzone))
+            .get_or_init(max_energy_range_uj(self.id.package, self.id.subzone))
             .await
     }
 
     pub async fn name(&self) -> Result<String> {
         self.name
-            .get_or(name(self.id.package, self.id.subzone))
+            .get_or_init(name(self.id.package, self.id.subzone))
             .await
     }
 
     pub async fn set_enabled(&self, v: bool) -> Result<()> {
         self.enabled
-            .clear_if(set_enabled(self.id.package, self.id.subzone, v))
+            .clear_if_ok(set_enabled(self.id.package, self.id.subzone, v))
             .await
     }
 }

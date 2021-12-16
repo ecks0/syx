@@ -60,7 +60,7 @@ pub(crate) mod path {
     }
 }
 
-use crate::{sysfs, Cached, Result};
+use crate::{sysfs, Cell, Result};
 
 pub async fn available() -> bool {
     path::module().is_dir()
@@ -141,14 +141,14 @@ pub async fn set_rpn_freq_mhz(id: u64, v: u64) -> Result<()> {
 #[derive(Clone, Debug)]
 pub struct Card {
     id: u64,
-    act_freq_mhz: Cached<u64>,
-    boost_freq_mhz: Cached<u64>,
-    cur_freq_mhz: Cached<u64>,
-    max_freq_mhz: Cached<u64>,
-    min_freq_mhz: Cached<u64>,
-    rp0_freq_mhz: Cached<u64>,
-    rp1_freq_mhz: Cached<u64>,
-    rpn_freq_mhz: Cached<u64>,
+    act_freq_mhz: Cell<u64>,
+    boost_freq_mhz: Cell<u64>,
+    cur_freq_mhz: Cell<u64>,
+    max_freq_mhz: Cell<u64>,
+    min_freq_mhz: Cell<u64>,
+    rp0_freq_mhz: Cell<u64>,
+    rp1_freq_mhz: Cell<u64>,
+    rpn_freq_mhz: Cell<u64>,
 }
 
 impl Card {
@@ -161,14 +161,14 @@ impl Card {
     }
 
     pub fn new(id: u64) -> Self {
-        let act_freq_mhz = Cached::default();
-        let boost_freq_mhz = Cached::default();
-        let cur_freq_mhz = Cached::default();
-        let max_freq_mhz = Cached::default();
-        let min_freq_mhz = Cached::default();
-        let rp0_freq_mhz = Cached::default();
-        let rp1_freq_mhz = Cached::default();
-        let rpn_freq_mhz = Cached::default();
+        let act_freq_mhz = Cell::default();
+        let boost_freq_mhz = Cell::default();
+        let cur_freq_mhz = Cell::default();
+        let max_freq_mhz = Cell::default();
+        let min_freq_mhz = Cell::default();
+        let rp0_freq_mhz = Cell::default();
+        let rp1_freq_mhz = Cell::default();
+        let rpn_freq_mhz = Cell::default();
         Self {
             id,
             act_freq_mhz,
@@ -200,70 +200,70 @@ impl Card {
     }
 
     pub async fn act_freq_mhz(&self) -> Result<u64> {
-        self.act_freq_mhz.get_or(act_freq_mhz(self.id)).await
+        self.act_freq_mhz.get_or_init(act_freq_mhz(self.id)).await
     }
 
     pub async fn boost_freq_mhz(&self) -> Result<u64> {
-        self.boost_freq_mhz.get_or(boost_freq_mhz(self.id)).await
+        self.boost_freq_mhz.get_or_init(boost_freq_mhz(self.id)).await
     }
 
     pub async fn cur_freq_mhz(&self) -> Result<u64> {
-        self.cur_freq_mhz.get_or(cur_freq_mhz(self.id)).await
+        self.cur_freq_mhz.get_or_init(cur_freq_mhz(self.id)).await
     }
 
     pub async fn max_freq_mhz(&self) -> Result<u64> {
-        self.max_freq_mhz.get_or(max_freq_mhz(self.id)).await
+        self.max_freq_mhz.get_or_init(max_freq_mhz(self.id)).await
     }
 
     pub async fn min_freq_mhz(&self) -> Result<u64> {
-        self.min_freq_mhz.get_or(min_freq_mhz(self.id)).await
+        self.min_freq_mhz.get_or_init(min_freq_mhz(self.id)).await
     }
 
     pub async fn rp0_freq_mhz(&self) -> Result<u64> {
-        self.rp0_freq_mhz.get_or(rp0_freq_mhz(self.id)).await
+        self.rp0_freq_mhz.get_or_init(rp0_freq_mhz(self.id)).await
     }
 
     pub async fn rp1_freq_mhz(&self) -> Result<u64> {
-        self.rp1_freq_mhz.get_or(rp1_freq_mhz(self.id)).await
+        self.rp1_freq_mhz.get_or_init(rp1_freq_mhz(self.id)).await
     }
 
     pub async fn rpn_freq_mhz(&self) -> Result<u64> {
-        self.rpn_freq_mhz.get_or(rpn_freq_mhz(self.id)).await
+        self.rpn_freq_mhz.get_or_init(rpn_freq_mhz(self.id)).await
     }
 
     pub async fn set_boost_freq_mhz(&self, v: u64) -> Result<()> {
         self.boost_freq_mhz
-            .clear_if(set_boost_freq_mhz(self.id, v))
+            .clear_if_ok(set_boost_freq_mhz(self.id, v))
             .await
     }
 
     pub async fn set_max_freq_mhz(&self, v: u64) -> Result<()> {
         self.max_freq_mhz
-            .clear_if(set_max_freq_mhz(self.id, v))
+            .clear_if_ok(set_max_freq_mhz(self.id, v))
             .await
     }
 
     pub async fn set_min_freq_mhz(&self, v: u64) -> Result<()> {
         self.min_freq_mhz
-            .clear_if(set_min_freq_mhz(self.id, v))
+            .clear_if_ok(set_min_freq_mhz(self.id, v))
             .await
     }
 
     pub async fn set_rp0_freq_mhz(&self, v: u64) -> Result<()> {
         self.rp0_freq_mhz
-            .clear_if(set_rp0_freq_mhz(self.id, v))
+            .clear_if_ok(set_rp0_freq_mhz(self.id, v))
             .await
     }
 
     pub async fn set_rp1_freq_mhz(&self, v: u64) -> Result<()> {
         self.rp1_freq_mhz
-            .clear_if(set_rp1_freq_mhz(self.id, v))
+            .clear_if_ok(set_rp1_freq_mhz(self.id, v))
             .await
     }
 
     pub async fn set_rpn_freq_mhz(&self, v: u64) -> Result<()> {
         self.rpn_freq_mhz
-            .clear_if(set_rpn_freq_mhz(self.id, v))
+            .clear_if_ok(set_rpn_freq_mhz(self.id, v))
             .await
     }
 }

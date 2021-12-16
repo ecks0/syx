@@ -44,7 +44,7 @@ pub(crate) mod path {
     }
 }
 
-use crate::{sysfs, Cached, Result};
+use crate::{sysfs, Cell, Result};
 
 pub async fn available() -> bool {
     path::root().is_dir()
@@ -81,7 +81,7 @@ pub async fn set_online(id: u64, val: bool) -> Result<()> {
 #[derive(Clone, Debug)]
 pub struct Cpu {
     id: u64,
-    online: Cached<bool>,
+    online: Cell<bool>,
 }
 
 impl Cpu {
@@ -94,7 +94,7 @@ impl Cpu {
     }
 
     pub fn new(id: u64) -> Self {
-        let online = Cached::default();
+        let online = Cell::default();
         Self { id, online }
     }
 
@@ -107,10 +107,10 @@ impl Cpu {
     }
 
     pub async fn online(&self) -> Result<bool> {
-        self.online.get_or(online(self.id)).await
+        self.online.get_or_init(online(self.id)).await
     }
 
     pub async fn set_online(&self, v: bool) -> Result<()> {
-        self.online.clear_if(set_online(self.id, v)).await
+        self.online.clear_if_ok(set_online(self.id, v)).await
     }
 }

@@ -50,7 +50,7 @@ pub(crate) mod path {
 }
 
 pub use crate::cpufreq::devices;
-use crate::{sysfs, Cached, Result};
+use crate::{sysfs, Cell, Result};
 
 async fn available() -> bool {
     path::status().is_file()
@@ -110,11 +110,11 @@ pub async fn set_no_turbo(v: bool) -> Result<()> {
 
 #[derive(Clone, Debug, Default)]
 pub struct System {
-    max_perf_pct: Cached<u64>,
-    min_perf_pct: Cached<u64>,
-    no_turbo: Cached<bool>,
-    status: Cached<String>,
-    turbo_pct: Cached<u64>,
+    max_perf_pct: Cell<u64>,
+    min_perf_pct: Cell<u64>,
+    no_turbo: Cell<bool>,
+    status: Cell<String>,
+    turbo_pct: Cell<u64>,
 }
 
 impl System {
@@ -133,44 +133,44 @@ impl System {
     }
 
     pub async fn max_perf_pct(&self) -> Result<u64> {
-        self.max_perf_pct.get_or(max_perf_pct()).await
+        self.max_perf_pct.get_or_init(max_perf_pct()).await
     }
 
     pub async fn min_perf_pct(&self) -> Result<u64> {
-        self.min_perf_pct.get_or(min_perf_pct()).await
+        self.min_perf_pct.get_or_init(min_perf_pct()).await
     }
 
     pub async fn no_turbo(&self) -> Result<bool> {
-        self.no_turbo.get_or(no_turbo()).await
+        self.no_turbo.get_or_init(no_turbo()).await
     }
 
     pub async fn status(&self) -> Result<String> {
-        self.status.get_or(status()).await
+        self.status.get_or_init(status()).await
     }
 
     pub async fn turbo_pct(&self) -> Result<u64> {
-        self.turbo_pct.get_or(turbo_pct()).await
+        self.turbo_pct.get_or_init(turbo_pct()).await
     }
 
     pub async fn set_max_perf_pct(&self, v: u64) -> Result<()> {
-        self.max_perf_pct.clear_if(set_max_perf_pct(v)).await
+        self.max_perf_pct.clear_if_ok(set_max_perf_pct(v)).await
     }
 
     pub async fn set_min_perf_pct(&self, v: u64) -> Result<()> {
-        self.min_perf_pct.clear_if(set_min_perf_pct(v)).await
+        self.min_perf_pct.clear_if_ok(set_min_perf_pct(v)).await
     }
 
     pub async fn set_no_turbo(&self, v: bool) -> Result<()> {
-        self.no_turbo.clear_if(set_no_turbo(v)).await
+        self.no_turbo.clear_if_ok(set_no_turbo(v)).await
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Cpu {
     id: u64,
-    energy_perf_bias: Cached<u64>,
-    energy_performance_preference: Cached<String>,
-    energy_performance_available_preferences: Cached<Vec<String>>,
+    energy_perf_bias: Cell<u64>,
+    energy_performance_preference: Cell<String>,
+    energy_performance_available_preferences: Cell<Vec<String>>,
 }
 
 impl Cpu {
@@ -183,9 +183,9 @@ impl Cpu {
     }
 
     pub fn new(id: u64) -> Self {
-        let energy_perf_bias = Cached::default();
-        let energy_performance_preference = Cached::default();
-        let energy_performance_available_preferences = Cached::default();
+        let energy_perf_bias = Cell::default();
+        let energy_performance_preference = Cell::default();
+        let energy_performance_available_preferences = Cell::default();
         Self {
             id,
             energy_perf_bias,
@@ -208,31 +208,31 @@ impl Cpu {
 
     pub async fn energy_perf_bias(&self) -> Result<u64> {
         self.energy_perf_bias
-            .get_or(energy_perf_bias(self.id))
+            .get_or_init(energy_perf_bias(self.id))
             .await
     }
 
     pub async fn energy_performance_preference(&self) -> Result<String> {
         self.energy_performance_preference
-            .get_or(energy_performance_preference(self.id))
+            .get_or_init(energy_performance_preference(self.id))
             .await
     }
 
     pub async fn energy_performance_available_preferences(&self) -> Result<Vec<String>> {
         self.energy_performance_available_preferences
-            .get_or(energy_performance_available_preferences(self.id))
+            .get_or_init(energy_performance_available_preferences(self.id))
             .await
     }
 
     pub async fn set_energy_perf_bias(&self, v: u64) -> Result<()> {
         self.energy_perf_bias
-            .clear_if(set_energy_perf_bias(self.id, v))
+            .clear_if_ok(set_energy_perf_bias(self.id, v))
             .await
     }
 
     pub async fn set_energy_performance_preference(&self, v: impl AsRef<str>) -> Result<()> {
         self.energy_performance_preference
-            .clear_if(set_energy_performance_preference(self.id, v.as_ref()))
+            .clear_if_ok(set_energy_performance_preference(self.id, v.as_ref()))
             .await
     }
 }

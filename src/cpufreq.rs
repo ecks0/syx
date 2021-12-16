@@ -50,7 +50,7 @@ pub(crate) mod path {
     }
 }
 
-use crate::{sysfs, Cached, Result};
+use crate::{sysfs, Cell, Result};
 
 pub async fn available() -> bool {
     path::root().is_dir()
@@ -107,14 +107,14 @@ pub async fn set_scaling_min_freq(id: u64, val: u64) -> Result<()> {
 #[derive(Clone, Debug)]
 pub struct Cpu {
     id: u64,
-    cpuinfo_max_freq: Cached<u64>,
-    cpuinfo_min_freq: Cached<u64>,
-    scaling_cur_freq: Cached<u64>,
-    scaling_driver: Cached<String>,
-    scaling_governor: Cached<String>,
-    scaling_available_governors: Cached<Vec<String>>,
-    scaling_max_freq: Cached<u64>,
-    scaling_min_freq: Cached<u64>,
+    cpuinfo_max_freq: Cell<u64>,
+    cpuinfo_min_freq: Cell<u64>,
+    scaling_cur_freq: Cell<u64>,
+    scaling_driver: Cell<String>,
+    scaling_governor: Cell<String>,
+    scaling_available_governors: Cell<Vec<String>>,
+    scaling_max_freq: Cell<u64>,
+    scaling_min_freq: Cell<u64>,
 }
 
 impl Cpu {
@@ -127,14 +127,14 @@ impl Cpu {
     }
 
     pub fn new(id: u64) -> Self {
-        let cpuinfo_max_freq = Cached::default();
-        let cpuinfo_min_freq = Cached::default();
-        let scaling_cur_freq = Cached::default();
-        let scaling_driver = Cached::default();
-        let scaling_governor = Cached::default();
-        let scaling_available_governors = Cached::default();
-        let scaling_max_freq = Cached::default();
-        let scaling_min_freq = Cached::default();
+        let cpuinfo_max_freq = Cell::default();
+        let cpuinfo_min_freq = Cell::default();
+        let scaling_cur_freq = Cell::default();
+        let scaling_driver = Cell::default();
+        let scaling_governor = Cell::default();
+        let scaling_available_governors = Cell::default();
+        let scaling_max_freq = Cell::default();
+        let scaling_min_freq = Cell::default();
         Self {
             id,
             cpuinfo_max_freq,
@@ -167,65 +167,65 @@ impl Cpu {
 
     pub async fn cpuinfo_max_freq(&self) -> Result<u64> {
         self.cpuinfo_max_freq
-            .get_or(cpuinfo_max_freq(self.id))
+            .get_or_init(cpuinfo_max_freq(self.id))
             .await
     }
 
     pub async fn cpuinfo_min_freq(&self) -> Result<u64> {
         self.cpuinfo_min_freq
-            .get_or(cpuinfo_min_freq(self.id))
+            .get_or_init(cpuinfo_min_freq(self.id))
             .await
     }
 
     pub async fn scaling_cur_freq(&self) -> Result<u64> {
         self.scaling_cur_freq
-            .get_or(scaling_cur_freq(self.id))
+            .get_or_init(scaling_cur_freq(self.id))
             .await
     }
 
     pub async fn scaling_driver(&self) -> Result<String> {
-        self.scaling_driver.get_or(scaling_driver(self.id)).await
+        self.scaling_driver.get_or_init(scaling_driver(self.id)).await
     }
 
     pub async fn scaling_governor(&self) -> Result<String> {
         self.scaling_governor
-            .get_or(scaling_governor(self.id))
+            .get_or_init(scaling_governor(self.id))
             .await
     }
 
     pub async fn scaling_available_governors(&self) -> Result<Vec<String>> {
         self.scaling_available_governors
-            .get_or(scaling_available_governors(self.id))
+            .get_or_init(scaling_available_governors(self.id))
             .await
     }
 
     pub async fn scaling_max_freq(&self) -> Result<u64> {
         self.scaling_max_freq
-            .get_or(scaling_max_freq(self.id))
+            .get_or_init(scaling_max_freq(self.id))
             .await
     }
 
     pub async fn scaling_min_freq(&self) -> Result<u64> {
         self.scaling_min_freq
-            .get_or(scaling_min_freq(self.id))
+            .get_or_init(scaling_min_freq(self.id))
             .await
     }
 
     pub async fn set_scaling_governor(&self, v: impl AsRef<str>) -> Result<()> {
         self.scaling_governor
-            .clear_if(set_scaling_governor(self.id, v.as_ref()))
+            .clear_if_ok(set_scaling_governor(self.id, v.as_ref()))
             .await
     }
 
     pub async fn set_scaling_max_freq(&self, v: u64) -> Result<()> {
         self.scaling_max_freq
-            .clear_if(set_scaling_max_freq(self.id, v))
+            .clear_if_ok(set_scaling_max_freq(self.id, v))
             .await
     }
 
     pub async fn set_scaling_min_freq(&self, v: u64) -> Result<()> {
         self.scaling_min_freq
-            .clear_if(set_scaling_min_freq(self.id, v))
+            .clear_if_ok(set_scaling_min_freq(self.id, v))
             .await
     }
 }

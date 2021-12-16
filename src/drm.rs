@@ -36,7 +36,7 @@ pub(crate) mod path {
     }
 }
 
-use crate::{sysfs, Cached, Result};
+use crate::{sysfs, Cell, Result};
 
 pub async fn available() -> bool {
     path::root().is_dir()
@@ -61,9 +61,9 @@ pub async fn driver(id: u64) -> Result<String> {
 #[derive(Clone, Debug)]
 pub struct Card {
     id: u64,
-    bus: Cached<String>,
-    bus_id: Cached<String>,
-    driver: Cached<String>,
+    bus: Cell<String>,
+    bus_id: Cell<String>,
+    driver: Cell<String>,
 }
 
 impl Card {
@@ -76,9 +76,9 @@ impl Card {
     }
 
     pub fn new(id: u64) -> Self {
-        let bus = Cached::default();
-        let bus_id = Cached::default();
-        let driver = Cached::default();
+        let bus = Cell::default();
+        let bus_id = Cell::default();
+        let driver = Cell::default();
         Self {
             id,
             bus,
@@ -96,14 +96,14 @@ impl Card {
     }
 
     pub async fn bus(&self) -> Result<String> {
-        self.bus.get_or(bus(self.id)).await
+        self.bus.get_or_init(bus(self.id)).await
     }
 
     pub async fn bus_id(&self) -> Result<String> {
-        self.bus_id.get_or(bus_id(self.id)).await
+        self.bus_id.get_or_init(bus_id(self.id)).await
     }
 
     pub async fn driver(&self) -> Result<String> {
-        self.driver.get_or(driver(self.id)).await
+        self.driver.get_or_init(driver(self.id)).await
     }
 }
