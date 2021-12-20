@@ -50,13 +50,19 @@ pub(crate) mod path {
     }
 }
 
-use crate::{sysfs, Cell, Result};
+use crate::util::sysfs;
+use crate::util::cell::Cell;
+use crate::Result;
 
-pub async fn available() -> bool {
-    path::root().is_dir()
+pub async fn available() -> Result<bool> {
+    Ok(path::root().is_dir())
 }
 
-pub async fn devices() -> Result<Vec<u64>> {
+pub async fn exists(id: u64) -> Result<bool> {
+    Ok(path::device(id).is_dir())
+}
+
+pub async fn ids() -> Result<Vec<u64>> {
     sysfs::read_ids(&path::root(), "policy").await
 }
 
@@ -105,7 +111,7 @@ pub async fn set_scaling_min_freq(id: u64, val: u64) -> Result<()> {
 }
 
 #[derive(Clone, Debug)]
-pub struct Cpu {
+pub struct Policy {
     id: u64,
     cpuinfo_max_freq: Cell<u64>,
     cpuinfo_min_freq: Cell<u64>,
@@ -117,13 +123,17 @@ pub struct Cpu {
     scaling_min_freq: Cell<u64>,
 }
 
-impl Cpu {
-    pub async fn available() -> bool {
+impl Policy {
+    pub async fn available() -> Result<bool> {
         available().await
     }
 
+    pub async fn exists(id: u64) -> Result<bool> {
+        exists(id).await
+    }
+
     pub async fn ids() -> Result<Vec<u64>> {
-        devices().await
+        ids().await
     }
 
     pub fn new(id: u64) -> Self {
@@ -167,47 +177,47 @@ impl Cpu {
 
     pub async fn cpuinfo_max_freq(&self) -> Result<u64> {
         self.cpuinfo_max_freq
-            .get_or_init(cpuinfo_max_freq(self.id))
+            .get_or_load(cpuinfo_max_freq(self.id))
             .await
     }
 
     pub async fn cpuinfo_min_freq(&self) -> Result<u64> {
         self.cpuinfo_min_freq
-            .get_or_init(cpuinfo_min_freq(self.id))
+            .get_or_load(cpuinfo_min_freq(self.id))
             .await
     }
 
     pub async fn scaling_cur_freq(&self) -> Result<u64> {
         self.scaling_cur_freq
-            .get_or_init(scaling_cur_freq(self.id))
+            .get_or_load(scaling_cur_freq(self.id))
             .await
     }
 
     pub async fn scaling_driver(&self) -> Result<String> {
-        self.scaling_driver.get_or_init(scaling_driver(self.id)).await
+        self.scaling_driver.get_or_load(scaling_driver(self.id)).await
     }
 
     pub async fn scaling_governor(&self) -> Result<String> {
         self.scaling_governor
-            .get_or_init(scaling_governor(self.id))
+            .get_or_load(scaling_governor(self.id))
             .await
     }
 
     pub async fn scaling_available_governors(&self) -> Result<Vec<String>> {
         self.scaling_available_governors
-            .get_or_init(scaling_available_governors(self.id))
+            .get_or_load(scaling_available_governors(self.id))
             .await
     }
 
     pub async fn scaling_max_freq(&self) -> Result<u64> {
         self.scaling_max_freq
-            .get_or_init(scaling_max_freq(self.id))
+            .get_or_load(scaling_max_freq(self.id))
             .await
     }
 
     pub async fn scaling_min_freq(&self) -> Result<u64> {
         self.scaling_min_freq
-            .get_or_init(scaling_min_freq(self.id))
+            .get_or_load(scaling_min_freq(self.id))
             .await
     }
 

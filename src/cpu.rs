@@ -23,20 +23,16 @@ pub(crate) mod path {
         p
     }
 
-    pub(crate) fn online_devices() -> PathBuf {
+    pub(crate) fn ids_online() -> PathBuf {
         root_attr("online")
     }
 
-    pub(crate) fn offline_devices() -> PathBuf {
+    pub(crate) fn ids_offline() -> PathBuf {
         root_attr("offline")
     }
 
-    pub(crate) fn present_devices() -> PathBuf {
+    pub(crate) fn ids_present() -> PathBuf {
         root_attr("present")
-    }
-
-    pub(crate) fn possible_devices() -> PathBuf {
-        root_attr("possible")
     }
 
     pub(crate) fn online(id: u64) -> PathBuf {
@@ -44,30 +40,32 @@ pub(crate) mod path {
     }
 }
 
-use crate::{sysfs, Cell, Result};
+use crate::util::cell::Cell;
+use crate::util::sysfs;
+use crate::Result;
 
-pub async fn available() -> bool {
-    path::root().is_dir()
+pub async fn available() -> Result<bool> {
+    Ok(path::root().is_dir())
 }
 
-pub async fn devices() -> Result<Vec<u64>> {
+pub async fn exists(id: u64) -> Result<bool> {
+    Ok(path::device(id).is_dir())
+}
+
+pub async fn ids() -> Result<Vec<u64>> {
     sysfs::read_ids(&path::root(), "cpu").await
 }
 
-pub async fn devices_online() -> Result<Vec<u64>> {
-    sysfs::read_indices(&path::online_devices()).await
+pub async fn ids_online() -> Result<Vec<u64>> {
+    sysfs::read_indices(&path::ids_online()).await
 }
 
-pub async fn devices_offline() -> Result<Vec<u64>> {
-    sysfs::read_indices(&path::offline_devices()).await
+pub async fn ids_offline() -> Result<Vec<u64>> {
+    sysfs::read_indices(&path::ids_offline()).await
 }
 
-pub async fn devices_present() -> Result<Vec<u64>> {
-    sysfs::read_indices(&path::present_devices()).await
-}
-
-pub async fn devices_possible() -> Result<Vec<u64>> {
-    sysfs::read_indices(&path::possible_devices()).await
+pub async fn ids_present() -> Result<Vec<u64>> {
+    sysfs::read_indices(&path::ids_present()).await
 }
 
 pub async fn online(id: u64) -> Result<bool> {
@@ -85,12 +83,16 @@ pub struct Cpu {
 }
 
 impl Cpu {
-    pub async fn available() -> bool {
+    pub async fn available() -> Result<bool> {
         available().await
     }
 
+    pub async fn exists(id: u64) -> Result<bool> {
+        exists(id).await
+    }
+
     pub async fn ids() -> Result<Vec<u64>> {
-        devices().await
+        ids().await
     }
 
     pub fn new(id: u64) -> Self {
@@ -107,7 +109,7 @@ impl Cpu {
     }
 
     pub async fn online(&self) -> Result<bool> {
-        self.online.get_or_init(online(self.id)).await
+        self.online.get_or_load(online(self.id)).await
     }
 
     pub async fn set_online(&self, v: bool) -> Result<()> {

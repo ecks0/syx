@@ -134,7 +134,7 @@ fn handle_read<T: Debug>(path: &Path, result: StdResult<T, IoError>) -> Result<T
             }
         },
     }
-    result.map_err(|e| Error::sysfs_read(path, e))
+    result.map_err(|e| Error::sysfs_read(e, path))
 }
 
 fn handle_write<T, S: Display>(path: &Path, result: StdResult<T, IoError>, _value: S) -> Result<T> {
@@ -156,5 +156,5 @@ fn handle_write<T, S: Display>(path: &Path, result: StdResult<T, IoError>, _valu
             }
         },
     }
-    result.map_err(|e| Error::sysfs_write(path, e))
+    result.map_err(|e| Error::sysfs_write(e, path))
 }

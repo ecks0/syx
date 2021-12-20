@@ -1,4 +1,3 @@
-mod cell;
 pub mod cpu;
 pub mod cpufreq;
 pub mod drm;
@@ -6,25 +5,21 @@ pub mod i915;
 pub mod nv;
 pub mod pstate;
 pub mod rapl;
-mod sysfs;
+mod util;
 
-use std::path::PathBuf;
+use std::{path::PathBuf, fmt::Display};
 
 pub use nvml_wrapper::error::NvmlError;
 pub use tokio::io::Error as IoError;
-
-#[cfg(feature = "sync")]
-pub(crate) use crate::cell::sync::Cell;
-#[cfg(not(feature = "sync"))]
-pub(crate) use crate::cell::unsync::Cell;
-
 pub use crate::cpu::Cpu;
-pub use crate::cpufreq::Cpu as CpufreqCpu;
+pub use crate::cpufreq::Policy as CpufreqPolicy;
 pub use crate::drm::Card as DrmCard;
 pub use crate::i915::Card as I915Card;
 pub use crate::nv::Card as NvCard;
-pub use crate::pstate::{Cpu as PstateCpu, System as PstateSystem};
-pub use crate::rapl::{Constraint as RaplConstraint, Zone as RaplZone};
+pub use crate::pstate::policy::Policy as PstatePolicy;
+pub use crate::pstate::system::System as PstateSystem;
+pub use crate::rapl::constraint::Constraint as RaplConstraint;
+pub use crate::rapl::zone::Zone as RaplZone;
 
 #[derive(Clone, Debug)]
 pub enum Op {
@@ -43,12 +38,15 @@ impl std::fmt::Display for Op {
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    #[error("Error: {0}")]
+    NonSequitor(String),
+
     #[error("sysfs {op}: {path}: {source}")]
     SysfsIo {
-        path: PathBuf,
-        op: Op,
         #[source]
         source: IoError,
+        path: PathBuf,
+        op: Op,
     },
 
     #[error("sysfs parse: {path}: Invalid value for {ty}: {value:?}")]
@@ -66,30 +64,35 @@ pub enum Error {
 
     #[error("nvml {op} id {device}: {source}")]
     NvmlIo {
-        device: u64,
-        op: Op,
-        method: &'static str,
         #[source]
         source: NvmlError,
+        device: String,
+        method: &'static str,
+        op: Op,
     },
 }
 
 impl Error {
-    fn sysfs_read(path: impl Into<PathBuf>, source: IoError) -> Self {
+    fn non_sequitor(s: impl Display) -> Self {
+        let s = s.to_string();
+        Self::NonSequitor(s)
+    }
+
+    fn sysfs_read(source: IoError, path: impl Into<PathBuf>) -> Self {
         let path = path.into();
         let op = Op::Read;
-        Self::SysfsIo { path, op, source }
+        Self::SysfsIo { source, path, op }
     }
 
-    fn sysfs_write(path: impl Into<PathBuf>, source: IoError) -> Self {
+    fn sysfs_write(source: IoError, path: impl Into<PathBuf>) -> Self {
         let path = path.into();
         let op = Op::Write;
-        Self::SysfsIo { path, op, source }
+        Self::SysfsIo { source, path, op }
     }
 
-    fn sysfs_parse(path: impl Into<PathBuf>, ty: &'static str, value: impl Into<String>) -> Self {
+    fn sysfs_parse(path: impl Into<PathBuf>, ty: &'static str, value: impl Display) -> Self {
         let path = path.into();
-        let value = value.into();
+        let value = value.to_string();
         Self::SysfsParse { path, ty, value }
     }
 
@@ -97,25 +100,34 @@ impl Error {
         Self::NvmlInit(error)
     }
 
-    fn nvml_read(device: u64, method: &'static str, source: NvmlError) -> Self {
+    fn nvml_read(source: NvmlError, device: impl Display, method: &'static str) -> Self {
+        let device = device.to_string();
         let op = Op::Read;
         Self::NvmlIo {
-            device,
-            op,
-            method,
             source,
+            device,
+            method,
+            op,
         }
     }
 
-    fn nvml_write(device: u64, method: &'static str, source: NvmlError) -> Self {
+    fn nvml_write(source: NvmlError, device: impl Display, method: &'static str) -> Self {
+        let device = device.to_string();
         let op = Op::Write;
         Self::NvmlIo {
-            device,
-            op,
-            method,
             source,
+            device,
+            method,
+            op,
         }
     }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+#[derive(Clone, Debug, Eq, Ord, Hash, PartialEq, PartialOrd)]
+pub struct BusId {
+    pub bus: String,
+    pub id: String,
+}
+
