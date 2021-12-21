@@ -1,21 +1,21 @@
 pub(crate) mod path {
     use std::path::PathBuf;
 
-    use crate::cpu::path::device_attr as cpu_device_attr;
-    use crate::cpufreq::path::device_attr as cpufreq_device_attr;
+    use crate::cpu::path::cpu_attr as cpu_attr;
+    use crate::cpufreq::path::policy_attr as policy_attr;
 
     pub(crate) fn energy_perf_bias(id: u64) -> PathBuf {
-        let mut p = cpu_device_attr(id, "power");
+        let mut p = cpu_attr(id, "power");
         p.push("energy_perf_bias");
         p
     }
 
     pub(crate) fn energy_performance_preference(id: u64) -> PathBuf {
-        cpufreq_device_attr(id, "energy_performance_preference")
+        policy_attr(id, "energy_performance_preference")
     }
 
     pub(crate) fn energy_performance_available_preferences(id: u64) -> PathBuf {
-        cpufreq_device_attr(id, "energy_performance_available_preferences")
+        policy_attr(id, "energy_performance_available_preferences")
     }
 }
 

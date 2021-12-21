@@ -2,7 +2,7 @@ pub mod cpu;
 pub mod cpufreq;
 pub mod drm;
 pub mod i915;
-pub mod nv;
+pub mod nvml;
 pub mod pstate;
 pub mod rapl;
 mod util;
@@ -15,7 +15,7 @@ pub use crate::cpu::Cpu;
 pub use crate::cpufreq::Policy as CpufreqPolicy;
 pub use crate::drm::Card as DrmCard;
 pub use crate::i915::Card as I915Card;
-pub use crate::nv::Card as NvCard;
+pub use crate::nvml::Card as NvCard;
 pub use crate::pstate::policy::Policy as PstatePolicy;
 pub use crate::pstate::system::System as PstateSystem;
 pub use crate::rapl::constraint::Constraint as RaplConstraint;
@@ -130,4 +130,3 @@ pub struct BusId {
     pub bus: String,
     pub id: String,
 }
-

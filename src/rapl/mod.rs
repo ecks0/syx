@@ -20,15 +20,15 @@ pub(crate) mod path {
         p
     }
 
-    pub(crate) fn device(package_: u64, subzone_: Option<u64>) -> PathBuf {
+    pub(crate) fn zone(package_: u64, subzone_: Option<u64>) -> PathBuf {
         match subzone_ {
             Some(subzone_) => subzone(package_, subzone_),
             None => package(package_),
         }
     }
 
-    pub(crate) fn device_attr(package: u64, subzone: Option<u64>, a: &str) -> PathBuf {
-        let mut p = device(package, subzone);
+    pub(crate) fn zone_attr(package: u64, subzone: Option<u64>, a: &str) -> PathBuf {
+        let mut p = zone(package, subzone);
         p.push(a);
         p
     }

@@ -1,85 +1,64 @@
 pub(crate) mod path {
     use std::path::PathBuf;
 
+    use crate::drm::path::card_attr;
+
     pub(crate) fn module() -> PathBuf {
         PathBuf::from("/sys/module/i915")
     }
 
-    pub(crate) fn root() -> PathBuf {
-        PathBuf::from("/sys/class/drm")
-    }
-
-    pub(crate) fn device(id: u64) -> PathBuf {
-        let mut p = root();
-        p.push(format!("card{}", id));
-        p
-    }
-
-    pub(crate) fn device_attr(id: u64, s: &str) -> PathBuf {
-        let mut p = device(id);
-        p.push(s);
-        p
-    }
-
-    pub(crate) fn driver(id: u64) -> PathBuf {
-        let mut p = device_attr(id, "device");
-        p.push("driver");
-        p
-    }
-
     pub(crate) fn act_freq_mhz(id: u64) -> PathBuf {
-        device_attr(id, "gt_act_freq_mhz")
+        card_attr(id, "gt_act_freq_mhz")
     }
 
     pub(crate) fn boost_freq_mhz(id: u64) -> PathBuf {
-        device_attr(id, "gt_boost_freq_mhz")
+        card_attr(id, "gt_boost_freq_mhz")
     }
 
     pub(crate) fn cur_freq_mhz(id: u64) -> PathBuf {
-        device_attr(id, "gt_cur_freq_mhz")
+        card_attr(id, "gt_cur_freq_mhz")
     }
 
     pub(crate) fn max_freq_mhz(id: u64) -> PathBuf {
-        device_attr(id, "gt_max_freq_mhz")
+        card_attr(id, "gt_max_freq_mhz")
     }
 
     pub(crate) fn min_freq_mhz(id: u64) -> PathBuf {
-        device_attr(id, "gt_min_freq_mhz")
+        card_attr(id, "gt_min_freq_mhz")
     }
 
     pub(crate) fn rp0_freq_mhz(id: u64) -> PathBuf {
-        device_attr(id, "gt_RP0_freq_mhz")
+        card_attr(id, "gt_RP0_freq_mhz")
     }
 
     pub(crate) fn rp1_freq_mhz(id: u64) -> PathBuf {
-        device_attr(id, "gt_RP1_freq_mhz")
+        card_attr(id, "gt_RP1_freq_mhz")
     }
 
     pub(crate) fn rpn_freq_mhz(id: u64) -> PathBuf {
-        device_attr(id, "gt_RPn_freq_mhz")
+        card_attr(id, "gt_RPn_freq_mhz")
     }
 }
 
-use crate::{sysfs, Cell, Result};
+use crate::drm;
+use crate::util::cell::Cell;
+use crate::util::sysfs;
+use crate::Result;
 
-pub async fn available() -> bool {
-    path::module().is_dir()
+pub async fn available() -> Result<bool> {
+    Ok(path::module().is_dir())
 }
 
-pub async fn devices() -> Result<Vec<u64>> {
-    let mut ids = vec![];
-    for id in sysfs::read_ids(&path::root(), "card").await? {
-        if let Ok(driver) = driver(id).await {
-            if "i915" == driver.as_str() {
-                ids.push(id);
-            }
-        }
+pub async fn exists(id: u64) -> Result<bool> {
+    if drm::exists(id).await? {
+        Ok("i915" == drm::driver(id).await?.as_str())
+    } else {
+        Ok(false)
     }
-    Ok(ids)
 }
 
-pub async fn driver(id: u64) -> Result<String> {
-    sysfs::read_link_name(&path::driver(id)).await
+pub async fn ids() -> Result<Vec<u64>> {
+    drm::ids_for_driver("i915").await
 }
 
 pub async fn act_freq_mhz(id: u64) -> Result<u64> {
@@ -152,33 +131,29 @@ pub struct Card {
 }
 
 impl Card {
-    pub async fn available() -> bool {
+    pub async fn available() -> Result<bool> {
         available().await
     }
 
+    pub async fn exists(id: u64) -> Result<bool> {
+        exists(id).await
+    }
+
     pub async fn ids() -> Result<Vec<u64>> {
-        devices().await
+        ids().await
     }
 
     pub fn new(id: u64) -> Self {
-        let act_freq_mhz = Cell::default();
-        let boost_freq_mhz = Cell::default();
-        let cur_freq_mhz = Cell::default();
-        let max_freq_mhz = Cell::default();
-        let min_freq_mhz = Cell::default();
-        let rp0_freq_mhz = Cell::default();
-        let rp1_freq_mhz = Cell::default();
-        let rpn_freq_mhz = Cell::default();
         Self {
             id,
-            act_freq_mhz,
-            boost_freq_mhz,
-            cur_freq_mhz,
-            max_freq_mhz,
-            min_freq_mhz,
-            rp0_freq_mhz,
-            rp1_freq_mhz,
-            rpn_freq_mhz,
+            act_freq_mhz: Cell::default(),
+            boost_freq_mhz: Cell::default(),
+            cur_freq_mhz: Cell::default(),
+            max_freq_mhz: Cell::default(),
+            min_freq_mhz: Cell::default(),
+            rp0_freq_mhz: Cell::default(),
+            rp1_freq_mhz: Cell::default(),
+            rpn_freq_mhz: Cell::default(),
         }
     }
 
@@ -200,35 +175,35 @@ impl Card {
     }
 
     pub async fn act_freq_mhz(&self) -> Result<u64> {
-        self.act_freq_mhz.get_or_init(act_freq_mhz(self.id)).await
+        self.act_freq_mhz.get_or_load(act_freq_mhz(self.id)).await
     }
 
     pub async fn boost_freq_mhz(&self) -> Result<u64> {
-        self.boost_freq_mhz.get_or_init(boost_freq_mhz(self.id)).await
+        self.boost_freq_mhz.get_or_load(boost_freq_mhz(self.id)).await
     }
 
     pub async fn cur_freq_mhz(&self) -> Result<u64> {
-        self.cur_freq_mhz.get_or_init(cur_freq_mhz(self.id)).await
+        self.cur_freq_mhz.get_or_load(cur_freq_mhz(self.id)).await
     }
 
     pub async fn max_freq_mhz(&self) -> Result<u64> {
-        self.max_freq_mhz.get_or_init(max_freq_mhz(self.id)).await
+        self.max_freq_mhz.get_or_load(max_freq_mhz(self.id)).await
     }
 
     pub async fn min_freq_mhz(&self) -> Result<u64> {
-        self.min_freq_mhz.get_or_init(min_freq_mhz(self.id)).await
+        self.min_freq_mhz.get_or_load(min_freq_mhz(self.id)).await
     }
 
     pub async fn rp0_freq_mhz(&self) -> Result<u64> {
-        self.rp0_freq_mhz.get_or_init(rp0_freq_mhz(self.id)).await
+        self.rp0_freq_mhz.get_or_load(rp0_freq_mhz(self.id)).await
     }
 
     pub async fn rp1_freq_mhz(&self) -> Result<u64> {
-        self.rp1_freq_mhz.get_or_init(rp1_freq_mhz(self.id)).await
+        self.rp1_freq_mhz.get_or_load(rp1_freq_mhz(self.id)).await
     }
 
     pub async fn rpn_freq_mhz(&self) -> Result<u64> {
-        self.rpn_freq_mhz.get_or_init(rpn_freq_mhz(self.id)).await
+        self.rpn_freq_mhz.get_or_load(rpn_freq_mhz(self.id)).await
     }
 
     pub async fn set_boost_freq_mhz(&self, v: u64) -> Result<()> {

@@ -11,14 +11,14 @@ pub(crate) mod path {
         p
     }
 
-    pub(crate) fn device(id: u64) -> PathBuf {
+    pub(crate) fn cpu(id: u64) -> PathBuf {
         let mut p = root();
         p.push(format!("cpu{}", id));
         p
     }
 
-    pub(crate) fn device_attr(i: u64, a: &str) -> PathBuf {
-        let mut p = device(i);
+    pub(crate) fn cpu_attr(i: u64, a: &str) -> PathBuf {
+        let mut p = cpu(i);
         p.push(a);
         p
     }
@@ -36,7 +36,7 @@ pub(crate) mod path {
     }
 
     pub(crate) fn online(id: u64) -> PathBuf {
-        device_attr(id, "online")
+        cpu_attr(id, "online")
     }
 }
 
@@ -49,7 +49,7 @@ pub async fn available() -> Result<bool> {
 }
 
 pub async fn exists(id: u64) -> Result<bool> {
-    Ok(path::device(id).is_dir())
+    Ok(path::cpu(id).is_dir())
 }
 
 pub async fn ids() -> Result<Vec<u64>> {

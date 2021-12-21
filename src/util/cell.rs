@@ -2,7 +2,6 @@ use std::future::Future;
 use std::sync::Arc;
 
 use parking_lot::FairMutex;
-use tokio::task::spawn_blocking;
 
 use crate::Result;
 
@@ -18,30 +17,17 @@ impl<T> Cell<T>
 where
     T: Clone + Send + 'static,
 {
-    async fn set(&self, v: T) {
-        let cell = Arc::clone(&self.cell);
-        spawn_blocking(move || cell.lock().replace(v))
-            .await
-            .unwrap();
-    }
-
-    async fn get(&self) -> Option<T> {
-        let cell = Arc::clone(&self.cell);
-        spawn_blocking(move || cell.lock().as_ref().cloned())
-            .await
-            .unwrap()
-    }
-
     pub(crate) async fn get_or_load<F>(&self, f: F) -> Result<T>
     where
         F: Future<Output = Result<T>>,
     {
-        if let Some(v) = self.get().await {
+        let mut value = self.cell.lock();
+        if let Some(v) = value.clone() {
             Ok(v)
         } else {
             match f.await {
                 Ok(v) => {
-                    self.set(v.clone()).await;
+                    value.replace(v.clone());
                     Ok(v)
                 },
                 Err(e) => Err(e),
@@ -50,8 +36,7 @@ where
     }
 
     pub(crate) async fn clear(&self) {
-        let cell = Arc::clone(&self.cell);
-        spawn_blocking(move || cell.lock().take()).await.unwrap();
+        self.cell.lock().take();
     }
 
     pub(crate) async fn clear_if_ok<F, R>(&self, f: F) -> Result<R>
@@ -59,9 +44,10 @@ where
         F: Future<Output = Result<R>>,
         R: Send + 'static,
     {
+        let mut value = self.cell.lock();
         let r = f.await;
         if r.is_ok() {
-            self.clear().await;
+            value.take();
         }
         r
     }
