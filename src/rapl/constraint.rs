@@ -129,8 +129,8 @@ pub async fn id_for_name(zone: impl Into<ZoneId>, name_: &str) -> Result<Option<
     Ok(None)
 }
 
-pub async fn exists(id: impl Into<Id>) -> bool {
-    path::name(id.into()).is_file()
+pub async fn exists(id: impl Into<Id>) -> Result<bool> {
+    Ok(path::name(id.into()).is_file())
 }
 
 pub async fn name(id: impl Into<Id>) -> Result<String> {
@@ -167,8 +167,12 @@ pub struct Constraint {
 }
 
 impl Constraint {
-    pub async fn available() -> bool {
+    pub async fn available() -> Result<bool> {
         available().await
+    }
+
+    pub async fn exists(id: Id) -> Result<bool> {
+        exists(id).await
     }
 
     pub async fn ids() -> Result<Vec<Id>> {

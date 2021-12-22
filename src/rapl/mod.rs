@@ -1,6 +1,8 @@
 pub mod constraint;
 pub mod zone;
 
+use crate::Result;
+
 pub(crate) mod path {
     use std::path::PathBuf;
 
@@ -34,6 +36,6 @@ pub(crate) mod path {
     }
 }
 
-pub async fn available() -> bool {
-    path::root().is_dir()
+pub async fn available() -> Result<bool> {
+    Ok(path::root().is_dir())
 }

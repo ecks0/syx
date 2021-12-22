@@ -135,7 +135,7 @@ pub struct Zone {
 }
 
 impl Zone {
-    pub async fn available() -> bool {
+    pub async fn available() -> Result<bool> {
         available().await
     }
 
