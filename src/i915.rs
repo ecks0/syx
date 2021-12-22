@@ -40,10 +40,9 @@ pub(crate) mod path {
     }
 }
 
-use crate::drm;
 use crate::util::cell::Cell;
 use crate::util::sysfs;
-use crate::Result;
+use crate::{drm, Result};
 
 pub async fn available() -> Result<bool> {
     Ok(path::module().is_dir())
@@ -179,7 +178,9 @@ impl Card {
     }
 
     pub async fn boost_freq_mhz(&self) -> Result<u64> {
-        self.boost_freq_mhz.get_or_load(boost_freq_mhz(self.id)).await
+        self.boost_freq_mhz
+            .get_or_load(boost_freq_mhz(self.id))
+            .await
     }
 
     pub async fn cur_freq_mhz(&self) -> Result<u64> {

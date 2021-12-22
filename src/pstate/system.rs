@@ -33,8 +33,8 @@ pub(crate) mod path {
 }
 
 pub use crate::pstate::available;
-use crate::util::sysfs;
 use crate::util::cell::Cell;
+use crate::util::sysfs;
 use crate::Result;
 
 pub async fn max_perf_pct() -> Result<u64> {

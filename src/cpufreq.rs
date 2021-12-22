@@ -50,8 +50,8 @@ pub(crate) mod path {
     }
 }
 
-use crate::util::sysfs;
 use crate::util::cell::Cell;
+use crate::util::sysfs;
 use crate::Result;
 
 pub async fn available() -> Result<bool> {
@@ -194,7 +194,9 @@ impl Policy {
     }
 
     pub async fn scaling_driver(&self) -> Result<String> {
-        self.scaling_driver.get_or_load(scaling_driver(self.id)).await
+        self.scaling_driver
+            .get_or_load(scaling_driver(self.id))
+            .await
     }
 
     pub async fn scaling_governor(&self) -> Result<String> {

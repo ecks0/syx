@@ -1,7 +1,7 @@
 pub(crate) mod path {
     use std::path::PathBuf;
 
-    pub(crate) use crate::rapl::path::{root, package, subzone};
+    pub(crate) use crate::rapl::path::{package, root, subzone};
     use crate::rapl::zone::Id;
 
     pub(crate) fn zone_attr(id: Id, a: &str) -> PathBuf {
@@ -27,8 +27,8 @@ pub(crate) mod path {
 }
 
 pub use crate::rapl::available;
-use crate::util::sysfs;
 use crate::util::cell::Cell;
+use crate::util::sysfs;
 use crate::Result;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -70,20 +70,19 @@ impl From<Id> for (u64, Option<u64>) {
 }
 
 pub async fn packages() -> Result<Vec<Id>> {
-    sysfs::read_ids(&path::root(), "intel-rapl:").await
-        .map(|v| v
-            .into_iter()
-            .map(|v| Id::from((v, None)))
-            .collect())
+    sysfs::read_ids(&path::root(), "intel-rapl:")
+        .await
+        .map(|v| v.into_iter().map(|v| Id::from((v, None))).collect())
 }
 
 pub async fn subzones(package: u64) -> Result<Vec<Id>> {
     sysfs::read_ids(&path::package(package), &format!("intel-rapl:{}:", package))
         .await
-        .map(|v| v
-            .into_iter()
-            .map(|v| Id::from((package, Some(v))))
-            .collect())
+        .map(|v| {
+            v.into_iter()
+                .map(|v| Id::from((package, Some(v))))
+                .collect()
+        })
 }
 
 pub async fn ids() -> Result<Vec<Id>> {
@@ -145,10 +144,9 @@ impl Zone {
     }
 
     pub async fn ids() -> Result<Vec<Id>> {
-        ids().await.map(|ids| ids
-            .into_iter()
-            .map(Id::from)
-            .collect())
+        ids()
+            .await
+            .map(|ids| ids.into_iter().map(Id::from).collect())
     }
 
     pub fn new(id: impl Into<Id>) -> Self {
@@ -180,15 +178,11 @@ impl Zone {
     }
 
     pub async fn enabled(&self) -> Result<bool> {
-        self.enabled
-            .get_or_load(enabled(self.id))
-            .await
+        self.enabled.get_or_load(enabled(self.id)).await
     }
 
     pub async fn energy_uj(&self) -> Result<u64> {
-        self.energy_uj
-            .get_or_load(energy_uj(self.id))
-            .await
+        self.energy_uj.get_or_load(energy_uj(self.id)).await
     }
 
     pub async fn max_energy_range_uj(&self) -> Result<u64> {
@@ -198,14 +192,10 @@ impl Zone {
     }
 
     pub async fn name(&self) -> Result<String> {
-        self.name
-            .get_or_load(name(self.id))
-            .await
+        self.name.get_or_load(name(self.id)).await
     }
 
     pub async fn set_enabled(&self, v: bool) -> Result<()> {
-        self.enabled
-            .clear_if_ok(set_enabled(self.id, v))
-            .await
+        self.enabled.clear_if_ok(set_enabled(self.id, v)).await
     }
 }

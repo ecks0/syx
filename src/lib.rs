@@ -7,10 +7,12 @@ pub mod pstate;
 pub mod rapl;
 mod util;
 
-use std::{path::PathBuf, fmt::Display};
+use std::fmt::Display;
+use std::path::PathBuf;
 
 pub use nvml_wrapper::error::NvmlError;
 pub use tokio::io::Error as IoError;
+
 pub use crate::cpu::Cpu;
 pub use crate::cpufreq::Policy as CpufreqPolicy;
 pub use crate::drm::Card as DrmCard;

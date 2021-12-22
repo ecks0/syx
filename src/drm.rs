@@ -79,12 +79,18 @@ pub async fn bus_id(index: u64) -> Result<BusId> {
 pub async fn index(bus_id: &BusId) -> Result<u64> {
     let indices = sysfs::read_ids(&path::bus_drm(bus_id), "card").await?;
     if indices.is_empty() {
-        let s = format!("Drm card node not found for {} device {}", bus_id.bus, bus_id.id);
+        let s = format!(
+            "Drm card node not found for {} device {}",
+            bus_id.bus, bus_id.id
+        );
         #[cfg(feature = "logging")]
         log::error!("ERR {}", s);
         Err(Error::non_sequitor(s))
     } else if indices.len() > 1 {
-        let s = format!("Multiple drm card nodes found for {} device {}", bus_id.bus, bus_id.id);
+        let s = format!(
+            "Multiple drm card nodes found for {} device {}",
+            bus_id.bus, bus_id.id
+        );
         #[cfg(feature = "logging")]
         log::error!("ERR {}", s);
         Err(Error::non_sequitor(s))
@@ -116,11 +122,7 @@ impl Card {
     pub fn new(id: u64) -> Self {
         let bus_id = Cell::default();
         let driver = Cell::default();
-        Self {
-            id,
-            bus_id,
-            driver,
-        }
+        Self { id, bus_id, driver }
     }
 
     pub async fn clear(&self) {

@@ -1,8 +1,8 @@
 pub(crate) mod path {
     use std::path::PathBuf;
 
-    use crate::cpu::path::cpu_attr as cpu_attr;
-    use crate::cpufreq::path::policy_attr as policy_attr;
+    use crate::cpu::path::cpu_attr;
+    use crate::cpufreq::path::policy_attr;
 
     pub(crate) fn energy_perf_bias(id: u64) -> PathBuf {
         let mut p = cpu_attr(id, "power");
@@ -19,10 +19,10 @@ pub(crate) mod path {
     }
 }
 
-pub use crate::cpufreq::{ids, exists};
+pub use crate::cpufreq::{exists, ids};
 pub use crate::pstate::available;
-use crate::util::sysfs;
 use crate::util::cell::Cell;
+use crate::util::sysfs;
 use crate::Result;
 
 pub async fn energy_perf_bias(id: u64) -> Result<u64> {

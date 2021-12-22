@@ -5,7 +5,11 @@ pub(crate) mod path {
 
     pub(crate) fn constraint_attr(id: Id, a: &str) -> PathBuf {
         use crate::rapl::path::zone_attr;
-        zone_attr(id.package, id.subzone, &format!("constraint_{}_{}", id.index, a))
+        zone_attr(
+            id.package,
+            id.subzone,
+            &format!("constraint_{}_{}", id.index, a),
+        )
     }
 
     pub(crate) fn name(id: Id) -> PathBuf {
@@ -26,9 +30,9 @@ pub(crate) mod path {
 }
 
 pub use crate::rapl::available;
-use crate::rapl::zone::{Id as ZoneId, ids as zone_ids};
-use crate::util::sysfs;
+use crate::rapl::zone::{ids as zone_ids, Id as ZoneId};
 use crate::util::cell::Cell;
+use crate::util::sysfs;
 use crate::Result;
 
 pub const LONG_TERM: &str = "long_term";
@@ -43,7 +47,11 @@ pub struct Id {
 
 impl Id {
     pub fn new(package: u64, subzone: Option<u64>, index: u64) -> Self {
-        Self { package, subzone, index }
+        Self {
+            package,
+            subzone,
+            index,
+        }
     }
 
     pub fn package(&self) -> u64 {
@@ -164,21 +172,20 @@ impl Constraint {
     }
 
     pub async fn ids() -> Result<Vec<Id>> {
-        ids().await.map(|ids| ids
-            .into_iter()
-            .map(Id::from)
-            .collect())
+        ids()
+            .await
+            .map(|ids| ids.into_iter().map(Id::from).collect())
     }
 
     pub async fn ids_for_zone(zone: impl Into<ZoneId>) -> Result<Vec<Id>> {
-        ids_for_zone(zone.into()).await.map(|ids| ids
-            .into_iter()
-            .map(Id::from)
-            .collect())
+        ids_for_zone(zone.into())
+            .await
+            .map(|ids| ids.into_iter().map(Id::from).collect())
     }
 
     pub async fn id_for_name(zone: impl Into<ZoneId>, name: &str) -> Result<Option<Id>> {
-        id_for_name(zone.into(), name).await
+        id_for_name(zone.into(), name)
+            .await
             .map(|o| o.map(Id::from))
     }
 
@@ -211,15 +218,11 @@ impl Constraint {
     }
 
     pub async fn name(&self) -> Result<String> {
-        self.name
-            .get_or_load(name(self.id))
-            .await
+        self.name.get_or_load(name(self.id)).await
     }
 
     pub async fn max_power_uw(&self) -> Result<u64> {
-        self.max_power_uw
-            .get_or_load(max_power_uw(self.id))
-            .await
+        self.max_power_uw.get_or_load(max_power_uw(self.id)).await
     }
 
     pub async fn power_limit_uw(&self) -> Result<u64> {
@@ -244,5 +247,3 @@ impl Constraint {
         self.time_window_us.clear_if_ok(f).await
     }
 }
-
-
