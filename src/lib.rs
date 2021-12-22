@@ -17,11 +17,11 @@ pub use crate::cpu::Cpu;
 pub use crate::cpufreq::Policy as CpufreqPolicy;
 pub use crate::drm::Card as DrmCard;
 pub use crate::i915::Card as I915Card;
-pub use crate::nvml::Card as NvCard;
+pub use crate::nvml::Card as NvmlCard;
 pub use crate::pstate::policy::Policy as PstatePolicy;
 pub use crate::pstate::system::System as PstateSystem;
-pub use crate::rapl::constraint::Constraint as RaplConstraint;
-pub use crate::rapl::zone::Zone as RaplZone;
+pub use crate::rapl::constraint::{Constraint as RaplConstraint, Id as RaplConstraintId};
+pub use crate::rapl::zone::{Id as RaplZoneId, Zone as RaplZone};
 
 #[derive(Clone, Debug)]
 pub enum Op {
