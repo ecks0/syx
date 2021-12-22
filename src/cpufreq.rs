@@ -137,24 +137,16 @@ impl Policy {
     }
 
     pub fn new(id: u64) -> Self {
-        let cpuinfo_max_freq = Cell::default();
-        let cpuinfo_min_freq = Cell::default();
-        let scaling_cur_freq = Cell::default();
-        let scaling_driver = Cell::default();
-        let scaling_governor = Cell::default();
-        let scaling_available_governors = Cell::default();
-        let scaling_max_freq = Cell::default();
-        let scaling_min_freq = Cell::default();
         Self {
             id,
-            cpuinfo_max_freq,
-            cpuinfo_min_freq,
-            scaling_cur_freq,
-            scaling_driver,
-            scaling_governor,
-            scaling_available_governors,
-            scaling_max_freq,
-            scaling_min_freq,
+            cpuinfo_max_freq: Cell::default(),
+            cpuinfo_min_freq: Cell::default(),
+            scaling_cur_freq: Cell::default(),
+            scaling_driver: Cell::default(),
+            scaling_governor: Cell::default(),
+            scaling_available_governors: Cell::default(),
+            scaling_max_freq: Cell::default(),
+            scaling_min_freq: Cell::default(),
         }
     }
 
