@@ -17,6 +17,12 @@ impl Record {
         system::available()
     }
 
+    pub async fn load() -> Self {
+        let mut s = Self::default();
+        s.read().await;
+        s
+    }
+
     pub fn is_empty(&self) -> bool {
         self == &Self::default()
     }

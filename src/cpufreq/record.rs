@@ -32,6 +32,12 @@ impl Record {
         cpufreq::ids()
     }
 
+    pub async fn load(id: u64) -> Self {
+        let mut s = Self::new(id);
+        s.read().await;
+        s
+    }
+
     pub fn new(id: u64) -> Self {
         Self {
             id,
