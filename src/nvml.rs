@@ -8,7 +8,8 @@ use once_cell::sync::OnceCell;
 use parking_lot::FairMutex;
 use tokio::task::spawn_blocking;
 
-use crate::util::cell::Cell;
+use crate::util::stream::prelude::*;
+ use crate::util::cell::Cached;
 use crate::{drm, Error, Result};
 
 fn nvml() -> Result<Arc<FairMutex<NVML>>> {
@@ -109,8 +110,8 @@ pub async fn exists(id: u64) -> Result<bool> {
     spawn_blocking(move || exists(&bus_id)).await.unwrap()
 }
 
-pub async fn ids() -> Result<Vec<u64>> {
-    drm::ids_for_driver("nvidia").await
+pub fn ids() -> impl Stream<Item=Result<u64>> {
+    drm::ids_for_driver("nvidia")
 }
 
 pub async fn gfx_freq(id: u64) -> Result<u32> {
@@ -228,21 +229,21 @@ pub async fn reset_power_limit(id: u64) -> Result<()> {
 #[derive(Clone, Debug)]
 pub struct Card {
     id: u64,
-    gfx_freq: Cell<u32>,
-    gfx_max_freq: Cell<u32>,
-    mem_freq: Cell<u32>,
-    mem_max_freq: Cell<u32>,
-    sm_freq: Cell<u32>,
-    sm_max_freq: Cell<u32>,
-    video_freq: Cell<u32>,
-    video_max_freq: Cell<u32>,
-    mem_total: Cell<u64>,
-    mem_used: Cell<u64>,
-    name: Cell<String>,
-    power: Cell<u32>,
-    power_limit: Cell<u32>,
-    power_limit_max: Cell<u32>,
-    power_limit_min: Cell<u32>,
+    gfx_freq: Cached<u32>,
+    gfx_max_freq: Cached<u32>,
+    mem_freq: Cached<u32>,
+    mem_max_freq: Cached<u32>,
+    sm_freq: Cached<u32>,
+    sm_max_freq: Cached<u32>,
+    video_freq: Cached<u32>,
+    video_max_freq: Cached<u32>,
+    mem_total: Cached<u64>,
+    mem_used: Cached<u64>,
+    name: Cached<String>,
+    power: Cached<u32>,
+    power_limit: Cached<u32>,
+    power_limit_max: Cached<u32>,
+    power_limit_min: Cached<u32>,
 }
 
 impl Card {
@@ -254,28 +255,28 @@ impl Card {
         exists(id).await
     }
 
-    pub async fn ids() -> Result<Vec<u64>> {
-        ids().await
+    pub fn ids() -> impl Stream<Item=Result<u64>> {
+        ids()
     }
 
     pub fn new(id: u64) -> Self {
         Self {
             id,
-            gfx_freq: Cell::default(),
-            gfx_max_freq: Cell::default(),
-            mem_freq: Cell::default(),
-            mem_max_freq: Cell::default(),
-            sm_freq: Cell::default(),
-            sm_max_freq: Cell::default(),
-            video_freq: Cell::default(),
-            video_max_freq: Cell::default(),
-            mem_total: Cell::default(),
-            mem_used: Cell::default(),
-            name: Cell::default(),
-            power: Cell::default(),
-            power_limit: Cell::default(),
-            power_limit_max: Cell::default(),
-            power_limit_min: Cell::default(),
+            gfx_freq: Cached::default(),
+            gfx_max_freq: Cached::default(),
+            mem_freq: Cached::default(),
+            mem_max_freq: Cached::default(),
+            sm_freq: Cached::default(),
+            sm_max_freq: Cached::default(),
+            video_freq: Cached::default(),
+            video_max_freq: Cached::default(),
+            mem_total: Cached::default(),
+            mem_used: Cached::default(),
+            name: Cached::default(),
+            power: Cached::default(),
+            power_limit: Cached::default(),
+            power_limit_max: Cached::default(),
+            power_limit_min: Cached::default(),
         }
     }
 

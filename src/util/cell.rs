@@ -1,19 +1,19 @@
-use std::future::Future;
 use std::sync::Arc;
 
+use futures::Future;
 use parking_lot::FairMutex;
 
 use crate::Result;
 
 #[derive(Clone, Debug)]
-pub(crate) struct Cell<T>
+pub(crate) struct Cached<T>
 where
     T: Clone + Send + 'static,
 {
     cell: Arc<FairMutex<Option<T>>>,
 }
 
-impl<T> Cell<T>
+impl<T> Cached<T>
 where
     T: Clone + Send + 'static,
 {
@@ -25,13 +25,9 @@ where
         if let Some(v) = value.clone() {
             Ok(v)
         } else {
-            match f.await {
-                Ok(v) => {
-                    value.replace(v.clone());
-                    Ok(v)
-                },
-                Err(e) => Err(e),
-            }
+            let v = f.await?;
+            value.replace(v.clone());
+            Ok(v)
         }
     }
 
@@ -53,7 +49,7 @@ where
     }
 }
 
-impl<T> Default for Cell<T>
+impl<T> Default for Cached<T>
 where
     T: Clone + Send + 'static,
 {

@@ -4,6 +4,7 @@ use std::result::Result as StdResult;
 
 use tokio::io::{AsyncReadExt as _, Error as IoError};
 
+use crate::util::stream::prelude::*;
 use crate::{Error, Result};
 
 pub(crate) async fn read_bool(path: &Path) -> Result<bool> {
@@ -23,52 +24,62 @@ pub(crate) async fn write_bool(path: &Path, val: bool) -> Result<()> {
     handle_write(path, tokio::fs::write(path, val).await, val)
 }
 
-pub(crate) async fn read_ids(path: &Path, prefix: &str) -> Result<Vec<u64>> {
-    async fn read_ids(path: &Path, prefix: &str) -> StdResult<Vec<u64>, IoError> {
-        let mut ids = vec![];
-        let mut dir = tokio::fs::read_dir(path).await?;
-        while let Some(ent) = dir.next_entry().await? {
+pub(crate) fn read_ids<P, X>(path: P, prefix: X) -> impl Stream<Item=Result<u64>>
+where
+    P: Into<PathBuf>,
+    X: Into<String>,
+{
+    try_stream! {
+        let (path, prefix) = (path.into(), prefix.into());
+        let mut dir = handle_read(&path, tokio::fs::read_dir(&path).await)?;
+        while let Some(ent) = dir.next_entry()
+            .await
+            .map_err(|e| Error::sysfs_read(e, &path))?
+        {
             if let Some(file_name) = ent.path().file_name() {
                 if let Some(file_name) = file_name.to_str() {
-                    if let Some(value) = file_name.strip_prefix(prefix) {
+                    if let Some(value) = file_name.strip_prefix(&prefix) {
                         if let Ok(value) = value.parse::<u64>() {
-                            ids.push(value);
-                            ids.sort_unstable();
+                            yield value;
                         }
                     }
                 }
             }
         }
-        Ok(ids)
     }
-    handle_read(path, read_ids(path, prefix).await)
 }
 
-pub(crate) async fn read_indices(path: &Path) -> Result<Vec<u64>> {
-    let s = read_string(path).await?;
-    let mut ids = vec![];
-    for item in s.split(',') {
-        let parts: Vec<&str> = item.split('-').collect();
-        match &parts[..] {
-            [id] => ids.push(
-                id.parse::<u64>()
-                    .map_err(|_| Error::sysfs_parse(path, "indices: index", item))?,
-            ),
-            [start, end] => {
-                let start = start
-                    .parse::<u64>()
-                    .map_err(|_| Error::sysfs_parse(path, "indices: start", item))?;
-                let end = 1 + end
-                    .parse::<u64>()
-                    .map_err(|_| Error::sysfs_parse(path, "indices: end", item))?;
-                ids.extend(start..end);
-            },
-            _ => return Err(Error::sysfs_parse(path, "indices", item)),
+pub(crate) fn read_indices<P>(path: P) -> impl Stream<Item=Result<u64>>
+where
+    P: Into<PathBuf>,
+{
+    try_stream! {
+        let path = path.into();
+        let s = read_string(&path).await?;
+        for item in s.split(',') {
+            let parts = item.split('-').collect::<Vec<_>>();
+            let range = match &parts[..] {
+                [id] => {
+                    let id = id.parse::<u64>()
+                        .map_err(|_| Error::sysfs_parse(&path, "indices: index", item))?;
+                    id..=id
+                },
+                [start, end] => {
+                    let start = start
+                        .parse::<u64>()
+                        .map_err(|_| Error::sysfs_parse(&path, "indices: start", item))?;
+                    let end = end
+                        .parse::<u64>()
+                        .map_err(|_| Error::sysfs_parse(&path, "indices: end", item))?;
+                    start..=end
+                },
+                _ => Err(Error::sysfs_parse(&path, "indices", item))?,
+            };
+            for i in range {
+                yield i;
+            }
         }
     }
-    ids.sort_unstable();
-    ids.dedup();
-    Ok(ids)
 }
 
 pub(crate) async fn read_link(path: &Path) -> Result<PathBuf> {
@@ -93,7 +104,7 @@ pub(crate) async fn read_string(path: &Path) -> Result<String> {
         let s = s.trim_end_matches('\n').to_string();
         Ok(s)
     }
-    handle_read(path, read_string(path).await).map(|s| s.trim_end_matches('\n').to_string())
+    handle_read(path, read_string(path).await)
 }
 
 pub(crate) async fn write_string(path: &Path, val: &str) -> Result<()> {

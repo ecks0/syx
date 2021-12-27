@@ -43,7 +43,9 @@ pub(crate) mod path {
     }
 }
 
-use crate::util::cell::Cell;
+use crate::util::cell::Cached;
+use crate::util::stream::prelude::*;
+use crate::util::stream;
 use crate::util::sysfs;
 use crate::{BusId, Error, Result};
 
@@ -55,18 +57,20 @@ pub async fn exists(id: u64) -> Result<bool> {
     Ok(path::card(id).is_dir())
 }
 
-pub async fn ids() -> Result<Vec<u64>> {
-    sysfs::read_ids(&path::root(), "card").await
+pub fn ids() -> impl Stream<Item=Result<u64>> {
+    sysfs::read_ids(path::root(), "card")
 }
 
-pub async fn ids_for_driver(driver_: &str) -> Result<Vec<u64>> {
-    let mut r = vec![];
-    for id in ids().await? {
-        if driver_ == driver(id).await?.as_str() {
-            r.push(id);
+pub fn ids_for_driver(driver_: impl Into<String>) -> impl Stream<Item=Result<u64>> {
+    try_stream! {
+        let driver_ = driver_.into();
+        for await id in ids() {
+            let id = id?;
+            if driver_ == driver(id).await?.as_str() {
+                yield id;
+            }
         }
     }
-    Ok(r)
 }
 
 pub async fn bus_id(index: u64) -> Result<BusId> {
@@ -77,7 +81,8 @@ pub async fn bus_id(index: u64) -> Result<BusId> {
 }
 
 pub async fn index(bus_id: &BusId) -> Result<u64> {
-    let indices = sysfs::read_ids(&path::bus_drm(bus_id), "card").await?;
+    let s = sysfs::read_ids(path::bus_drm(bus_id), "card");
+    let indices: Vec<_> = stream::collect(s).await?;
     if indices.is_empty() {
         let s = format!(
             "Drm card node not found for {} device {}",
@@ -106,8 +111,8 @@ pub async fn driver(index: u64) -> Result<String> {
 #[derive(Clone, Debug)]
 pub struct Card {
     id: u64,
-    bus_id: Cell<BusId>,
-    driver: Cell<String>,
+    bus_id: Cached<BusId>,
+    driver: Cached<String>,
 }
 
 impl Card {
@@ -115,13 +120,13 @@ impl Card {
         available().await
     }
 
-    pub async fn ids() -> Result<Vec<u64>> {
-        ids().await
+    pub async fn ids() ->  impl Stream<Item=Result<u64>> {
+        ids()
     }
 
     pub fn new(id: u64) -> Self {
-        let bus_id = Cell::default();
-        let driver = Cell::default();
+        let bus_id = Cached::default();
+        let driver = Cached::default();
         Self { id, bus_id, driver }
     }
 

@@ -40,7 +40,8 @@ pub(crate) mod path {
     }
 }
 
-use crate::util::cell::Cell;
+use crate::util::cell::Cached;
+use crate::util::stream::prelude::*;
 use crate::util::sysfs;
 use crate::{drm, Result};
 
@@ -56,8 +57,8 @@ pub async fn exists(id: u64) -> Result<bool> {
     }
 }
 
-pub async fn ids() -> Result<Vec<u64>> {
-    drm::ids_for_driver("i915").await
+pub fn ids() -> impl Stream<Item=Result<u64>> {
+    drm::ids_for_driver("i915")
 }
 
 pub async fn act_freq_mhz(id: u64) -> Result<u64> {
@@ -119,14 +120,14 @@ pub async fn set_rpn_freq_mhz(id: u64, v: u64) -> Result<()> {
 #[derive(Clone, Debug)]
 pub struct Card {
     id: u64,
-    act_freq_mhz: Cell<u64>,
-    boost_freq_mhz: Cell<u64>,
-    cur_freq_mhz: Cell<u64>,
-    max_freq_mhz: Cell<u64>,
-    min_freq_mhz: Cell<u64>,
-    rp0_freq_mhz: Cell<u64>,
-    rp1_freq_mhz: Cell<u64>,
-    rpn_freq_mhz: Cell<u64>,
+    act_freq_mhz: Cached<u64>,
+    boost_freq_mhz: Cached<u64>,
+    cur_freq_mhz: Cached<u64>,
+    max_freq_mhz: Cached<u64>,
+    min_freq_mhz: Cached<u64>,
+    rp0_freq_mhz: Cached<u64>,
+    rp1_freq_mhz: Cached<u64>,
+    rpn_freq_mhz: Cached<u64>,
 }
 
 impl Card {
@@ -138,21 +139,21 @@ impl Card {
         exists(id).await
     }
 
-    pub async fn ids() -> Result<Vec<u64>> {
-        ids().await
+    pub async fn ids() -> impl Stream<Item=Result<u64>> {
+        ids()
     }
 
     pub fn new(id: u64) -> Self {
         Self {
             id,
-            act_freq_mhz: Cell::default(),
-            boost_freq_mhz: Cell::default(),
-            cur_freq_mhz: Cell::default(),
-            max_freq_mhz: Cell::default(),
-            min_freq_mhz: Cell::default(),
-            rp0_freq_mhz: Cell::default(),
-            rp1_freq_mhz: Cell::default(),
-            rpn_freq_mhz: Cell::default(),
+            act_freq_mhz: Cached::default(),
+            boost_freq_mhz: Cached::default(),
+            cur_freq_mhz: Cached::default(),
+            max_freq_mhz: Cached::default(),
+            min_freq_mhz: Cached::default(),
+            rp0_freq_mhz: Cached::default(),
+            rp1_freq_mhz: Cached::default(),
+            rpn_freq_mhz: Cached::default(),
         }
     }
 
