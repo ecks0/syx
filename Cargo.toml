@@ -1,8 +1,8 @@
 [package]
-name = "giga"
+name = "syx"
 version = "0.5.1"
 edition = "2021"
-homepage = "https://github.com/ecks0/giga"
+homepage = "https://github.com/ecks0/syx"
 license = "MIT"
 authors = ["eckso <eckso@eckso.io>"]
 
