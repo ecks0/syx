@@ -2,11 +2,12 @@ mod cache;
 pub(crate) mod path;
 mod record;
 
-pub use crate::rapl::zone::cache::Cache;
-pub use crate::rapl::zone::record::Record;
+use async_stream::try_stream;
+use futures::stream::{Stream, TryStreamExt as _};
 
 pub use crate::rapl::available;
-use crate::util::stream::prelude::*;
+pub use crate::rapl::zone::cache::Cache;
+pub use crate::rapl::zone::record::Record;
 use crate::util::sysfs;
 use crate::Result;
 
@@ -48,29 +49,25 @@ impl From<Id> for (u64, Option<u64>) {
     }
 }
 
-pub fn packages() -> impl Stream<Item=Result<Id>> {
+pub fn packages() -> impl Stream<Item = Result<Id>> {
+    sysfs::read_ids(&path::root(), "intel-rapl:")
+        .and_then(|v| async move { Ok(Id::from((v, None))) })
+}
+
+pub fn subzones(package: u64) -> impl Stream<Item = Result<Id>> {
     try_stream! {
-        let s = sysfs::read_ids(path::root(), "intel-rapl:");
+        let path = path::package(package);
+        let prefix = format!("intel-rapl:{}:", package);
+        let s = sysfs::read_ids(&path, &prefix);
         for await v in s {
             let v = v?;
-            let y = Id::from((v, None));
-            yield y;
+            let r = Id::from((package, Some(v)));
+            yield r;
         }
     }
 }
 
-pub fn subzones(package: u64) -> impl Stream<Item=Result<Id>> {
-    try_stream! {
-        let s = sysfs::read_ids(path::package(package), format!("intel-rapl:{}:", package));
-        for await v in s {
-            let v = v?;
-            let y = Id::from((package, Some(v)));
-            yield y;
-        }
-    }
-}
-
-pub fn ids() -> impl Stream<Item=Result<Id>> {
+pub fn ids() -> impl Stream<Item = Result<Id>> {
     try_stream! {
         for await p in packages() {
             let p = p?;

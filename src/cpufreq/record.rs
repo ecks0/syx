@@ -1,10 +1,9 @@
 use std::ops::Deref;
 
+use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-use crate::cpufreq;
-use crate::util::stream::prelude::*;
-use crate::Result;
+use crate::{cpufreq, Result};
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Record {
@@ -20,15 +19,15 @@ pub struct Record {
 }
 
 impl Record {
-    pub fn available() -> impl Future<Output=Result<bool>> {
+    pub fn available() -> impl Future<Output = Result<bool>> {
         cpufreq::available()
     }
 
-    pub fn exists(id: u64) -> impl Future<Output=Result<bool>> {
+    pub fn exists(id: u64) -> impl Future<Output = Result<bool>> {
         cpufreq::exists(id)
     }
 
-    pub fn ids() -> impl Stream<Item=Result<u64>> {
+    pub fn ids() -> impl Stream<Item = Result<u64>> {
         cpufreq::ids()
     }
 
@@ -36,6 +35,10 @@ impl Record {
         let mut s = Self::new(id);
         s.read().await;
         s
+    }
+
+    pub fn all() -> impl Stream<Item = Result<Self>> {
+        cpufreq::ids().and_then(|id| async move { Ok(Self::load(id).await) })
     }
 
     pub fn new(id: u64) -> Self {
@@ -92,13 +95,10 @@ impl Record {
         self.scaling_governor.as_deref()
     }
 
-    pub fn scaling_available_governors(&self) -> Option<impl IntoIterator<Item=&str>> {
+    pub fn scaling_available_governors(&self) -> Option<impl IntoIterator<Item = &str>> {
         self.scaling_available_governors
             .as_ref()
-            .map(|v| v
-                .iter()
-                .map(Deref::deref)
-                .collect::<Vec<_>>())
+            .map(|v| v.iter().map(Deref::deref).collect::<Vec<_>>())
     }
 
     pub fn scaling_max_freq(&self) -> Option<u64> {

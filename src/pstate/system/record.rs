@@ -13,7 +13,7 @@ pub struct Record {
 }
 
 impl Record {
-    pub fn available() -> impl Future<Output=Result<bool>> {
+    pub fn available() -> impl Future<Output = Result<bool>> {
         system::available()
     }
 

@@ -1,8 +1,7 @@
+use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-use crate::nvml;
-use crate::util::stream::prelude::*;
-use crate::Result;
+use crate::{nvml, Result};
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Record {
@@ -25,15 +24,15 @@ pub struct Record {
 }
 
 impl Record {
-    pub fn available() -> impl Future<Output=Result<bool>> {
+    pub fn available() -> impl Future<Output = Result<bool>> {
         nvml::available()
     }
 
-    pub fn exists(id: u64) -> impl Future<Output=Result<bool>> {
+    pub fn exists(id: u64) -> impl Future<Output = Result<bool>> {
         nvml::exists(id)
     }
 
-    pub fn ids() -> impl Stream<Item=Result<u64>> {
+    pub fn ids() -> impl Stream<Item = Result<u64>> {
         nvml::ids()
     }
 
@@ -41,6 +40,10 @@ impl Record {
         let mut s = Self::new(id);
         s.read().await;
         s
+    }
+
+    pub fn all() -> impl Stream<Item = Result<Self>> {
+        nvml::ids().and_then(|id| async move { Ok(Self::load(id).await) })
     }
 
     pub fn new(id: u64) -> Self {

@@ -14,7 +14,7 @@ pub struct Cache {
 }
 
 impl Cache {
-    pub fn available() -> impl Future<Output=Result<bool>> {
+    pub fn available() -> impl Future<Output = Result<bool>> {
         system::available()
     }
 
@@ -49,11 +49,15 @@ impl Cache {
     }
 
     pub async fn set_max_perf_pct(&self, v: u64) -> Result<()> {
-        self.max_perf_pct.clear_if_ok(system::set_max_perf_pct(v)).await
+        self.max_perf_pct
+            .clear_if_ok(system::set_max_perf_pct(v))
+            .await
     }
 
     pub async fn set_min_perf_pct(&self, v: u64) -> Result<()> {
-        self.min_perf_pct.clear_if_ok(system::set_min_perf_pct(v)).await
+        self.min_perf_pct
+            .clear_if_ok(system::set_min_perf_pct(v))
+            .await
     }
 
     pub async fn set_no_turbo(&self, v: bool) -> Result<()> {

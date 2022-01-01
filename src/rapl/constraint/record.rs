@@ -1,8 +1,8 @@
+use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
 use crate::rapl::constraint::{self, Id};
 use crate::rapl::zone;
-use crate::util::stream::prelude::*;
 use crate::Result;
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -15,28 +15,42 @@ pub struct Record {
 }
 
 impl Record {
-    pub fn available() -> impl Future<Output=Result<bool>> {
+    pub fn available() -> impl Future<Output = Result<bool>> {
         constraint::available()
     }
 
-    pub async fn exists(id: Id) -> impl Future<Output=Result<bool>> {
+    pub async fn exists(id: Id) -> impl Future<Output = Result<bool>> {
         constraint::exists(id)
     }
 
-    pub fn ids() -> impl Stream<Item=Result<Id>> {
+    pub fn ids() -> impl Stream<Item = Result<Id>> {
         constraint::ids()
     }
 
-    pub fn ids_for_zone(zone: impl Into<zone::Id>) -> impl Stream<Item=Result<Id>> {
+    pub fn ids_for_zone(zone: impl Into<zone::Id>) -> impl Stream<Item = Result<Id>> {
         constraint::ids_for_zone(zone)
     }
 
-    pub fn id_for_name<Z, S>(zone: Z, name: S) -> impl Future<Output=Result<Option<Id>>>
+    pub fn id_for_name<Z, S>(zone: Z, name: S) -> impl Future<Output = Result<Option<Id>>>
     where
         Z: Into<zone::Id>,
         S: Into<String>,
     {
         constraint::id_for_name(zone, name)
+    }
+
+    pub async fn load(id: impl Into<Id>) -> Self {
+        let mut s = Self::new(id);
+        s.read().await;
+        s
+    }
+
+    pub fn all() -> impl Stream<Item = Result<Self>> {
+        constraint::ids().and_then(|id| async move { Ok(Self::load(id).await) })
+    }
+
+    pub fn all_for_zone(zone: impl Into<zone::Id>) -> impl Stream<Item = Result<Self>> {
+        constraint::ids_for_zone(zone).and_then(|id| async move { Ok(Self::load(id).await) })
     }
 
     pub fn new(id: impl Into<Id>) -> Self {

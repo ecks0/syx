@@ -2,13 +2,12 @@ mod cache;
 pub(crate) mod path;
 mod record;
 
+use futures::stream::Stream;
+
 pub use crate::i915::cache::Cache;
 pub use crate::i915::record::Record;
-
-use crate::drm;
-use crate::util::stream::prelude::*;
 use crate::util::sysfs;
-use crate::Result;
+use crate::{drm, Result};
 
 pub async fn available() -> Result<bool> {
     Ok(path::module().is_dir())
@@ -23,7 +22,7 @@ pub async fn exists(id: u64) -> Result<bool> {
     Ok(r)
 }
 
-pub fn ids() -> impl Stream<Item=Result<u64>> {
+pub fn ids() -> impl Stream<Item = Result<u64>> {
     drm::ids_for_driver("i915")
 }
 

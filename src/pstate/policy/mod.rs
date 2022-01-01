@@ -3,8 +3,8 @@ pub(crate) mod path;
 pub mod record;
 
 pub use crate::cpufreq::{exists, ids};
-pub use crate::pstate::policy::cache::Cache;
 pub use crate::pstate::available;
+pub use crate::pstate::policy::cache::Cache;
 use crate::util::sysfs;
 use crate::Result;
 

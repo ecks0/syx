@@ -2,10 +2,10 @@ pub mod cache;
 pub(crate) mod path;
 pub mod record;
 
+use futures::stream::Stream;
+
 pub use crate::cpufreq::cache::Cache;
 pub use crate::cpufreq::record::Record;
-
-use crate::util::stream::prelude::*;
 use crate::util::sysfs;
 use crate::Result;
 
@@ -17,8 +17,8 @@ pub async fn exists(id: u64) -> Result<bool> {
     Ok(path::policy(id).is_dir())
 }
 
-pub fn ids() -> impl Stream<Item=Result<u64>> {
-    sysfs::read_ids(path::root(), "policy")
+pub fn ids() -> impl Stream<Item = Result<u64>> {
+    sysfs::read_ids(&path::root(), "policy")
 }
 
 pub async fn cpuinfo_max_freq(id: u64) -> Result<u64> {

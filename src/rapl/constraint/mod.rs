@@ -2,12 +2,14 @@ mod cache;
 pub(crate) mod path;
 mod record;
 
-pub use crate::rapl::constraint::cache::Cache;
-pub use crate::rapl::constraint::record::Record;
+use async_stream::stream;
+use futures::pin_mut;
+use futures::stream::{Stream, TryStreamExt as _};
 
 pub use crate::rapl::available;
+pub use crate::rapl::constraint::cache::Cache;
+pub use crate::rapl::constraint::record::Record;
 use crate::rapl::zone::{ids as zone_ids, Id as ZoneId};
-use crate::util::stream::prelude::*;
 use crate::util::sysfs;
 use crate::Result;
 
@@ -73,19 +75,12 @@ impl From<Id> for ZoneId {
     }
 }
 
-pub fn ids() -> impl Stream<Item=Result<Id>> {
-    try_stream! {
-        for await zid in zone_ids() {
-            let zid = zid?;
-            for await cid in ids_for_zone(zid) {
-                let cid = cid?;
-                yield cid;
-            }
-        }
-    }
+pub fn ids() -> impl Stream<Item = Result<Id>> {
+    zone_ids().map_ok(ids_for_zone).try_flatten()
 }
 
-pub fn ids_for_zone(zone: impl Into<ZoneId>) -> impl Stream<Item=Result<Id>> {
+pub fn ids_for_zone(zone: impl Into<ZoneId>) -> impl Stream<Item = Result<Id>> {
+    let zone = zone.into();
     stream! {
         let zone = zone.into();
         for c in 0.. {
@@ -108,8 +103,7 @@ where
     let mut r = None;
     let s = ids_for_zone(zone);
     pin_mut!(s);
-    while let Some(v) = s.next().await {
-        let v = v?;
+    while let Some(v) = s.try_next().await? {
         if name_ == name(v).await? {
             r = Some(v);
             break;

@@ -2,9 +2,11 @@ use std::fmt::{Debug, Display};
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
 
+use async_stream::try_stream;
+use futures::stream::Stream;
+use tokio::fs::DirEntry;
 use tokio::io::{AsyncReadExt as _, Error as IoError};
 
-use crate::util::stream::prelude::*;
 use crate::{Error, Result};
 
 pub(crate) async fn read_bool(path: &Path) -> Result<bool> {
@@ -24,60 +26,64 @@ pub(crate) async fn write_bool(path: &Path, val: bool) -> Result<()> {
     handle_write(path, tokio::fs::write(path, val).await, val)
 }
 
-pub(crate) fn read_ids<P, X>(path: P, prefix: X) -> impl Stream<Item=Result<u64>>
-where
-    P: Into<PathBuf>,
-    X: Into<String>,
-{
+fn read_dir_ents(path: &Path) -> impl Stream<Item = Result<DirEntry>> {
+    let path = path.to_path_buf();
     try_stream! {
-        let (path, prefix) = (path.into(), prefix.into());
-        let mut dir = handle_read(&path, tokio::fs::read_dir(&path).await)?;
+        let f = tokio::fs::read_dir(&path);
+        let mut dir = handle_read(&path, f.await)?;
         while let Some(ent) = dir.next_entry()
             .await
             .map_err(|e| Error::sysfs_read(e, &path))?
         {
-            if let Some(file_name) = ent.path().file_name() {
-                if let Some(file_name) = file_name.to_str() {
-                    if let Some(value) = file_name.strip_prefix(&prefix) {
-                        if let Ok(value) = value.parse::<u64>() {
-                            yield value;
-                        }
-                    }
-                }
+            yield ent;
+        }
+    }
+}
+
+pub(crate) fn read_ids(path: &Path, prefix: &str) -> impl Stream<Item = Result<u64>> {
+    let path = path.to_path_buf();
+    let prefix = prefix.to_string();
+    try_stream! {
+        for await ent in read_dir_ents(&path) {
+            let ent = ent?;
+            let v = ent
+                .path()
+                .file_name()
+                .and_then(|v| v.to_str())
+                .and_then(|v| v.strip_prefix(&prefix))
+                .and_then(|v| v.parse::<u64>().ok());
+            if let Some(v) = v {
+                yield v;
             }
         }
     }
 }
 
-pub(crate) fn read_indices<P>(path: P) -> impl Stream<Item=Result<u64>>
-where
-    P: Into<PathBuf>,
-{
+#[rustfmt::skip]
+pub(crate) fn read_indices(path: &Path) -> impl Stream<Item=Result<u64>> {
+    let path = path.to_path_buf();
     try_stream! {
-        let path = path.into();
         let s = read_string(&path).await?;
-        for item in s.split(',') {
-            let parts = item.split('-').collect::<Vec<_>>();
-            let range = match &parts[..] {
-                [id] => {
-                    let id = id.parse::<u64>()
-                        .map_err(|_| Error::sysfs_parse(&path, "indices: index", item))?;
-                    id..=id
-                },
-                [start, end] => {
-                    let start = start
-                        .parse::<u64>()
-                        .map_err(|_| Error::sysfs_parse(&path, "indices: start", item))?;
-                    let end = end
-                        .parse::<u64>()
-                        .map_err(|_| Error::sysfs_parse(&path, "indices: end", item))?;
-                    start..=end
-                },
-                _ => Err(Error::sysfs_parse(&path, "indices", item))?,
-            };
-            for i in range {
-                yield i;
-            }
+        let p: Vec<_> = s.split('-').collect();
+        let i = match &p[..] {
+            [id] => {
+                let id = id.parse::<u64>()
+                    .map_err(|_| Error::sysfs_parse(&path, "indices: index", &s))?;
+                id..=id
+            },
+            [start, end] => {
+                let start = start
+                    .parse::<u64>()
+                    .map_err(|_| Error::sysfs_parse(&path, "indices: start", &s))?;
+                let end = end
+                    .parse::<u64>()
+                    .map_err(|_| Error::sysfs_parse(&path, "indices: end", s))?;
+                start..=end
+            },
+            _ => Err(Error::sysfs_parse(&path, "indices", s))?,
+        };
+        for v in i {
+            yield v;
         }
     }
 }

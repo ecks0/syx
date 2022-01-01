@@ -1,9 +1,10 @@
+use std::ops::Deref;
+
+use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
 use crate::pstate::policy;
-use crate::util::stream::prelude::*;
 use crate::Result;
-use std::ops::Deref;
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Record {
@@ -14,15 +15,15 @@ pub struct Record {
 }
 
 impl Record {
-    pub fn available() -> impl Future<Output=Result<bool>> {
+    pub fn available() -> impl Future<Output = Result<bool>> {
         policy::available()
     }
 
-    pub fn exists(id: u64) -> impl Future<Output=Result<bool>> {
+    pub fn exists(id: u64) -> impl Future<Output = Result<bool>> {
         policy::exists(id)
     }
 
-    pub fn ids() -> impl Stream<Item=Result<u64>> {
+    pub fn ids() -> impl Stream<Item = Result<u64>> {
         policy::ids()
     }
 
@@ -30,6 +31,10 @@ impl Record {
         let mut s = Self::new(id);
         s.read().await;
         s
+    }
+
+    pub fn all() -> impl Stream<Item = Result<Self>> {
+        policy::ids().and_then(|id| async move { Ok(Self::load(id).await) })
     }
 
     pub fn new(id: u64) -> Self {
@@ -54,7 +59,9 @@ impl Record {
         self.energy_performance_preference =
             policy::energy_performance_preference(self.id).await.ok();
         self.energy_performance_available_preferences =
-            policy::energy_performance_available_preferences(self.id).await.ok();
+            policy::energy_performance_available_preferences(self.id)
+                .await
+                .ok();
         !self.is_empty()
     }
 
@@ -66,12 +73,11 @@ impl Record {
         self.energy_performance_preference.as_deref()
     }
 
-    pub fn energy_performance_available_preferences(&self) -> Option<impl IntoIterator<Item=&str>> {
+    pub fn energy_performance_available_preferences(
+        &self,
+    ) -> Option<impl IntoIterator<Item = &str>> {
         self.energy_performance_available_preferences
             .as_ref()
-            .map(|v| v
-                .iter()
-                .map(Deref::deref)
-                .collect::<Vec<_>>())
+            .map(|v| v.iter().map(Deref::deref).collect::<Vec<_>>())
     }
 }

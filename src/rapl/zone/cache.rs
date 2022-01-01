@@ -1,8 +1,8 @@
+use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
 use crate::rapl::zone::{self, Id};
 use crate::util::cell::Cached;
-use crate::util::stream::prelude::*;
 use crate::Result;
 
 #[derive(Clone, Debug)]
@@ -15,16 +15,20 @@ pub struct Cache {
 }
 
 impl Cache {
-    pub fn available() -> impl Future<Output=Result<bool>> {
+    pub fn available() -> impl Future<Output = Result<bool>> {
         zone::available()
     }
 
-    pub fn exists(id: Id) -> impl Future<Output=Result<bool>> {
+    pub fn exists(id: Id) -> impl Future<Output = Result<bool>> {
         zone::exists(id)
     }
 
-    pub fn ids() -> impl Stream<Item=Result<Id>> {
+    pub fn ids() -> impl Stream<Item = Result<Id>> {
         zone::ids()
+    }
+
+    pub fn all() -> impl Stream<Item = Result<Self>> {
+        zone::ids().map_ok(Self::new)
     }
 
     pub fn new(id: impl Into<Id>) -> Self {
@@ -69,6 +73,8 @@ impl Cache {
     }
 
     pub async fn set_enabled(&self, v: bool) -> Result<()> {
-        self.enabled.clear_if_ok(zone::set_enabled(self.id, v)).await
+        self.enabled
+            .clear_if_ok(zone::set_enabled(self.id, v))
+            .await
     }
 }

@@ -2,11 +2,11 @@ mod cache;
 pub(crate) mod path;
 mod record;
 
+use async_stream::try_stream;
+use futures::stream::{Stream, TryStreamExt as _};
+
 pub use crate::drm::cache::Cache;
 pub use crate::drm::record::Record;
-
-use crate::util::stream::prelude::*;
-use crate::util::stream;
 use crate::util::sysfs;
 use crate::{BusId, Error, Result};
 
@@ -18,16 +18,16 @@ pub async fn exists(id: u64) -> Result<bool> {
     Ok(path::card(id).is_dir())
 }
 
-pub fn ids() -> impl Stream<Item=Result<u64>> {
-    sysfs::read_ids(path::root(), "card")
+pub fn ids() -> impl Stream<Item = Result<u64>> {
+    sysfs::read_ids(&path::root(), "card")
 }
 
-pub fn ids_for_driver(driver_: impl Into<String>) -> impl Stream<Item=Result<u64>> {
+pub fn ids_for_driver(driver_: impl Into<String>) -> impl Stream<Item = Result<u64>> {
+    let driver_ = driver_.into();
     try_stream! {
-        let driver_ = driver_.into();
         for await id in ids() {
             let id = id?;
-            if driver_ == driver(id).await?.as_str() {
+            if driver_ == driver(id).await? {
                 yield id;
             }
         }
@@ -42,8 +42,8 @@ pub async fn bus_id(index: u64) -> Result<BusId> {
 }
 
 pub async fn index(bus_id: &BusId) -> Result<u64> {
-    let s = sysfs::read_ids(path::bus_drm(bus_id), "card");
-    let indices: Vec<_> = stream::collect(s).await?;
+    let path = path::bus_drm(bus_id);
+    let indices: Vec<_> = sysfs::read_ids(&path, "card").try_collect().await?;
     if indices.is_empty() {
         let s = format!(
             "Drm card node not found for {} device {}",

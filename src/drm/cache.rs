@@ -1,9 +1,8 @@
+use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-use crate::drm;
 use crate::util::cell::Cached;
-use crate::util::stream::prelude::*;
-use crate::{BusId, Result};
+use crate::{drm, BusId, Result};
 
 #[derive(Clone, Debug)]
 pub struct Cache {
@@ -13,16 +12,20 @@ pub struct Cache {
 }
 
 impl Cache {
-    pub fn available() -> impl Future<Output=Result<bool>> {
+    pub fn available() -> impl Future<Output = Result<bool>> {
         drm::available()
     }
 
-    pub fn exists(id: u64) -> impl Future<Output=Result<bool>> {
+    pub fn exists(id: u64) -> impl Future<Output = Result<bool>> {
         drm::exists(id)
     }
 
-    pub fn ids() ->  impl Stream<Item=Result<u64>> {
+    pub fn ids() -> impl Stream<Item = Result<u64>> {
         drm::ids()
+    }
+
+    pub fn all() -> impl Stream<Item = Result<Self>> {
+        drm::ids().map_ok(Self::new)
     }
 
     pub fn new(id: u64) -> Self {

@@ -2,9 +2,9 @@ pub mod cache;
 pub(crate) mod path;
 pub mod record;
 
+pub use crate::pstate::available;
 pub use crate::pstate::system::cache::Cache;
 pub use crate::pstate::system::record::Record;
-pub use crate::pstate::available;
 use crate::util::sysfs;
 use crate::Result;
 

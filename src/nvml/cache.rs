@@ -1,9 +1,8 @@
+use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-use crate::nvml;
-use crate::util::stream::prelude::*;
 use crate::util::cell::Cached;
-use crate::Result;
+use crate::{nvml, Result};
 
 #[derive(Clone, Debug)]
 pub struct Cache {
@@ -26,16 +25,20 @@ pub struct Cache {
 }
 
 impl Cache {
-    pub fn available() -> impl Future<Output=Result<bool>> {
+    pub fn available() -> impl Future<Output = Result<bool>> {
         nvml::available()
     }
 
-    pub fn exists(id: u64) -> impl Future<Output=Result<bool>> {
+    pub fn exists(id: u64) -> impl Future<Output = Result<bool>> {
         nvml::exists(id)
     }
 
-    pub fn ids() -> impl Stream<Item=Result<u64>> {
+    pub fn ids() -> impl Stream<Item = Result<u64>> {
         nvml::ids()
+    }
+
+    pub fn all() -> impl Stream<Item = Result<Self>> {
+        nvml::ids().map_ok(Self::new)
     }
 
     pub fn new(id: u64) -> Self {
@@ -88,7 +91,9 @@ impl Cache {
     }
 
     pub async fn gfx_max_freq(&self) -> Result<u32> {
-        self.gfx_max_freq.get_or_load(nvml::gfx_max_freq(self.id)).await
+        self.gfx_max_freq
+            .get_or_load(nvml::gfx_max_freq(self.id))
+            .await
     }
 
     pub async fn mem_freq(&self) -> Result<u32> {
@@ -96,7 +101,9 @@ impl Cache {
     }
 
     pub async fn mem_max_freq(&self) -> Result<u32> {
-        self.mem_max_freq.get_or_load(nvml::mem_max_freq(self.id)).await
+        self.mem_max_freq
+            .get_or_load(nvml::mem_max_freq(self.id))
+            .await
     }
 
     pub async fn sm_freq(&self) -> Result<u32> {
@@ -130,7 +137,9 @@ impl Cache {
     }
 
     pub async fn power_limit(&self) -> Result<u32> {
-        self.power_limit.get_or_load(nvml::power_limit(self.id)).await
+        self.power_limit
+            .get_or_load(nvml::power_limit(self.id))
+            .await
     }
 
     pub async fn power_max_limit(&self) -> Result<u32> {
@@ -152,7 +161,9 @@ impl Cache {
     }
 
     pub async fn reset_gfx_freq(&self) -> Result<()> {
-        self.gfx_freq.clear_if_ok(nvml::reset_gfx_freq(self.id)).await
+        self.gfx_freq
+            .clear_if_ok(nvml::reset_gfx_freq(self.id))
+            .await
     }
 
     pub async fn set_power_limit(&self, v: u32) -> Result<()> {

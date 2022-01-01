@@ -4,6 +4,7 @@ mod record;
 use std::result::Result as StdResult;
 use std::sync::Arc;
 
+use futures::stream::Stream;
 use nvml_wrapper::enum_wrappers::device::{Clock as NVMLClock, ClockId as NVMLClockId};
 use nvml_wrapper::error::NvmlError;
 use nvml_wrapper::NVML;
@@ -13,9 +14,7 @@ use tokio::task::spawn_blocking;
 
 pub use crate::nvml::cache::Cache;
 pub use crate::nvml::record::Record;
-use crate::drm;
-use crate::util::stream::prelude::*;
-use crate::{Error, Result};
+use crate::{drm, Error, Result};
 
 fn nvml() -> Result<Arc<FairMutex<NVML>>> {
     static INSTANCE: OnceCell<StdResult<Arc<FairMutex<NVML>>, NvmlError>> = OnceCell::new();
@@ -115,7 +114,7 @@ pub async fn exists(id: u64) -> Result<bool> {
     spawn_blocking(move || exists(&bus_id)).await.unwrap()
 }
 
-pub fn ids() -> impl Stream<Item=Result<u64>> {
+pub fn ids() -> impl Stream<Item = Result<u64>> {
     drm::ids_for_driver("nvidia")
 }
 

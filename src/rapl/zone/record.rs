@@ -1,7 +1,7 @@
+use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
 use crate::rapl::zone::{self, Id};
-use crate::util::stream::prelude::*;
 use crate::Result;
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -14,16 +14,26 @@ pub struct Record {
 }
 
 impl Record {
-    pub fn available() -> impl Future<Output=Result<bool>> {
+    pub fn available() -> impl Future<Output = Result<bool>> {
         zone::available()
     }
 
-    pub fn exists(id: Id) -> impl Future<Output=Result<bool>> {
+    pub fn exists(id: Id) -> impl Future<Output = Result<bool>> {
         zone::exists(id)
     }
 
-    pub fn ids() -> impl Stream<Item=Result<Id>> {
+    pub fn ids() -> impl Stream<Item = Result<Id>> {
         zone::ids()
+    }
+
+    pub async fn load(id: impl Into<Id>) -> Self {
+        let mut s = Self::new(id);
+        s.read().await;
+        s
+    }
+
+    pub fn all() -> impl Stream<Item = Result<Self>> {
+        zone::ids().and_then(|id| async move { Ok(Self::load(id).await) })
     }
 
     pub fn new(id: impl Into<Id>) -> Self {
