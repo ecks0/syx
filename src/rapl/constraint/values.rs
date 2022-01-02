@@ -6,7 +6,7 @@ use crate::rapl::constraint::{self, Cache, Id};
 use crate::rapl::zone;
 use crate::Result;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Values {
     id: Id,
 }

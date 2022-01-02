@@ -4,7 +4,7 @@ use futures::Future;
 use crate::cpufreq::{self, Cache};
 use crate::Result;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Values {
     id: u64,
 }

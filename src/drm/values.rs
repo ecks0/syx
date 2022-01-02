@@ -4,7 +4,7 @@ use futures::Future;
 use crate::drm::{self, Cache};
 use crate::{BusId, Result};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Values {
     id: u64,
 }

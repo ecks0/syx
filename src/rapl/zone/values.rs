@@ -4,7 +4,7 @@ use futures::Future;
 use crate::rapl::zone::{self, Id, Cache};
 use crate::Result;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Values {
     id: Id,
 }

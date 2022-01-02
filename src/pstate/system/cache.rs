@@ -45,7 +45,7 @@ impl Cache {
     }
 
     pub async fn is_active(&self) -> Result<bool> {
-        self.status().await.map(|v| v != "active")
+        self.status().await.map(|v| v == "active")
     }
 
     pub async fn turbo_pct(&self) -> Result<u64> {

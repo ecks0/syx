@@ -3,7 +3,7 @@ use futures::Future;
 use crate::pstate::system::{self, Cache};
 use crate::Result;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Values;
 
 impl Values {
@@ -28,7 +28,7 @@ impl Values {
     }
 
     pub async fn is_active(&self) -> Result<bool> {
-        self.status().await.map(|v| v != "active")
+        self.status().await.map(|v| v == "active")
     }
 
     pub fn turbo_pct(&self) -> impl Future<Output=Result<u64>> {
