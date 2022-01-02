@@ -5,7 +5,7 @@ use std::result::Result as StdResult;
 use async_stream::try_stream;
 use futures::stream::Stream;
 use tokio::fs::DirEntry;
-use tokio::io::{AsyncReadExt as _, Error as IoError};
+use tokio::io::Error as IoError;
 
 use crate::{Error, Result};
 
@@ -103,14 +103,10 @@ pub(crate) async fn read_link_name(path: &Path) -> Result<String> {
 }
 
 pub(crate) async fn read_string(path: &Path) -> Result<String> {
-    async fn read_string(path: &Path) -> StdResult<String, IoError> {
-        let mut f = tokio::fs::File::open(path).await?;
-        let mut s = String::with_capacity(256);
-        f.read_to_string(&mut s).await?;
-        let s = s.trim_end_matches('\n').to_string();
-        Ok(s)
-    }
-    handle_read(path, read_string(path).await)
+    handle_read(path, tokio::fs::read_to_string(path).await)
+        .map(|s| s
+            .trim_end_matches('\n')
+            .to_string())
 }
 
 pub(crate) async fn write_string(path: &Path, val: &str) -> Result<()> {

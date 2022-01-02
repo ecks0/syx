@@ -1,6 +1,6 @@
 [package]
 name = "syx"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 homepage = "https://github.com/ecks0/syx"
 license = "MIT"
@@ -12,6 +12,7 @@ logging = ["log", "nix"]
 
 [dependencies]
 async-stream = "~0.3"
+async-trait = "0.1.52"
 futures = "~0.3"
 log = { version = "~0.4", optional = true }
 nix = { version = "~0.23", optional = true }

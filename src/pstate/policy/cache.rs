@@ -1,16 +1,16 @@
 use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-use crate::pstate::policy;
-use crate::util::cell::Cached;
+use crate::pstate::policy::{self, Values};
+use crate::util::cell::Cell;
 use crate::Result;
 
 #[derive(Clone, Debug)]
 pub struct Cache {
     id: u64,
-    energy_perf_bias: Cached<u64>,
-    energy_performance_preference: Cached<String>,
-    energy_performance_available_preferences: Cached<Vec<String>>,
+    energy_perf_bias: Cell<u64>,
+    energy_performance_preference: Cell<String>,
+    energy_performance_available_preferences: Cell<Vec<String>>,
 }
 
 impl Cache {
@@ -33,9 +33,9 @@ impl Cache {
     pub fn new(id: u64) -> Self {
         Self {
             id,
-            energy_perf_bias: Cached::default(),
-            energy_performance_preference: Cached::default(),
-            energy_performance_available_preferences: Cached::default(),
+            energy_perf_bias: Cell::default(),
+            energy_performance_preference: Cell::default(),
+            energy_performance_available_preferences: Cell::default(),
         }
     }
 
@@ -82,5 +82,17 @@ impl Cache {
                 v.as_ref(),
             ))
             .await
+    }
+}
+
+impl From<Values> for Cache {
+    fn from(v: Values) -> Self {
+        Self::new(v.id())
+    }
+}
+
+impl From<&Values> for Cache {
+    fn from(v: &Values) -> Self {
+        Self::new(v.id())
     }
 }

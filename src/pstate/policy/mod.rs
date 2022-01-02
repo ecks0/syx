@@ -1,10 +1,11 @@
 pub mod cache;
 pub(crate) mod path;
-pub mod record;
+pub mod values;
 
 pub use crate::cpufreq::{exists, ids};
 pub use crate::pstate::available;
 pub use crate::pstate::policy::cache::Cache;
+pub use crate::pstate::policy::values::Values;
 use crate::util::sysfs;
 use crate::Result;
 

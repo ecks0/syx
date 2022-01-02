@@ -1,17 +1,15 @@
 use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-use crate::cpu::{self, Values};
-use crate::util::cell::Cell;
+use crate::cpu::{self, Cache};
 use crate::Result;
 
 #[derive(Clone, Debug)]
-pub struct Cache {
+pub struct Values {
     id: u64,
-    online: Cell<bool>,
 }
 
-impl Cache {
+impl Values {
     pub fn available() -> impl Future<Output = Result<bool>> {
         cpu::available()
     }
@@ -29,35 +27,30 @@ impl Cache {
     }
 
     pub fn new(id: u64) -> Self {
-        let online = Cell::default();
-        Self { id, online }
-    }
-
-    pub async fn clear(&self) {
-        self.online.clear().await;
+        Self { id }
     }
 
     pub fn id(&self) -> u64 {
         self.id
     }
 
-    pub async fn online(&self) -> Result<bool> {
-        self.online.get_or_load(cpu::online(self.id)).await
+    pub fn online(&self) -> impl Future<Output=Result<bool>> {
+        cpu::online(self.id)
     }
 
-    pub async fn set_online(&self, v: bool) -> Result<()> {
-        self.online.clear_if_ok(cpu::set_online(self.id, v)).await
+    pub fn set_online(&self, v: bool) -> impl Future<Output=Result<()>> {
+        cpu::set_online(self.id, v)
     }
 }
 
-impl From<Values> for Cache {
-    fn from(v: Values) -> Self {
+impl From<Cache> for Values {
+    fn from(v: Cache) -> Self {
         Self::new(v.id())
     }
 }
 
-impl From<&Values> for Cache {
-    fn from(v: &Values) -> Self {
+impl From<&Cache> for Values {
+    fn from(v: &Cache) -> Self {
         Self::new(v.id())
     }
 }

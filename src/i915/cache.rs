@@ -1,20 +1,21 @@
 use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-use crate::util::cell::Cached;
-use crate::{i915, Result};
+use crate::i915::{self, Values};
+use crate::util::cell::Cell;
+use crate::Result;
 
 #[derive(Clone, Debug)]
 pub struct Cache {
     id: u64,
-    act_freq_mhz: Cached<u64>,
-    boost_freq_mhz: Cached<u64>,
-    cur_freq_mhz: Cached<u64>,
-    max_freq_mhz: Cached<u64>,
-    min_freq_mhz: Cached<u64>,
-    rp0_freq_mhz: Cached<u64>,
-    rp1_freq_mhz: Cached<u64>,
-    rpn_freq_mhz: Cached<u64>,
+    act_freq_mhz: Cell<u64>,
+    boost_freq_mhz: Cell<u64>,
+    cur_freq_mhz: Cell<u64>,
+    max_freq_mhz: Cell<u64>,
+    min_freq_mhz: Cell<u64>,
+    rp0_freq_mhz: Cell<u64>,
+    rp1_freq_mhz: Cell<u64>,
+    rpn_freq_mhz: Cell<u64>,
 }
 
 impl Cache {
@@ -37,14 +38,14 @@ impl Cache {
     pub fn new(id: u64) -> Self {
         Self {
             id,
-            act_freq_mhz: Cached::default(),
-            boost_freq_mhz: Cached::default(),
-            cur_freq_mhz: Cached::default(),
-            max_freq_mhz: Cached::default(),
-            min_freq_mhz: Cached::default(),
-            rp0_freq_mhz: Cached::default(),
-            rp1_freq_mhz: Cached::default(),
-            rpn_freq_mhz: Cached::default(),
+            act_freq_mhz: Cell::default(),
+            boost_freq_mhz: Cell::default(),
+            cur_freq_mhz: Cell::default(),
+            max_freq_mhz: Cell::default(),
+            min_freq_mhz: Cell::default(),
+            rp0_freq_mhz: Cell::default(),
+            rp1_freq_mhz: Cell::default(),
+            rpn_freq_mhz: Cell::default(),
         }
     }
 
@@ -147,5 +148,17 @@ impl Cache {
         self.rpn_freq_mhz
             .clear_if_ok(i915::set_rpn_freq_mhz(self.id, v))
             .await
+    }
+}
+
+impl From<Values> for Cache {
+    fn from(v: Values) -> Self {
+        Self::new(v.id())
+    }
+}
+
+impl From<&Values> for Cache {
+    fn from(v: &Values) -> Self {
+        Self::new(v.id())
     }
 }

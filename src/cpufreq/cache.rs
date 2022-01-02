@@ -1,20 +1,21 @@
 use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-use crate::util::cell::Cached;
-use crate::{cpufreq, Result};
+use crate::cpufreq::{self, Values};
+use crate::util::cell::Cell;
+use crate::Result;
 
 #[derive(Clone, Debug)]
 pub struct Cache {
     id: u64,
-    cpuinfo_max_freq: Cached<u64>,
-    cpuinfo_min_freq: Cached<u64>,
-    scaling_cur_freq: Cached<u64>,
-    scaling_driver: Cached<String>,
-    scaling_governor: Cached<String>,
-    scaling_available_governors: Cached<Vec<String>>,
-    scaling_max_freq: Cached<u64>,
-    scaling_min_freq: Cached<u64>,
+    cpuinfo_max_freq: Cell<u64>,
+    cpuinfo_min_freq: Cell<u64>,
+    scaling_cur_freq: Cell<u64>,
+    scaling_driver: Cell<String>,
+    scaling_governor: Cell<String>,
+    scaling_available_governors: Cell<Vec<String>>,
+    scaling_max_freq: Cell<u64>,
+    scaling_min_freq: Cell<u64>,
 }
 
 impl Cache {
@@ -37,14 +38,14 @@ impl Cache {
     pub fn new(id: u64) -> Self {
         Self {
             id,
-            cpuinfo_max_freq: Cached::default(),
-            cpuinfo_min_freq: Cached::default(),
-            scaling_cur_freq: Cached::default(),
-            scaling_driver: Cached::default(),
-            scaling_governor: Cached::default(),
-            scaling_available_governors: Cached::default(),
-            scaling_max_freq: Cached::default(),
-            scaling_min_freq: Cached::default(),
+            cpuinfo_max_freq: Cell::default(),
+            cpuinfo_min_freq: Cell::default(),
+            scaling_cur_freq: Cell::default(),
+            scaling_driver: Cell::default(),
+            scaling_governor: Cell::default(),
+            scaling_available_governors: Cell::default(),
+            scaling_max_freq: Cell::default(),
+            scaling_min_freq: Cell::default(),
         }
     }
 
@@ -129,5 +130,17 @@ impl Cache {
         self.scaling_min_freq
             .clear_if_ok(cpufreq::set_scaling_min_freq(self.id, v))
             .await
+    }
+}
+
+impl From<Values> for Cache {
+    fn from(v: Values) -> Self {
+        Self::new(v.id())
+    }
+}
+
+impl From<&Values> for Cache {
+    fn from(v: &Values) -> Self {
+        Self::new(v.id())
     }
 }

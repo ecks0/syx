@@ -1,12 +1,12 @@
 mod cache;
 pub(crate) mod path;
-mod record;
+mod values;
 
 use async_stream::try_stream;
 use futures::stream::{Stream, TryStreamExt as _};
 
 pub use crate::drm::cache::Cache;
-pub use crate::drm::record::Record;
+pub use crate::drm::values::Values;
 use crate::util::sysfs;
 use crate::{BusId, Error, Result};
 

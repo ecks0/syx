@@ -6,14 +6,14 @@ use parking_lot::FairMutex;
 use crate::Result;
 
 #[derive(Clone, Debug)]
-pub(crate) struct Cached<T>
+pub(crate) struct Cell<T>
 where
     T: Clone + Send + 'static,
 {
     cell: Arc<FairMutex<Option<T>>>,
 }
 
-impl<T> Cached<T>
+impl<T> Cell<T>
 where
     T: Clone + Send + 'static,
 {
@@ -49,7 +49,7 @@ where
     }
 }
 
-impl<T> Default for Cached<T>
+impl<T> Default for Cell<T>
 where
     T: Clone + Send + 'static,
 {

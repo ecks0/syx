@@ -1,5 +1,5 @@
 mod cache;
-mod record;
+mod values;
 
 use std::result::Result as StdResult;
 use std::sync::Arc;
@@ -13,7 +13,7 @@ use parking_lot::FairMutex;
 use tokio::task::spawn_blocking;
 
 pub use crate::nvml::cache::Cache;
-pub use crate::nvml::record::Record;
+pub use crate::nvml::values::Values;
 use crate::{drm, Error, Result};
 
 fn nvml() -> Result<Arc<FairMutex<NVML>>> {

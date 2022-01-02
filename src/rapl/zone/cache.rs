@@ -1,17 +1,17 @@
 use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-use crate::rapl::zone::{self, Id};
-use crate::util::cell::Cached;
+use crate::rapl::zone::{self, Id, Values};
+use crate::util::cell::Cell;
 use crate::Result;
 
 #[derive(Clone, Debug)]
 pub struct Cache {
     id: Id,
-    enabled: Cached<bool>,
-    energy_uj: Cached<u64>,
-    max_energy_range_uj: Cached<u64>,
-    name: Cached<String>,
+    enabled: Cell<bool>,
+    energy_uj: Cell<u64>,
+    max_energy_range_uj: Cell<u64>,
+    name: Cell<String>,
 }
 
 impl Cache {
@@ -34,10 +34,10 @@ impl Cache {
     pub fn new(id: impl Into<Id>) -> Self {
         Self {
             id: id.into(),
-            enabled: Cached::default(),
-            energy_uj: Cached::default(),
-            max_energy_range_uj: Cached::default(),
-            name: Cached::default(),
+            enabled: Cell::default(),
+            energy_uj: Cell::default(),
+            max_energy_range_uj: Cell::default(),
+            name: Cell::default(),
         }
     }
 
@@ -76,5 +76,17 @@ impl Cache {
         self.enabled
             .clear_if_ok(zone::set_enabled(self.id, v))
             .await
+    }
+}
+
+impl From<Values> for Cache {
+    fn from(v: Values) -> Self {
+        Self::new(v.id())
+    }
+}
+
+impl From<&Values> for Cache {
+    fn from(v: &Values) -> Self {
+        Self::new(v.id())
     }
 }

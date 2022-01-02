@@ -2,21 +2,24 @@ use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
 pub use crate::rapl::available;
-use crate::rapl::constraint::{self, Id};
+use crate::rapl::constraint::{self, Id, Values};
 use crate::rapl::zone;
-use crate::util::cell::Cached;
+use crate::util::cell::Cell;
 use crate::Result;
 
 #[derive(Clone, Debug)]
 pub struct Cache {
     id: Id,
-    name: Cached<String>,
-    max_power_uw: Cached<u64>,
-    power_limit_uw: Cached<u64>,
-    time_window_us: Cached<u64>,
+    name: Cell<String>,
+    max_power_uw: Cell<u64>,
+    power_limit_uw: Cell<u64>,
+    time_window_us: Cell<u64>,
 }
 
 impl Cache {
+    pub const LONG_TERM: &'static str = crate::rapl::constraint::LONG_TERM;
+    pub const SHORT_TERM: &'static str = crate::rapl::constraint::SHORT_TERM;
+
     pub fn available() -> impl Future<Output = Result<bool>> {
         constraint::available()
     }
@@ -45,17 +48,21 @@ impl Cache {
         constraint::ids().map_ok(Self::new)
     }
 
-    pub async fn all_for_zone() -> impl Stream<Item = Result<Self>> {
-        constraint::ids().map_ok(Self::new)
+    pub fn all_for_zone(zone: impl Into<zone::Id>) -> impl Stream<Item = Result<Self>> {
+        constraint::ids_for_zone(zone).map_ok(Self::new)
+    }
+
+    pub async fn for_name(zone: impl Into<zone::Id>, name: &str) -> Result<Option<Self>> {
+        Ok(constraint::id_for_name(zone, name).await?.map(Self::new))
     }
 
     pub fn new(id: impl Into<Id>) -> Self {
         Self {
             id: id.into(),
-            name: Cached::default(),
-            max_power_uw: Cached::default(),
-            power_limit_uw: Cached::default(),
-            time_window_us: Cached::default(),
+            name: Cell::default(),
+            max_power_uw: Cell::default(),
+            power_limit_uw: Cell::default(),
+            time_window_us: Cell::default(),
         }
     }
 
@@ -102,5 +109,17 @@ impl Cache {
     pub async fn set_time_window_us(&self, v: u64) -> Result<()> {
         let f = constraint::set_time_window_us(self.id, v);
         self.time_window_us.clear_if_ok(f).await
+    }
+}
+
+impl From<Values> for Cache {
+    fn from(v: Values) -> Self {
+        Self::new(v.id())
+    }
+}
+
+impl From<&Values> for Cache {
+    fn from(v: &Values) -> Self {
+        Self::new(v.id())
     }
 }

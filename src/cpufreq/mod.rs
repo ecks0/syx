@@ -1,11 +1,11 @@
-pub mod cache;
+mod cache;
 pub(crate) mod path;
-pub mod record;
+mod values;
 
 use futures::stream::Stream;
 
 pub use crate::cpufreq::cache::Cache;
-pub use crate::cpufreq::record::Record;
+pub use crate::cpufreq::values::Values;
 use crate::util::sysfs;
 use crate::Result;
 
@@ -53,14 +53,14 @@ pub async fn scaling_min_freq(id: u64) -> Result<u64> {
     sysfs::read_u64(&path::scaling_min_freq(id)).await
 }
 
-pub async fn set_scaling_governor(id: u64, val: &str) -> Result<()> {
-    sysfs::write_string(&path::scaling_governor(id), val).await
+pub async fn set_scaling_governor(id: u64, v: &str) -> Result<()> {
+    sysfs::write_string(&path::scaling_governor(id), v).await
 }
 
-pub async fn set_scaling_max_freq(id: u64, val: u64) -> Result<()> {
-    sysfs::write_u64(&path::scaling_max_freq(id), val).await
+pub async fn set_scaling_max_freq(id: u64, v: u64) -> Result<()> {
+    sysfs::write_u64(&path::scaling_max_freq(id), v).await
 }
 
-pub async fn set_scaling_min_freq(id: u64, val: u64) -> Result<()> {
-    sysfs::write_u64(&path::scaling_min_freq(id), val).await
+pub async fn set_scaling_min_freq(id: u64, v: u64) -> Result<()> {
+    sysfs::write_u64(&path::scaling_min_freq(id), v).await
 }

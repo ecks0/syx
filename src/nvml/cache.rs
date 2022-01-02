@@ -1,27 +1,28 @@
 use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-use crate::util::cell::Cached;
-use crate::{nvml, Result};
+use crate::nvml::{self, Values};
+use crate::util::cell::Cell;
+use crate::Result;
 
 #[derive(Clone, Debug)]
 pub struct Cache {
     id: u64,
-    gfx_freq: Cached<u32>,
-    gfx_max_freq: Cached<u32>,
-    mem_freq: Cached<u32>,
-    mem_max_freq: Cached<u32>,
-    sm_freq: Cached<u32>,
-    sm_max_freq: Cached<u32>,
-    video_freq: Cached<u32>,
-    video_max_freq: Cached<u32>,
-    mem_total: Cached<u64>,
-    mem_used: Cached<u64>,
-    name: Cached<String>,
-    power: Cached<u32>,
-    power_limit: Cached<u32>,
-    power_limit_max: Cached<u32>,
-    power_limit_min: Cached<u32>,
+    gfx_freq: Cell<u32>,
+    gfx_max_freq: Cell<u32>,
+    mem_freq: Cell<u32>,
+    mem_max_freq: Cell<u32>,
+    sm_freq: Cell<u32>,
+    sm_max_freq: Cell<u32>,
+    video_freq: Cell<u32>,
+    video_max_freq: Cell<u32>,
+    mem_total: Cell<u64>,
+    mem_used: Cell<u64>,
+    name: Cell<String>,
+    power: Cell<u32>,
+    power_limit: Cell<u32>,
+    power_limit_max: Cell<u32>,
+    power_limit_min: Cell<u32>,
 }
 
 impl Cache {
@@ -44,21 +45,21 @@ impl Cache {
     pub fn new(id: u64) -> Self {
         Self {
             id,
-            gfx_freq: Cached::default(),
-            gfx_max_freq: Cached::default(),
-            mem_freq: Cached::default(),
-            mem_max_freq: Cached::default(),
-            sm_freq: Cached::default(),
-            sm_max_freq: Cached::default(),
-            video_freq: Cached::default(),
-            video_max_freq: Cached::default(),
-            mem_total: Cached::default(),
-            mem_used: Cached::default(),
-            name: Cached::default(),
-            power: Cached::default(),
-            power_limit: Cached::default(),
-            power_limit_max: Cached::default(),
-            power_limit_min: Cached::default(),
+            gfx_freq: Cell::default(),
+            gfx_max_freq: Cell::default(),
+            mem_freq: Cell::default(),
+            mem_max_freq: Cell::default(),
+            sm_freq: Cell::default(),
+            sm_max_freq: Cell::default(),
+            video_freq: Cell::default(),
+            video_max_freq: Cell::default(),
+            mem_total: Cell::default(),
+            mem_used: Cell::default(),
+            name: Cell::default(),
+            power: Cell::default(),
+            power_limit: Cell::default(),
+            power_limit_max: Cell::default(),
+            power_limit_min: Cell::default(),
         }
     }
 
@@ -176,5 +177,17 @@ impl Cache {
         self.power_limit
             .clear_if_ok(nvml::reset_power_limit(self.id))
             .await
+    }
+}
+
+impl From<Values> for Cache {
+    fn from(v: Values) -> Self {
+        Self::new(v.id())
+    }
+}
+
+impl From<&Values> for Cache {
+    fn from(v: &Values) -> Self {
+        Self::new(v.id())
     }
 }

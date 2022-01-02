@@ -1,18 +1,15 @@
 use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-use crate::drm::{self, Values};
-use crate::util::cell::Cell;
+use crate::drm::{self, Cache};
 use crate::{BusId, Result};
 
 #[derive(Clone, Debug)]
-pub struct Cache {
+pub struct Values {
     id: u64,
-    bus_id: Cell<BusId>,
-    driver: Cell<String>,
 }
 
-impl Cache {
+impl Values {
     pub fn available() -> impl Future<Output = Result<bool>> {
         drm::available()
     }
@@ -30,15 +27,7 @@ impl Cache {
     }
 
     pub fn new(id: u64) -> Self {
-        Self {
-            id,
-            bus_id: Cell::default(),
-            driver: Cell::default(),
-        }
-    }
-
-    pub async fn clear(&self) {
-        tokio::join!(self.bus_id.clear(), self.driver.clear());
+        Self { id }
     }
 
     pub fn id(&self) -> u64 {
@@ -46,22 +35,21 @@ impl Cache {
     }
 
     pub async fn bus_id(&self) -> Result<BusId> {
-        self.bus_id.get_or_load(drm::bus_id(self.id)).await
+        drm::bus_id(self.id).await
     }
 
     pub async fn driver(&self) -> Result<String> {
-        self.driver.get_or_load(drm::driver(self.id)).await
-    }
+        drm::driver(self.id).await    }
 }
 
-impl From<Values> for Cache {
-    fn from(v: Values) -> Self {
+impl From<Cache> for Values {
+    fn from(v: Cache) -> Self {
         Self::new(v.id())
     }
 }
 
-impl From<&Values> for Cache {
-    fn from(v: &Values) -> Self {
+impl From<&Cache> for Values {
+    fn from(v: &Cache) -> Self {
         Self::new(v.id())
     }
 }

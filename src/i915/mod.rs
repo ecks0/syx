@@ -1,11 +1,11 @@
 mod cache;
 pub(crate) mod path;
-mod record;
+mod values;
 
 use futures::stream::Stream;
 
 pub use crate::i915::cache::Cache;
-pub use crate::i915::record::Record;
+pub use crate::i915::values::Values;
 use crate::util::sysfs;
 use crate::{drm, Result};
 

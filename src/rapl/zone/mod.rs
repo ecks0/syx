@@ -1,13 +1,13 @@
 mod cache;
 pub(crate) mod path;
-mod record;
+mod values;
 
 use async_stream::try_stream;
 use futures::stream::{Stream, TryStreamExt as _};
 
 pub use crate::rapl::available;
 pub use crate::rapl::zone::cache::Cache;
-pub use crate::rapl::zone::record::Record;
+pub use crate::rapl::zone::values::Values;
 use crate::util::sysfs;
 use crate::Result;
 

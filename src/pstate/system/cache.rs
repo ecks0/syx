@@ -1,16 +1,16 @@
 use futures::Future;
 
-use crate::pstate::system;
-use crate::util::cell::Cached;
+use crate::pstate::system::{self, Values};
+use crate::util::cell::Cell;
 use crate::Result;
 
 #[derive(Clone, Debug, Default)]
 pub struct Cache {
-    max_perf_pct: Cached<u64>,
-    min_perf_pct: Cached<u64>,
-    no_turbo: Cached<bool>,
-    status: Cached<String>,
-    turbo_pct: Cached<u64>,
+    max_perf_pct: Cell<u64>,
+    min_perf_pct: Cell<u64>,
+    no_turbo: Cell<bool>,
+    status: Cell<String>,
+    turbo_pct: Cell<u64>,
 }
 
 impl Cache {
@@ -44,6 +44,10 @@ impl Cache {
         self.status.get_or_load(system::status()).await
     }
 
+    pub async fn is_active(&self) -> Result<bool> {
+        self.status().await.map(|v| v != "active")
+    }
+
     pub async fn turbo_pct(&self) -> Result<u64> {
         self.turbo_pct.get_or_load(system::turbo_pct()).await
     }
@@ -62,5 +66,17 @@ impl Cache {
 
     pub async fn set_no_turbo(&self, v: bool) -> Result<()> {
         self.no_turbo.clear_if_ok(system::set_no_turbo(v)).await
+    }
+}
+
+impl From<Values> for Cache {
+    fn from(_: Values) -> Self {
+        Self::default()
+    }
+}
+
+impl From<&Values> for Cache {
+    fn from(_: &Values) -> Self {
+        Self::default()
     }
 }
