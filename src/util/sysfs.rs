@@ -64,23 +64,27 @@ pub(crate) fn read_indices(path: &Path) -> impl Stream<Item=Result<u64>> {
     let path = path.to_path_buf();
     try_stream! {
         let s = read_string(&path).await?;
-        let p: Vec<_> = s.split('-').collect();
-        let i = match &p[..] {
-            [id] => {
-                let id = id.parse::<u64>()
-                    .map_err(|_| Error::sysfs_parse(&path, "indices: index", &s))?;
-                id..=id
-            },
-            [start, end] => {
-                let start = start
-                    .parse::<u64>()
-                    .map_err(|_| Error::sysfs_parse(&path, "indices: start", &s))?;
-                let end = end
-                    .parse::<u64>()
-                    .map_err(|_| Error::sysfs_parse(&path, "indices: end", s))?;
-                start..=end
-            },
-            _ => Err(Error::sysfs_parse(&path, "indices", s))?,
+        let i = if s.is_empty() {
+            0..0
+        } else {
+            let p: Vec<_> = s.split('-').collect();
+            match &p[..] {
+                [id] => {
+                    let id = id.parse::<u64>()
+                        .map_err(|_| Error::sysfs_parse(&path, "indices: index", &s))?;
+                    id..(id+1)
+                },
+                [start, end] => {
+                    let start = start
+                        .parse::<u64>()
+                        .map_err(|_| Error::sysfs_parse(&path, "indices: start", &s))?;
+                    let end = end
+                        .parse::<u64>()
+                        .map_err(|_| Error::sysfs_parse(&path, "indices: end", s))?;
+                    start..(end+1)
+                },
+                _ => Err(Error::sysfs_parse(&path, "indices", s))?,
+            }
         };
         for v in i {
             yield v;
