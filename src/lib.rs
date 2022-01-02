@@ -33,7 +33,7 @@ pub enum Error {
     #[error("Error: {0}")]
     NonSequitor(String),
 
-    #[error("sysfs {op}: {path}: {source}")]
+    #[error("{op}: {path}: {source}")]
     SysfsIo {
         #[source]
         source: IoError,
@@ -41,7 +41,7 @@ pub enum Error {
         op: Op,
     },
 
-    #[error("sysfs parse: {path}: Invalid value for {ty}: {value:?}")]
+    #[error("parse: {path}: Invalid value for {ty}: {value:?}")]
     SysfsParse {
         path: PathBuf,
         ty: &'static str,
