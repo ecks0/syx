@@ -34,35 +34,35 @@ impl Values {
         self.id
     }
 
-    pub fn cpuinfo_max_freq(&self) -> impl Future<Output=Result<u64>> {
+    pub fn cpuinfo_max_freq(&self) -> impl Future<Output = Result<u64>> {
         cpufreq::cpuinfo_max_freq(self.id)
     }
 
-    pub fn cpuinfo_min_freq(&self) -> impl Future<Output=Result<u64>> {
+    pub fn cpuinfo_min_freq(&self) -> impl Future<Output = Result<u64>> {
         cpufreq::cpuinfo_min_freq(self.id)
     }
 
-    pub fn scaling_cur_freq(&self) -> impl Future<Output=Result<u64>> {
+    pub fn scaling_cur_freq(&self) -> impl Future<Output = Result<u64>> {
         cpufreq::scaling_cur_freq(self.id)
     }
 
-    pub fn scaling_driver(&self) -> impl Future<Output=Result<String>> {
+    pub fn scaling_driver(&self) -> impl Future<Output = Result<String>> {
         cpufreq::scaling_driver(self.id)
     }
 
-    pub fn scaling_governor(&self) -> impl Future<Output=Result<String>> {
+    pub fn scaling_governor(&self) -> impl Future<Output = Result<String>> {
         cpufreq::scaling_governor(self.id)
     }
 
-    pub fn scaling_available_governors(&self) -> impl Future<Output=Result<Vec<String>>> {
+    pub fn scaling_available_governors(&self) -> impl Future<Output = Result<Vec<String>>> {
         cpufreq::scaling_available_governors(self.id)
     }
 
-    pub fn scaling_max_freq(&self) -> impl Future<Output=Result<u64>> {
+    pub fn scaling_max_freq(&self) -> impl Future<Output = Result<u64>> {
         cpufreq::scaling_max_freq(self.id)
     }
 
-    pub fn scaling_min_freq(&self) -> impl Future<Output=Result<u64>> {
+    pub fn scaling_min_freq(&self) -> impl Future<Output = Result<u64>> {
         cpufreq::scaling_min_freq(self.id)
     }
 
@@ -70,11 +70,11 @@ impl Values {
         cpufreq::set_scaling_governor(self.id, v.as_ref()).await
     }
 
-    pub fn set_scaling_max_freq(&self, v: u64) -> impl Future<Output=Result<()>> {
+    pub fn set_scaling_max_freq(&self, v: u64) -> impl Future<Output = Result<()>> {
         cpufreq::set_scaling_max_freq(self.id, v)
     }
 
-    pub fn set_scaling_min_freq(&self, v: u64) -> impl Future<Output=Result<()>> {
+    pub fn set_scaling_min_freq(&self, v: u64) -> impl Future<Output = Result<()>> {
         cpufreq::set_scaling_min_freq(self.id, v)
     }
 }

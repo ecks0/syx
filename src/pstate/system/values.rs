@@ -11,19 +11,19 @@ impl Values {
         system::available()
     }
 
-    pub fn max_perf_pct(&self) -> impl Future<Output=Result<u64>> {
+    pub fn max_perf_pct(&self) -> impl Future<Output = Result<u64>> {
         system::max_perf_pct()
     }
 
-    pub fn min_perf_pct(&self) -> impl Future<Output=Result<u64>> {
+    pub fn min_perf_pct(&self) -> impl Future<Output = Result<u64>> {
         system::min_perf_pct()
     }
 
-    pub fn no_turbo(&self) -> impl Future<Output=Result<bool>> {
+    pub fn no_turbo(&self) -> impl Future<Output = Result<bool>> {
         system::no_turbo()
     }
 
-    pub fn status(&self) -> impl Future<Output=Result<String>> {
+    pub fn status(&self) -> impl Future<Output = Result<String>> {
         system::status()
     }
 
@@ -31,19 +31,19 @@ impl Values {
         self.status().await.map(|v| v == "active")
     }
 
-    pub fn turbo_pct(&self) -> impl Future<Output=Result<u64>> {
+    pub fn turbo_pct(&self) -> impl Future<Output = Result<u64>> {
         system::turbo_pct()
     }
 
-    pub fn set_max_perf_pct(&self, v: u64) -> impl Future<Output=Result<()>> {
+    pub fn set_max_perf_pct(&self, v: u64) -> impl Future<Output = Result<()>> {
         system::set_max_perf_pct(v)
     }
 
-    pub fn set_min_perf_pct(&self, v: u64) -> impl Future<Output=Result<()>> {
+    pub fn set_min_perf_pct(&self, v: u64) -> impl Future<Output = Result<()>> {
         system::set_min_perf_pct(v)
     }
 
-    pub fn set_no_turbo(&self, v: bool) -> impl Future<Output=Result<()>> {
+    pub fn set_no_turbo(&self, v: bool) -> impl Future<Output = Result<()>> {
         system::set_no_turbo(v)
     }
 }

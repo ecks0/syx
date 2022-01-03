@@ -108,9 +108,7 @@ pub(crate) async fn read_link_name(path: &Path) -> Result<String> {
 
 pub(crate) async fn read_string(path: &Path) -> Result<String> {
     handle_read(path, tokio::fs::read_to_string(path).await)
-        .map(|s| s
-            .trim_end_matches('\n')
-            .to_string())
+        .map(|s| s.trim_end_matches('\n').to_string())
 }
 
 pub(crate) async fn write_string(path: &Path, val: &str) -> Result<()> {
@@ -118,9 +116,12 @@ pub(crate) async fn write_string(path: &Path, val: &str) -> Result<()> {
 }
 
 pub(crate) async fn read_string_list(path: &Path, delim: char) -> Result<Vec<String>> {
-    read_string(path)
-        .await
-        .map(|s| s.split(delim).map(String::from).collect())
+    read_string(path).await.map(|s| {
+        s.trim_end_matches(delim)
+            .split(delim)
+            .map(String::from)
+            .collect()
+    })
 }
 
 pub(crate) async fn read_u64(path: &Path) -> Result<u64> {

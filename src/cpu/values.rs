@@ -34,11 +34,11 @@ impl Values {
         self.id
     }
 
-    pub fn online(&self) -> impl Future<Output=Result<bool>> {
+    pub fn online(&self) -> impl Future<Output = Result<bool>> {
         cpu::online(self.id)
     }
 
-    pub fn set_online(&self, v: bool) -> impl Future<Output=Result<()>> {
+    pub fn set_online(&self, v: bool) -> impl Future<Output = Result<()>> {
         cpu::set_online(self.id, v)
     }
 }

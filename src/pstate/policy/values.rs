@@ -34,19 +34,21 @@ impl Values {
         self.id
     }
 
-    pub fn energy_perf_bias(&self) -> impl Future<Output=Result<u64>> {
+    pub fn energy_perf_bias(&self) -> impl Future<Output = Result<u64>> {
         policy::energy_perf_bias(self.id)
     }
 
-    pub fn energy_performance_preference(&self) -> impl Future<Output=Result<String>> {
+    pub fn energy_performance_preference(&self) -> impl Future<Output = Result<String>> {
         policy::energy_performance_preference(self.id)
     }
 
-    pub fn energy_performance_available_preferences(&self) -> impl Future<Output=Result<Vec<String>>> {
+    pub fn energy_performance_available_preferences(
+        &self,
+    ) -> impl Future<Output = Result<Vec<String>>> {
         policy::energy_performance_available_preferences(self.id)
     }
 
-    pub fn set_energy_perf_bias(&self, v: u64) -> impl Future<Output=Result<()>> {
+    pub fn set_energy_perf_bias(&self, v: u64) -> impl Future<Output = Result<()>> {
         policy::set_energy_perf_bias(self.id, v)
     }
 

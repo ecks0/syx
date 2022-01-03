@@ -52,36 +52,34 @@ impl Values {
     }
 
     pub fn new(id: impl Into<Id>) -> Self {
-        Self {
-            id: id.into(),
-        }
+        Self { id: id.into() }
     }
 
     pub fn id(&self) -> Id {
         self.id
     }
 
-    pub fn name(&self) -> impl Future<Output=Result<String>> {
+    pub fn name(&self) -> impl Future<Output = Result<String>> {
         constraint::name(self.id)
     }
 
-    pub fn max_power_uw(&self) -> impl Future<Output=Result<u64>> {
+    pub fn max_power_uw(&self) -> impl Future<Output = Result<u64>> {
         constraint::max_power_uw(self.id)
     }
 
-    pub fn power_limit_uw(&self) -> impl Future<Output=Result<u64>> {
+    pub fn power_limit_uw(&self) -> impl Future<Output = Result<u64>> {
         constraint::power_limit_uw(self.id)
     }
 
-    pub fn time_window_us(&self) -> impl Future<Output=Result<u64>> {
+    pub fn time_window_us(&self) -> impl Future<Output = Result<u64>> {
         constraint::time_window_us(self.id)
     }
 
-    pub fn set_power_limit_uw(&self, v: u64) -> impl Future<Output=Result<()>> {
+    pub fn set_power_limit_uw(&self, v: u64) -> impl Future<Output = Result<()>> {
         constraint::set_power_limit_uw(self.id, v)
     }
 
-    pub fn set_time_window_us(&self, v: u64) -> impl Future<Output=Result<()>> {
+    pub fn set_time_window_us(&self, v: u64) -> impl Future<Output = Result<()>> {
         constraint::set_time_window_us(self.id, v)
     }
 }

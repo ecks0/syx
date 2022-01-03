@@ -39,7 +39,8 @@ impl Values {
     }
 
     pub async fn driver(&self) -> Result<String> {
-        drm::driver(self.id).await    }
+        drm::driver(self.id).await
+    }
 }
 
 impl From<Cache> for Values {

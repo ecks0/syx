@@ -46,8 +46,7 @@ impl Id {
 
     pub fn is_in(&self, zone: impl Into<ZoneId>) -> bool {
         let zone = zone.into();
-        self.package == zone.package() &&
-        self.subzone == zone.subzone()
+        self.package == zone.package() && self.subzone == zone.subzone()
     }
 }
 
