@@ -2,6 +2,7 @@ pub mod cpu;
 pub mod cpufreq;
 pub mod drm;
 pub mod i915;
+#[cfg(feature = "nvml")]
 pub mod nvml;
 pub mod pstate;
 pub mod rapl;
@@ -10,6 +11,7 @@ mod util;
 use std::fmt::Display;
 use std::path::PathBuf;
 
+#[cfg(feature = "nvml")]
 pub use nvml_wrapper::error::NvmlError;
 pub use tokio::io::Error as IoError;
 
@@ -48,12 +50,15 @@ pub enum Error {
         value: String,
     },
 
+    #[cfg(feature = "nvml")]
     #[error("nvml init: {0}")]
     NvmlInit(&'static NvmlError),
 
+    #[cfg(feature = "nvml")]
     #[error("nvml list devices: {0}")]
     NvmlListDevices(#[source] NvmlError),
 
+    #[cfg(feature = "nvml")]
     #[error("nvml {op} id {device}: {source}")]
     NvmlIo {
         #[source]
@@ -88,10 +93,12 @@ impl Error {
         Self::SysfsParse { path, ty, value }
     }
 
+    #[cfg(feature = "nvml")]
     fn nvml_init(error: &'static NvmlError) -> Self {
         Self::NvmlInit(error)
     }
 
+    #[cfg(feature = "nvml")]
     fn nvml_read(source: NvmlError, device: impl Display, method: &'static str) -> Self {
         let device = device.to_string();
         let op = Op::Read;
@@ -103,6 +110,7 @@ impl Error {
         }
     }
 
+    #[cfg(feature = "nvml")]
     fn nvml_write(source: NvmlError, device: impl Display, method: &'static str) -> Self {
         let device = device.to_string();
         let op = Op::Write;
