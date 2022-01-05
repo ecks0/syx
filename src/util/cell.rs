@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use futures::Future;
-use parking_lot::FairMutex;
+use tokio::sync::Mutex;
 
 use crate::Result;
 
@@ -10,7 +10,7 @@ pub(crate) struct Cell<T>
 where
     T: Clone + Send + 'static,
 {
-    cell: Arc<FairMutex<Option<T>>>,
+    cell: Arc<Mutex<Option<T>>>,
 }
 
 impl<T> Cell<T>
@@ -21,7 +21,7 @@ where
     where
         F: Future<Output = Result<T>>,
     {
-        let mut value = self.cell.lock();
+        let mut value = self.cell.lock().await;
         if let Some(v) = value.clone() {
             Ok(v)
         } else {
@@ -32,7 +32,7 @@ where
     }
 
     pub(crate) async fn clear(&self) {
-        self.cell.lock().take();
+        self.cell.lock().await.take();
     }
 
     pub(crate) async fn clear_if_ok<F, R>(&self, f: F) -> Result<R>
@@ -40,7 +40,7 @@ where
         F: Future<Output = Result<R>>,
         R: Send + 'static,
     {
-        let mut value = self.cell.lock();
+        let mut value = self.cell.lock().await;
         let r = f.await;
         if r.is_ok() {
             value.take();
@@ -54,7 +54,7 @@ where
     T: Clone + Send + 'static,
 {
     fn default() -> Self {
-        let cell = Arc::new(FairMutex::new(None));
+        let cell = Arc::new(Mutex::new(None));
         Self { cell }
     }
 }
