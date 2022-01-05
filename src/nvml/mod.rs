@@ -8,66 +8,21 @@ use futures::stream::Stream;
 use nvml_wrapper::enum_wrappers::device::{Clock as NVMLClock, ClockId as NVMLClockId};
 use nvml_wrapper::error::NvmlError;
 use nvml_wrapper::NVML;
-use once_cell::sync::OnceCell;
-use parking_lot::FairMutex;
-use tokio::task::spawn_blocking;
+use tokio::sync::{Mutex, OnceCell};
 
 pub use crate::nvml::cache::Cache;
 pub use crate::nvml::values::Values;
 use crate::{drm, Error, Result};
 
-fn nvml() -> Result<Arc<FairMutex<NVML>>> {
-    static INSTANCE: OnceCell<StdResult<Arc<FairMutex<NVML>>, NvmlError>> = OnceCell::new();
-    let r = INSTANCE.get_or_init(|| NVML::init().map(|nvml| Arc::new(FairMutex::new(nvml))));
-    match r {
+async fn nvml() -> Result<Arc<Mutex<NVML>>> {
+    static INSTANCE: OnceCell<StdResult<Arc<Mutex<NVML>>, NvmlError>> = OnceCell::const_new();
+    async fn nvml() -> StdResult<Arc<Mutex<NVML>>, NvmlError> {
+        NVML::init().map(|nvml| Arc::new(Mutex::new(nvml)))
+    }
+    match INSTANCE.get_or_init(nvml).await {
         Ok(v) => Ok(Arc::clone(v)),
         Err(e) => Err(Error::nvml_init(e)),
     }
-}
-
-fn read_device_nvml<F, T>(bus_id: &str, name: &'static str, f: F) -> Result<T>
-where
-    T: std::fmt::Debug,
-    F: FnOnce(&nvml_wrapper::Device) -> StdResult<T, NvmlError>,
-{
-    let res = {
-        let nvml = nvml()?;
-        let nvml = nvml.lock();
-        let device = nvml
-            .device_by_pci_bus_id(bus_id)
-            .map_err(|e| Error::nvml_read(e, bus_id, name))?;
-        let r = f(&device);
-        drop(nvml);
-        r.map_err(|e| Error::nvml_read(e, bus_id, name))
-    };
-    #[cfg(feature = "logging")]
-    match &res {
-        Ok(v) => log::debug!("OK nvml r {} {} {:?}", name, bus_id, v),
-        Err(e) => log::warn!("ERR nvml r {} {} {}", name, bus_id, e),
-    }
-    res
-}
-
-fn write_device_nvml<F, T>(bus_id: &str, name: &'static str, f: F) -> Result<T>
-where
-    F: FnOnce(&mut nvml_wrapper::Device) -> StdResult<T, NvmlError>,
-{
-    let res = {
-        let nvml = nvml()?;
-        let nvml = nvml.lock();
-        let mut device = nvml
-            .device_by_pci_bus_id(bus_id)
-            .map_err(|e| Error::nvml_write(e, bus_id, name))?;
-        let r = f(&mut device);
-        drop(nvml);
-        r.map_err(|e| Error::nvml_write(e, bus_id, name))
-    };
-    #[cfg(feature = "logging")]
-    match &res {
-        Ok(_) => log::debug!("OK nvml w {} {}", name, bus_id),
-        Err(e) => log::error!("ERR nvml w {} {} {}", name, bus_id, e),
-    }
-    res
 }
 
 async fn nvml_bus_id(id: u64) -> Result<String> {
@@ -81,10 +36,22 @@ where
     T: std::fmt::Debug + Send + 'static,
     F: FnOnce(&nvml_wrapper::Device) -> StdResult<T, NvmlError> + Send + 'static,
 {
-    let id = nvml_bus_id(id).await?;
-    spawn_blocking(move || read_device_nvml(&id, name, f))
-        .await
-        .unwrap()
+    let bus_id = nvml_bus_id(id).await?;
+    let lock = nvml().await?;
+    let nvml = lock.lock().await;
+    let r = {
+        let device = nvml
+            .device_by_pci_bus_id(bus_id.clone())
+            .map_err(|e| Error::nvml_read(e, &bus_id, name))?;
+        f(&device).map_err(|e| Error::nvml_read(e, &bus_id, name))
+    };
+    drop(nvml);
+    #[cfg(feature = "logging")]
+    match &r {
+        Ok(v) => log::debug!("OK nvml r {} {} {:?}", name, bus_id, v),
+        Err(e) => log::warn!("ERR nvml r {} {} {}", name, bus_id, e),
+    }
+    r
 }
 
 async fn write_device<F, T>(id: u64, name: &'static str, f: F) -> Result<T>
@@ -92,26 +59,35 @@ where
     T: std::fmt::Debug + Send + 'static,
     F: FnOnce(&mut nvml_wrapper::Device) -> StdResult<T, NvmlError> + Send + 'static,
 {
-    let id = nvml_bus_id(id).await?;
-    spawn_blocking(move || write_device_nvml(&id, name, f))
-        .await
-        .unwrap()
+    let bus_id = nvml_bus_id(id).await?;
+    let nvml = nvml().await?;
+    let nvml = nvml.lock().await;
+    let res = {
+        let mut device = nvml
+            .device_by_pci_bus_id(bus_id.clone())
+            .map_err(|e| Error::nvml_write(e, &bus_id, name))?;
+        f(&mut device)
+            .map_err(|e| Error::nvml_write(e, &bus_id, name))
+    };
+    drop(nvml);
+    #[cfg(feature = "logging")]
+    match &res {
+        Ok(_) => log::debug!("OK nvml w {} {}", name, bus_id),
+        Err(e) => log::error!("ERR nvml w {} {} {}", name, bus_id, e),
+    }
+    res
 }
 
 pub async fn available() -> Result<bool> {
-    Ok(spawn_blocking(|| nvml().is_ok()).await.unwrap())
+    Ok(nvml().await.is_ok())
 }
 
 pub async fn exists(id: u64) -> Result<bool> {
-    fn exists(bus_id: &str) -> Result<bool> {
-        let nvml = nvml()?;
-        let nvml = nvml.lock();
-        let r = nvml.device_by_pci_bus_id(bus_id);
-        Ok(r.is_ok())
-    }
-
     let bus_id = nvml_bus_id(id).await?;
-    spawn_blocking(move || exists(&bus_id)).await.unwrap()
+    let nvml = nvml().await?;
+    let nvml = nvml.lock().await;
+    let r = nvml.device_by_pci_bus_id(bus_id);
+    Ok(r.is_ok())
 }
 
 pub fn ids() -> impl Stream<Item = Result<u64>> {

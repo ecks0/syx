@@ -11,9 +11,7 @@ default = []
 logging = ["log", "nix"]
 nvml = [
   "nvml-wrapper",
-  "once_cell",
-  "parking_lot",
-  "tokio/rt"
+  "tokio/parking_lot"
 ]
 
 [dependencies]
