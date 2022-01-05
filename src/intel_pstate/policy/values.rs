@@ -1,7 +1,7 @@
 use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-use crate::pstate::policy::{self, Cache};
+use crate::intel_pstate::policy::{self, Cache};
 use crate::Result;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]

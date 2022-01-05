@@ -1,9 +1,9 @@
 use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-pub use crate::rapl::available;
-use crate::rapl::constraint::{self, Id, Values};
-use crate::rapl::zone;
+pub use crate::intel_rapl::available;
+use crate::intel_rapl::constraint::{self, Id, Values};
+use crate::intel_rapl::zone;
 use crate::util::cell::Cell;
 use crate::Result;
 
@@ -17,8 +17,8 @@ pub struct Cache {
 }
 
 impl Cache {
-    pub const LONG_TERM: &'static str = crate::rapl::constraint::LONG_TERM;
-    pub const SHORT_TERM: &'static str = crate::rapl::constraint::SHORT_TERM;
+    pub const LONG_TERM: &'static str = crate::intel_rapl::constraint::LONG_TERM;
+    pub const SHORT_TERM: &'static str = crate::intel_rapl::constraint::SHORT_TERM;
 
     pub fn available() -> impl Future<Output = Result<bool>> {
         constraint::available()

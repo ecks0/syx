@@ -6,10 +6,10 @@ use async_stream::stream;
 use futures::pin_mut;
 use futures::stream::{Stream, TryStreamExt as _};
 
-pub use crate::rapl::available;
-pub use crate::rapl::constraint::cache::Cache;
-pub use crate::rapl::constraint::values::Values;
-use crate::rapl::zone::{ids as zone_ids, Id as ZoneId};
+pub use crate::intel_rapl::available;
+pub use crate::intel_rapl::constraint::cache::Cache;
+pub use crate::intel_rapl::constraint::values::Values;
+use crate::intel_rapl::zone::{ids as zone_ids, Id as ZoneId};
 use crate::util::sysfs;
 use crate::Result;
 

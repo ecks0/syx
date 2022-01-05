@@ -1,6 +1,6 @@
 use futures::Future;
 
-use crate::pstate::system::{self, Values};
+use crate::intel_pstate::system::{self, Values};
 use crate::util::cell::Cell;
 use crate::Result;
 

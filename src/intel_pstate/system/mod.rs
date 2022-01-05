@@ -2,9 +2,9 @@ mod cache;
 pub(crate) mod path;
 mod values;
 
-pub use crate::pstate::available;
-pub use crate::pstate::system::cache::Cache;
-pub use crate::pstate::system::values::Values;
+pub use crate::intel_pstate::available;
+pub use crate::intel_pstate::system::cache::Cache;
+pub use crate::intel_pstate::system::values::Values;
 use crate::util::sysfs;
 use crate::Result;
 

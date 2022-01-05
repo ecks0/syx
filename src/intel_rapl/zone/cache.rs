@@ -1,7 +1,7 @@
 use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-use crate::rapl::zone::{self, Id, Values};
+use crate::intel_rapl::zone::{self, Id, Values};
 use crate::util::cell::Cell;
 use crate::Result;
 

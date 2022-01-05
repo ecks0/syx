@@ -1,6 +1,6 @@
 use futures::Future;
 
-use crate::pstate::system::{self, Cache};
+use crate::intel_pstate::system::{self, Cache};
 use crate::Result;
 
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]

@@ -2,10 +2,10 @@ pub mod cpu;
 pub mod cpufreq;
 pub mod drm;
 pub mod i915;
+pub mod intel_pstate;
+pub mod intel_rapl;
 #[cfg(feature = "nvml")]
 pub mod nvml;
-pub mod pstate;
-pub mod rapl;
 mod util;
 
 use std::fmt::Display;

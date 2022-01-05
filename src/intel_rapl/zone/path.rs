@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-pub(crate) use crate::rapl::path::{package, root, subzone};
-use crate::rapl::zone::Id;
+pub(crate) use crate::intel_rapl::path::{package, root, subzone};
+use crate::intel_rapl::zone::Id;
 
 pub(crate) fn zone_attr(id: Id, a: &str) -> PathBuf {
-    use crate::rapl::path::zone_attr;
+    use crate::intel_rapl::path::zone_attr;
     zone_attr(id.package, id.subzone, a)
 }
 

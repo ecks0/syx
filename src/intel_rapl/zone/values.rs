@@ -1,7 +1,7 @@
 use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-use crate::rapl::zone::{self, Cache, Id};
+use crate::intel_rapl::zone::{self, Cache, Id};
 use crate::Result;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]

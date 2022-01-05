@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use crate::rapl::constraint::Id;
+use crate::intel_rapl::constraint::Id;
 
 pub(crate) fn constraint_attr(id: Id, a: &str) -> PathBuf {
-    use crate::rapl::path::zone_attr;
+    use crate::intel_rapl::path::zone_attr;
     zone_attr(
         id.package,
         id.subzone,

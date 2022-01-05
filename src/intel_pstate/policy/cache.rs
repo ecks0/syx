@@ -1,7 +1,7 @@
 use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-use crate::pstate::policy::{self, Values};
+use crate::intel_pstate::policy::{self, Values};
 use crate::util::cell::Cell;
 use crate::Result;
 
