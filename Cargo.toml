@@ -1,6 +1,6 @@
 [package]
 name = "syx"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 homepage = "https://github.com/ecks0/syx"
 license = "MIT"
@@ -22,7 +22,7 @@ log = { version = "~0.4", optional = true }
 nix = { version = "~0.23", optional = true }
 nvml-wrapper = { version = "~0.7", optional = true }
 once_cell = { version = "~1.9", optional = true }
-parking_lot = "~0.11"
+parking_lot = { version = "~0.11", features = ["send_guard"] }
 thiserror = "~1.0"
 
 [dependencies.tokio]
