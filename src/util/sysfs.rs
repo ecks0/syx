@@ -138,17 +138,17 @@ fn handle_read<T: Debug>(path: &Path, result: StdResult<T, IoError>) -> Result<T
     #[cfg(feature = "logging")]
     match &result {
         Ok(v) => {
-            log::debug!("OK sysfs r {} {:?}", path.display(), v);
+            log::trace!("OK sysfs r {} {:?}", path.display(), v);
         },
         Err(e) => {
             if let Some(errno) = e.raw_os_error() {
-                log::warn!(
+                log::trace!(
                     "ERR sysfs r {:?} {}",
                     nix::errno::Errno::from_i32(errno),
                     path.display()
                 );
             } else {
-                log::error!("ERR sysfs r {} {}", path.display(), e);
+                log::trace!("ERR sysfs r {} {}", path.display(), e);
             }
         },
     }
@@ -159,18 +159,18 @@ fn handle_write<T, S: Display>(path: &Path, result: StdResult<T, IoError>, _valu
     #[cfg(feature = "logging")]
     match &result {
         Ok(_) => {
-            log::debug!("OK sysfs w {} {}", path.display(), _value);
+            log::trace!("OK sysfs w {} {}", path.display(), _value);
         },
         Err(e) => {
             if let Some(errno) = e.raw_os_error() {
-                log::error!(
+                log::trace!(
                     "ERR sysfs w {:?} {} {}",
                     nix::errno::Errno::from_i32(errno),
                     path.display(),
                     _value,
                 );
             } else {
-                log::error!("ERR sysfs w {} {} {}", path.display(), _value, e);
+                log::trace!("ERR sysfs w {} {} {}", path.display(), _value, e);
             }
         },
     }

@@ -18,22 +18,22 @@ pub async fn exists(id: u64) -> Result<bool> {
 }
 
 pub fn ids() -> impl Stream<Item = Result<u64>> {
-    sysfs::read_ids(&path::root(), "cpu")
+    present_ids()
 }
 
-pub fn ids_online() -> impl Stream<Item = Result<u64>> {
+pub fn online_ids() -> impl Stream<Item = Result<u64>> {
     sysfs::read_indices(&path::ids_online())
 }
 
-pub fn ids_offline() -> impl Stream<Item = Result<u64>> {
+pub fn offline_ids() -> impl Stream<Item = Result<u64>> {
     sysfs::read_indices(&path::ids_offline())
 }
 
-pub fn ids_present() -> impl Stream<Item = Result<u64>> {
+pub fn present_ids() -> impl Stream<Item = Result<u64>> {
     sysfs::read_indices(&path::ids_present())
 }
 
-pub fn ids_possible() -> impl Stream<Item = Result<u64>> {
+pub fn possible_ids() -> impl Stream<Item = Result<u64>> {
     sysfs::read_indices(&path::ids_possible())
 }
 

@@ -22,6 +22,18 @@ impl Values {
         cpu::ids()
     }
 
+    pub fn online_ids() -> impl Stream<Item = Result<u64>> {
+        cpu::online_ids()
+    }
+
+    pub fn offline_ids() -> impl Stream<Item = Result<u64>> {
+        cpu::offline_ids()
+    }
+
+    pub fn present_ids() -> impl Stream<Item = Result<u64>> {
+        cpu::present_ids()
+    }
+
     pub fn all() -> impl Stream<Item = Result<Self>> {
         cpu::ids().map_ok(Self::new)
     }
