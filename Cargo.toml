@@ -3,8 +3,8 @@ name = "syx"
 version = "0.6.1"
 edition = "2021"
 homepage = "https://github.com/ecks0/syx"
-license = "MIT"
 authors = ["eckso <eckso@eckso.io>"]
+license = "MIT OR Apache-2.0"
 
 [features]
 default = []
