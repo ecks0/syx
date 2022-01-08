@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::fmt::Debug;
 
 use futures::Future;
 use tokio::sync::Mutex;
@@ -8,14 +9,14 @@ use crate::Result;
 #[derive(Clone, Debug)]
 pub(crate) struct Cell<T>
 where
-    T: Clone + Send + 'static,
+    T: Clone + Debug + Send + 'static,
 {
     cell: Arc<Mutex<Option<T>>>,
 }
 
 impl<T> Cell<T>
 where
-    T: Clone + Send + 'static,
+    T: Clone + Debug + Send + 'static,
 {
     pub(crate) async fn get_or_load<F>(&self, f: F) -> Result<T>
     where
@@ -23,9 +24,17 @@ where
     {
         let mut value = self.cell.lock().await;
         if let Some(v) = value.clone() {
+            #[cfg(feature = "logging")]
+            log::trace!("OK cache HIT {:?}", v);
             Ok(v)
         } else {
-            let v = f.await?;
+            let v = f.await;
+            #[cfg(feature = "logging")]
+            match &v {
+                Ok(v) => log::trace!("OK cache MISS {:?}", v),
+                Err(e) => log::trace!("ERR cache {}", e.to_string()),
+            }
+            let v = v?;
             value.replace(v.clone());
             Ok(v)
         }
@@ -51,7 +60,7 @@ where
 
 impl<T> Default for Cell<T>
 where
-    T: Clone + Send + 'static,
+    T: Clone + Debug + Send + 'static,
 {
     fn default() -> Self {
         let cell = Arc::new(Mutex::new(None));
