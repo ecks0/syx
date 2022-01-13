@@ -1,6 +1,9 @@
 use futures::Future;
 
-use crate::intel_pstate::system::{self, Cache};
+use crate::intel_pstate::system;
+#[cfg(feature = "cache")]
+use crate::intel_pstate::system::Cache;
+
 use crate::Result;
 
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
@@ -48,12 +51,14 @@ impl Values {
     }
 }
 
+#[cfg(feature = "cache")]
 impl From<Cache> for Values {
     fn from(_: Cache) -> Self {
         Self::default()
     }
 }
 
+#[cfg(feature = "cache")]
 impl From<&Cache> for Values {
     fn from(_: &Cache) -> Self {
         Self::default()

@@ -1,7 +1,9 @@
 use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-use crate::drm::{self, Cache};
+use crate::drm;
+#[cfg(feature = "cache")]
+use crate::drm::Cache;
 use crate::{BusId, Result};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
@@ -43,12 +45,14 @@ impl Values {
     }
 }
 
+#[cfg(feature = "cache")]
 impl From<Cache> for Values {
     fn from(v: Cache) -> Self {
         Self::new(v.id())
     }
 }
 
+#[cfg(feature = "cache")]
 impl From<&Cache> for Values {
     fn from(v: &Cache) -> Self {
         Self::new(v.id())

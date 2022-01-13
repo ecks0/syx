@@ -1,3 +1,4 @@
+#[cfg(feature = "cache")]
 mod cache;
 mod values;
 
@@ -10,6 +11,7 @@ use nvml_wrapper::error::NvmlError;
 use nvml_wrapper::NVML;
 use tokio::sync::{Mutex, OnceCell};
 
+#[cfg(feature = "cache")]
 pub use crate::nvml::cache::Cache;
 pub use crate::nvml::values::Values;
 use crate::{drm, Error, Result};

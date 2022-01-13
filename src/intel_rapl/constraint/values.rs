@@ -2,7 +2,10 @@ use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
 pub use crate::intel_rapl::available;
-use crate::intel_rapl::constraint::{self, Cache, Id};
+use crate::intel_rapl::constraint::{self, Id};
+#[cfg(feature = "cache")]
+use crate::intel_rapl::constraint::Cache;
+
 use crate::intel_rapl::zone;
 use crate::Result;
 
@@ -84,12 +87,14 @@ impl Values {
     }
 }
 
+#[cfg(feature = "cache")]
 impl From<Cache> for Values {
     fn from(v: Cache) -> Self {
         Self::new(v.id())
     }
 }
 
+#[cfg(feature = "cache")]
 impl From<&Cache> for Values {
     fn from(v: &Cache) -> Self {
         Self::new(v.id())

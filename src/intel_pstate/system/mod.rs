@@ -1,8 +1,10 @@
+#[cfg(feature = "cache")]
 mod cache;
 pub(crate) mod path;
 mod values;
 
 pub use crate::intel_pstate::available;
+#[cfg(feature = "cache")]
 pub use crate::intel_pstate::system::cache::Cache;
 pub use crate::intel_pstate::system::values::Values;
 use crate::util::sysfs;

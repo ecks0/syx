@@ -1,3 +1,4 @@
+#[cfg(feature = "cache")]
 mod cache;
 pub(crate) mod path;
 mod values;
@@ -6,6 +7,7 @@ use async_stream::try_stream;
 use futures::stream::{Stream, TryStreamExt as _};
 
 pub use crate::intel_rapl::available;
+#[cfg(feature = "cache")]
 pub use crate::intel_rapl::zone::cache::Cache;
 pub use crate::intel_rapl::zone::values::Values;
 use crate::util::sysfs;

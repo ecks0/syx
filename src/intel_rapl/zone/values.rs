@@ -1,7 +1,10 @@
 use futures::stream::{Stream, TryStreamExt as _};
 use futures::Future;
 
-use crate::intel_rapl::zone::{self, Cache, Id};
+use crate::intel_rapl::zone::{self, Id};
+#[cfg(feature = "cache")]
+use crate::intel_rapl::zone::Cache;
+
 use crate::Result;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
@@ -55,12 +58,14 @@ impl Values {
     }
 }
 
+#[cfg(feature = "cache")]
 impl From<Cache> for Values {
     fn from(v: Cache) -> Self {
         Self::new(v.id())
     }
 }
 
+#[cfg(feature = "cache")]
 impl From<&Cache> for Values {
     fn from(v: &Cache) -> Self {
         Self::new(v.id())

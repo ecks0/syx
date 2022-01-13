@@ -8,6 +8,7 @@ license = "MIT OR Apache-2.0"
 
 [features]
 default = []
+cache = []
 logging = ["log", "nix"]
 nvml = [
   "nvml-wrapper",

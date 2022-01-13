@@ -1,9 +1,11 @@
+#[cfg(feature = "cache")]
 mod cache;
 pub(crate) mod path;
 mod values;
 
 use futures::stream::Stream;
 
+#[cfg(feature = "cache")]
 pub use crate::cpufreq::cache::Cache;
 pub use crate::cpufreq::values::Values;
 use crate::util::sysfs;

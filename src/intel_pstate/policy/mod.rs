@@ -1,9 +1,11 @@
+#[cfg(feature = "cache")]
 pub mod cache;
 pub(crate) mod path;
 pub mod values;
 
 pub use crate::cpufreq::{exists, ids};
 pub use crate::intel_pstate::available;
+#[cfg(feature = "cache")]
 pub use crate::intel_pstate::policy::cache::Cache;
 pub use crate::intel_pstate::policy::values::Values;
 use crate::util::sysfs;

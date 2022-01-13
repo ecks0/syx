@@ -1,3 +1,4 @@
+#[cfg(feature = "cache")]
 mod cache;
 pub(crate) mod path;
 mod values;
@@ -7,6 +8,7 @@ use futures::pin_mut;
 use futures::stream::{Stream, TryStreamExt as _};
 
 pub use crate::intel_rapl::available;
+#[cfg(feature = "cache")]
 pub use crate::intel_rapl::constraint::cache::Cache;
 pub use crate::intel_rapl::constraint::values::Values;
 use crate::intel_rapl::zone::{ids as zone_ids, Id as ZoneId};

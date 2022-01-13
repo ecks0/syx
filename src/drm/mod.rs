@@ -1,3 +1,4 @@
+#[cfg(feature = "cache")]
 mod cache;
 pub(crate) mod path;
 mod values;
@@ -5,6 +6,7 @@ mod values;
 use async_stream::try_stream;
 use futures::stream::{Stream, TryStreamExt as _};
 
+#[cfg(feature = "cache")]
 pub use crate::drm::cache::Cache;
 pub use crate::drm::values::Values;
 use crate::util::sysfs;
