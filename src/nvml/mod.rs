@@ -66,8 +66,7 @@ where
         let mut device = nvml
             .device_by_pci_bus_id(bus_id.clone())
             .map_err(|e| Error::nvml_write(e, &bus_id, name))?;
-        f(&mut device)
-            .map_err(|e| Error::nvml_write(e, &bus_id, name))
+        f(&mut device).map_err(|e| Error::nvml_write(e, &bus_id, name))
     };
     drop(nvml);
     #[cfg(feature = "logging")]

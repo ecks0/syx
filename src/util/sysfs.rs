@@ -101,7 +101,7 @@ pub(crate) async fn read_link_name(path: &Path) -> Result<String> {
         .await?
         .file_name()
         .and_then(|s| s.to_str())
-        .unwrap_or("")
+        .unwrap_or("") // FIXME
         .to_string();
     Ok(val)
 }

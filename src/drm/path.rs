@@ -7,15 +7,11 @@ pub(crate) fn root() -> PathBuf {
 }
 
 pub(crate) fn card(id: u64) -> PathBuf {
-    let mut p = root();
-    p.push(format!("card{}", id));
-    p
+    root().join(&format!("card{}", id))
 }
 
 pub(crate) fn card_attr(id: u64, a: &str) -> PathBuf {
-    let mut p = card(id);
-    p.push(a);
-    p
+    card(id).join(a)
 }
 
 pub(crate) fn device(id: u64) -> PathBuf {
@@ -23,9 +19,7 @@ pub(crate) fn device(id: u64) -> PathBuf {
 }
 
 pub(crate) fn device_attr(id: u64, a: &str) -> PathBuf {
-    let mut p = device(id);
-    p.push(a);
-    p
+    device(id).join(a)
 }
 
 pub(crate) fn subsystem(id: u64) -> PathBuf {

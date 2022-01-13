@@ -5,15 +5,11 @@ pub(crate) fn root() -> PathBuf {
 }
 
 pub(crate) fn policy(id: u64) -> PathBuf {
-    let mut p = root();
-    p.push(&format!("policy{}", id));
-    p
+    root().join(&format!("policy{}", id))
 }
 
 pub(crate) fn policy_attr(i: u64, a: &str) -> PathBuf {
-    let mut p = policy(i);
-    p.push(a);
-    p
+    policy(i).join(a)
 }
 
 pub(crate) fn cpuinfo_max_freq(id: u64) -> PathBuf {

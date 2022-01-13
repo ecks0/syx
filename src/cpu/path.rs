@@ -5,36 +5,30 @@ pub(crate) fn root() -> PathBuf {
 }
 
 pub(crate) fn root_attr(a: &str) -> PathBuf {
-    let mut p = root();
-    p.push(a);
-    p
+    root().join(a)
 }
 
 pub(crate) fn cpu(id: u64) -> PathBuf {
-    let mut p = root();
-    p.push(format!("cpu{}", id));
-    p
+    root_attr(&format!("cpu{}", id))
 }
 
 pub(crate) fn cpu_attr(i: u64, a: &str) -> PathBuf {
-    let mut p = cpu(i);
-    p.push(a);
-    p
+    cpu(i).join(a)
 }
 
-pub(crate) fn ids_online() -> PathBuf {
+pub(crate) fn online_ids() -> PathBuf {
     root_attr("online")
 }
 
-pub(crate) fn ids_offline() -> PathBuf {
+pub(crate) fn offline_ids() -> PathBuf {
     root_attr("offline")
 }
 
-pub(crate) fn ids_present() -> PathBuf {
+pub(crate) fn present_ids() -> PathBuf {
     root_attr("present")
 }
 
-pub(crate) fn ids_possible() -> PathBuf {
+pub(crate) fn possible_ids() -> PathBuf {
     root_attr("possible")
 }
 

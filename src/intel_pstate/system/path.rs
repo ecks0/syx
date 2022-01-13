@@ -5,9 +5,7 @@ pub(crate) fn root() -> PathBuf {
 }
 
 pub(crate) fn root_attr(a: &str) -> PathBuf {
-    let mut p = root();
-    p.push(a);
-    p
+    root().join(a)
 }
 
 pub(crate) fn max_perf_pct() -> PathBuf {

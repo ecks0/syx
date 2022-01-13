@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use futures::Future;
 use tokio::sync::Mutex;

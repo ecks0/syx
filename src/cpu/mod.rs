@@ -22,19 +22,19 @@ pub fn ids() -> impl Stream<Item = Result<u64>> {
 }
 
 pub fn online_ids() -> impl Stream<Item = Result<u64>> {
-    sysfs::read_indices(&path::ids_online())
+    sysfs::read_indices(&path::online_ids())
 }
 
 pub fn offline_ids() -> impl Stream<Item = Result<u64>> {
-    sysfs::read_indices(&path::ids_offline())
+    sysfs::read_indices(&path::offline_ids())
 }
 
 pub fn present_ids() -> impl Stream<Item = Result<u64>> {
-    sysfs::read_indices(&path::ids_present())
+    sysfs::read_indices(&path::present_ids())
 }
 
 pub fn possible_ids() -> impl Stream<Item = Result<u64>> {
-    sysfs::read_indices(&path::ids_possible())
+    sysfs::read_indices(&path::possible_ids())
 }
 
 pub async fn online(id: u64) -> Result<bool> {

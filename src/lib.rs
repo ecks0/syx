@@ -1,3 +1,4 @@
+//pub mod amdgpu;
 pub mod cpu;
 pub mod cpufreq;
 pub mod drm;
@@ -9,11 +10,11 @@ pub mod nvml;
 mod util;
 
 use std::fmt::Display;
+pub use std::io::Error as IoError;
 use std::path::PathBuf;
 
 #[cfg(feature = "nvml")]
 pub use nvml_wrapper::error::NvmlError;
-pub use tokio::io::Error as IoError;
 
 #[derive(Clone, Debug)]
 pub enum Op {

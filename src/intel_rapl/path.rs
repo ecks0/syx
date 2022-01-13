@@ -5,9 +5,7 @@ pub(crate) fn root() -> PathBuf {
 }
 
 pub(crate) fn package(package: u64) -> PathBuf {
-    let mut p = root();
-    p.push(&format!("intel-rapl:{}", package));
-    p
+    root().join(&format!("intel-rapl:{}", package))
 }
 
 pub(crate) fn subzone(package_: u64, subzone: u64) -> PathBuf {
@@ -24,7 +22,5 @@ pub(crate) fn zone(package_: u64, subzone_: Option<u64>) -> PathBuf {
 }
 
 pub(crate) fn zone_attr(package: u64, subzone: Option<u64>, a: &str) -> PathBuf {
-    let mut p = zone(package, subzone);
-    p.push(a);
-    p
+    zone(package, subzone).join(a)
 }
